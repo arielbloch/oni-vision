@@ -67,12 +67,16 @@ async function runOnce(reason) {
 // Initial parse on startup.
 runOnce("startup");
 
+// Match a path that contains an `auto_save` segment, on either separator.
+// Used to skip ONI's auto-save directory when the user hasn't opted in.
+const AUTO_SAVE_SEGMENT = /[\\/]auto_save[\\/]/;
+
 // Watch the directory tree for .sav file events. awaitWriteFinish ensures
 // we don't try to parse while the game is still writing.
 const watcher = chokidar.watch(config.saveDir, {
   ignored: config.includeAutoSaves
     ? undefined
-    : (p) => p.includes(`${require_sep()}auto_save${require_sep()}`),
+    : (p) => AUTO_SAVE_SEGMENT.test(p),
   ignoreInitial: true,
   awaitWriteFinish: {
     stabilityThreshold: config.debounceMs,
@@ -92,10 +96,6 @@ watcher.on("error", (err) => {
 });
 
 console.log("[watcher] running. Ctrl-C to stop.");
-
-function require_sep() {
-  return process.platform === "win32" ? "\\" : "/";
-}
 
 // Tidy shutdown.
 function shutdown() {
