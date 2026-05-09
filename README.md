@@ -56,9 +56,19 @@ node src/parse-once.js path/to.sav    # parse a specific file
 └── current.sav        # copy of the parsed source save (handy for re-runs)
 ```
 
-## Smoke test
+## Tests and smoke run
 
-Want to verify everything works without firing up ONI? `npm run smoke` runs the extractor + DB writer against a hand-built mini "save" and prints a few queries. If that passes, the setup is fine end-to-end.
+The regression test suite uses Node's built-in test runner against a hand-built fake save in `test/fixture.js`:
+
+```bash
+npm test
+```
+
+It covers extractor classification (dupes vs critters vs buildings vs world objects), schema-shape consistency between extractors and `db.js`, and end-to-end DB queries.
+
+For a human-readable look at what the extractor produces, `npm run smoke` runs the same fixture through the pipeline and prints row counts plus a handful of representative queries.
+
+Both run in CI on every push (see `.github/workflows/ci.yml`).
 
 ## Configuration
 
@@ -144,17 +154,28 @@ sqlite3 ~/.oni-watcher/output/current.sqlite ".schema"
 ```
 oni-watcher/
 ├── src/
-│   ├── index.js         # daemon entry
+│   ├── index.js         # daemon entry (chokidar watcher inline)
 │   ├── parse-once.js    # one-shot CLI
-│   ├── watcher logic is inline in index.js (chokidar)
-│   ├── pipeline.js      # parse → extract → write
+│   ├── pipeline.js      # parse → extract → write (atomic rename)
 │   ├── parser.js        # wraps oni-save-parser
-│   ├── extractors.js    # SaveGame → row arrays
-│   ├── db.js            # node:sqlite schema + bulk insert
+│   ├── extractors.js    # SaveGame → row arrays (uses behavior constants from oni-save-parser)
+│   ├── db.js            # node:sqlite schema + bulk insert via named-parameter binding
 │   ├── find-latest.js   # newest .sav in tree
-│   └── paths.js         # config + defaults
+│   ├── paths.js         # platform-aware defaults + user config
+│   └── utils.js         # shared JSON serialization helpers
+├── test/
+│   ├── fixture.js       # synthetic SaveGame used by tests + smoke run
+│   ├── extractors.test.js
+│   └── db.test.js
+├── .github/workflows/ci.yml
+├── smoke.mjs            # human-friendly demo run
 ├── config.example.json
 ├── CLAUDE.md
+├── LICENSE              # MIT
 ├── README.md
 └── package.json
 ```
+
+## License
+
+MIT — see `LICENSE`.
