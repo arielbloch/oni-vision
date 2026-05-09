@@ -2,14 +2,15 @@
 
 A small daemon that watches your **Oxygen Not Included** save folder, parses the latest `.sav` file, and writes a SQLite database (plus a JSON sidecar) that **Claude Code** can query token-efficiently.
 
-## Why SQLite, not a giant JSON dump
+Based on https://github.com/RoboPhred/oni-save-parser
 
-A 4 MB ONI save expands to roughly 30–80 MB of JSON. Reading that into Claude's context costs a lot of tokens and most of it is irrelevant to any given question. SQLite lets Claude run targeted queries — `SELECT name, stress FROM duplicants ORDER BY stress DESC` returns one row per dupe, ~200 tokens — and aggregations happen in-engine. For the awkward, non-tabular bits of the save (header, settings, world metadata) we keep a small `current.json` sidecar.
+
 
 ## Requirements
 
 - Node.js **22.5+** (uses the built-in `node:sqlite` module — no native compilation, no `better-sqlite3`).
 - macOS, Linux, or Windows. Default save path is for macOS; see *Configuration* below.
+
 
 ## Install
 
@@ -17,6 +18,7 @@ A 4 MB ONI save expands to roughly 30–80 MB of JSON. Reading that into Claude'
 cd oni-watcher
 npm install
 ```
+
 
 ## Run the watcher
 
