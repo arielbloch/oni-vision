@@ -97,17 +97,18 @@ Specialized tables (use these first — they're indexed and ergonomic):
 
 | Table                    | What                                                                       |
 |--------------------------|----------------------------------------------------------------------------|
-| `save_meta`              | Cycle, base name, dupe count, save version, etc. as key/value pairs.       |
+| `save_meta`              | Cycle, base name, dupe count, save version, **plus `parsed_at` and `source_file`** for staleness checks. Key/value pairs. |
 | `duplicants`             | One row per dupe — name, gender, role, stress/calories/HP/breath/...       |
 | `duplicant_traits`       | dupe → trait id (e.g. `Trait_Sociable`).                                   |
 | `duplicant_skills`       | dupe → mastered skill id.                                                  |
 | `duplicant_attributes`   | dupe → attribute level + experience.                                       |
 | `duplicant_effects`      | dupe → status effect id + time remaining.                                  |
 | `duplicant_amounts`      | dupe → every "amount" (Stress, Calories, ...) in case you want raw access. |
-| `buildings`              | Anything with a `PrimaryElement` — element, units (mass), temperature.     |
-| `storage_contents`       | Items inside a building's `Storage` behavior.                              |
-| `geysers`                | All `GeyserGeneric_*` objects with their roll/configuration values.        |
-| `critters`               | Hatches, dreckos, pacus, pufts, etc. (excluding eggs is left to a filter). |
+| `buildings`              | **Placed structures only** (objects with a `BuildingComplete` behavior). Element, units (mass), temperature. |
+| `world_objects`          | Loose stuff with mass/temp — debris, food, plants, eggs, raw materials lying on the map. Same column shape as `buildings`. |
+| `storage_contents`       | Items inside a `buildings`/`world_objects` row's `Storage` behavior.        |
+| `geysers`                | All geyser/vent/volcano objects. **Note: `*_roll` columns are 0–1 percentiles, not kg/s** — resolving to actual rates requires the library's geyser const-data. |
+| `critters`               | Anything that has a `MinionModifiers` behavior and isn't a Minion — covers all critter species, eggs, and babies, including ones added in future updates. |
 
 Generic fallback (full faith access to anything the parser understands):
 
@@ -120,6 +121,7 @@ Generic fallback (full faith access to anything the parser understands):
 Convenience views:
 
 - `v_resources_in_storage` — element_id → item count + total units across all storage.
+- `v_world_objects_by_element` — element_id → loose-pile count + total units lying on the map.
 - `v_geysers_summary` — geyser type → count.
 - `v_buildings_by_prefab` — prefab → building count.
 
@@ -131,9 +133,11 @@ sqlite3 ~/.oni-watcher/output/current.sqlite ".schema"
 
 ## Caveats
 
-- The library currently advertises support for the **Automation Innovation Update (save version 7.17)** in its README, but the package is on `oni-save-parser@14.x` and tracks newer save formats in practice. If you're on a brand-new ONI patch and parse fails, file an issue upstream at https://github.com/RoboPhred/oni-save-parser.
-- Tile/element-by-cell map data is not exposed in tabular form — that's millions of cells. Use `current.json` or the `buildings` table for material/temperature questions.
-- The `behaviors.template_data` JSON column is a fallback; prefer the typed tables when they cover what you need.
+- `oni-save-parser@14.x` should handle recent ONI saves, but the upstream README is stale (still mentions Automation Innovation, save 7.17). If a brand-new ONI patch breaks parsing, file an issue at https://github.com/RoboPhred/oni-save-parser and bump the package once it's released.
+- Tile/element-by-cell map data is not exposed in tabular form — that's millions of cells. Material/temperature questions about the *map* go through `current.json`'s world section; questions about *placed buildings* go through the `buildings` table; questions about *loose debris and resources* go through `world_objects`.
+- The `behaviors.template_data` and `behaviors.extra_data` columns are stringified JSON. Prefer the typed tables when they cover what you need; reach for `json_extract(template_data, '$.field')` for fields the typed tables don't lift.
+- Geyser output is exposed as the *configuration rolls* (0–1 percentiles), not resolved kg/s rates. Computing actual rates requires looking up the geyser type's base ranges from the library's const-data; not done here yet.
+- DLC content like rockets, planetoids, and clusters (Spaced Out) is reachable through the generic `behaviors` table but does not have its own typed extractor.
 
 ## Project layout
 

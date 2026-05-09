@@ -93,8 +93,27 @@ const fakeSave = {
           rotation: { x: 0, y: 0, z: 0, w: 1 }, folder: 0,
           behaviors: [
             { name: "KPrefabID", templateData: { InstanceID: 7 } },
+            { name: "BuildingComplete", templateData: {} },
             { name: "PrimaryElement", templateData: {
               ElementID: "RefinedMetal", Units: 200, _Temperature: 295.15,
+              diseaseID: "", diseaseCount: 0,
+            }},
+          ],
+        },
+      ],
+    },
+    {
+      // Loose pile of algae lying on the floor — should land in world_objects,
+      // NOT buildings, because it has no BuildingComplete.
+      name: "Algae",
+      gameObjects: [
+        {
+          position: { x: 30, y: 30, z: 0 }, scale: { x: 1, y: 1 },
+          rotation: { x: 0, y: 0, z: 0, w: 1 }, folder: 0,
+          behaviors: [
+            { name: "KPrefabID", templateData: { InstanceID: 100 } },
+            { name: "PrimaryElement", templateData: {
+              ElementID: "Algae", Units: 750, _Temperature: 293,
               diseaseID: "", diseaseCount: 0,
             }},
           ],
@@ -109,6 +128,7 @@ const fakeSave = {
           rotation: { x: 0, y: 0, z: 0, w: 1 }, folder: 0,
           behaviors: [
             { name: "KPrefabID", templateData: { InstanceID: 8 } },
+            { name: "BuildingComplete", templateData: {} },
             { name: "PrimaryElement", templateData: {
               ElementID: "Iron", Units: 100, _Temperature: 295,
               diseaseID: "", diseaseCount: 0,
@@ -168,10 +188,40 @@ const fakeSave = {
         },
       ],
     },
+    {
+      // Pip wasn't in the old hardcoded critter list. The new heuristic
+      // (has MinionModifiers && not a Minion) should still classify it as a
+      // critter and route it into the critters table.
+      name: "Pip",
+      gameObjects: [
+        {
+          position: { x: 33, y: 33, z: 0 }, scale: { x: 1, y: 1 },
+          rotation: { x: 0, y: 0, z: 0, w: 1 }, folder: 0,
+          behaviors: [
+            { name: "KPrefabID", templateData: { InstanceID: 200 } },
+            { name: "PrimaryElement", templateData: {
+              ElementID: "Creature", Units: 1, _Temperature: 295,
+              diseaseID: "", diseaseCount: 0,
+            }},
+            { name: "MinionModifiers", templateData: {}, extraData: {
+              amounts: [
+                { name: "Calories", value: { value: 50000 } },
+                { name: "Age", value: { value: 30 } },
+              ],
+              sicknesses: [],
+            }},
+          ],
+        },
+      ],
+    },
   ],
 };
 
+// Pipeline simulates pipeline.js for the smoke test by stamping parsed_at.
 const tables = extractAll(fakeSave);
+tables.save_meta.push({ key: "parsed_at", value: new Date().toISOString() });
+tables.save_meta.push({ key: "source_file", value: "<smoke-test>" });
+
 console.log("Row counts:");
 for (const [k, v] of Object.entries(tables)) console.log(`  ${k}: ${v.length}`);
 
@@ -182,16 +232,18 @@ console.log(`Wrote ${dbPath}`);
 
 const db = new DatabaseSync(dbPath);
 const queries = [
-  "SELECT key, value FROM save_meta WHERE key IN ('numberOfCycles','numberOfDuplicants','baseName')",
+  "SELECT key, value FROM save_meta WHERE key IN ('numberOfCycles','numberOfDuplicants','baseName','parsed_at')",
   "SELECT name, ROUND(stress,2) AS stress, current_role FROM duplicants",
   "SELECT trait FROM duplicant_traits",
   "SELECT skill FROM duplicant_skills",
   "SELECT attribute, level FROM duplicant_attributes",
   "SELECT type_id, position_x, position_y FROM geysers",
   "SELECT prefab_id, element_id, units FROM buildings",
+  "SELECT prefab_id, element_id, units FROM world_objects",
   "SELECT building_id, item_prefab_id, element_id, units FROM storage_contents",
   "SELECT prefab_id, calories, age FROM critters",
   "SELECT element_id, total_units FROM v_resources_in_storage",
+  "SELECT element_id, total_units FROM v_world_objects_by_element",
   "SELECT type_id, count FROM v_geysers_summary",
 ];
 for (const q of queries) {

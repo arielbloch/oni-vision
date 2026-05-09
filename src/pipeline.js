@@ -22,6 +22,9 @@ export async function buildOutputs({ savePath, outputDir }) {
   );
 
   const tables = extractAll(save);
+  // Stamp parsing metadata so Claude can detect stale data via SQL.
+  tables.save_meta.push({ key: "parsed_at", value: new Date().toISOString() });
+  tables.save_meta.push({ key: "source_file", value: savePath });
   const tExtracted = Date.now();
   console.log(
     `[pipeline]   extracted ${countRows(tables)} rows across ${Object.keys(tables).length} tables in ${tExtracted - tParsed} ms`

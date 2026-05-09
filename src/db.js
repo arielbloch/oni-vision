@@ -100,6 +100,23 @@ const SCHEMA = [
    )`,
   `CREATE INDEX idx_b_prefab ON buildings(prefab_id)`,
   `CREATE INDEX idx_b_element ON buildings(element_id)`,
+  // world_objects: anything with PrimaryElement that isn't a placed building,
+  // dupe, critter, or geyser. Captures dropped debris, food, plants, eggs,
+  // raw materials, etc. — separate from `buildings` so building counts are
+  // not polluted by every loose lump of algae on the map.
+  `CREATE TABLE world_objects (
+     game_object_id INTEGER PRIMARY KEY,
+     prefab_id TEXT NOT NULL,
+     position_x REAL,
+     position_y REAL,
+     element_id TEXT,
+     units REAL,
+     temperature REAL,
+     disease_id TEXT,
+     disease_count INTEGER
+   )`,
+  `CREATE INDEX idx_wo_prefab ON world_objects(prefab_id)`,
+  `CREATE INDEX idx_wo_element ON world_objects(element_id)`,
   `CREATE TABLE storage_contents (
      building_id INTEGER NOT NULL,
      item_prefab_id TEXT,
@@ -150,6 +167,11 @@ const SCHEMA = [
      SELECT prefab_id, COUNT(*) AS count
      FROM buildings
      GROUP BY prefab_id`,
+  `CREATE VIEW v_world_objects_by_element AS
+     SELECT element_id, COUNT(*) AS items, ROUND(SUM(units), 2) AS total_units
+     FROM world_objects
+     WHERE element_id IS NOT NULL
+     GROUP BY element_id`,
 ];
 
 const INSERTS = {
@@ -164,6 +186,7 @@ const INSERTS = {
   duplicant_effects: `INSERT INTO duplicant_effects(duplicant_id, effect, time_remaining) VALUES (?, ?, ?)`,
   duplicant_amounts: `INSERT INTO duplicant_amounts(duplicant_id, amount_name, value) VALUES (?, ?, ?)`,
   buildings: `INSERT INTO buildings(game_object_id, prefab_id, position_x, position_y, element_id, units, temperature, disease_id, disease_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  world_objects: `INSERT INTO world_objects(game_object_id, prefab_id, position_x, position_y, element_id, units, temperature, disease_id, disease_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   storage_contents: `INSERT INTO storage_contents(building_id, item_prefab_id, element_id, units, temperature, disease_id, disease_count) VALUES (?, ?, ?, ?, ?, ?, ?)`,
   geysers: `INSERT INTO geysers(game_object_id, prefab_id, type_id, rate_roll, iteration_length_roll, iteration_percent_roll, year_length_roll, year_percent_roll, position_x, position_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   critters: `INSERT INTO critters(game_object_id, prefab_id, position_x, position_y, age, calories, hp, happiness, temperature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -192,6 +215,10 @@ const COLUMNS = {
   duplicant_effects: ["duplicant_id", "effect", "time_remaining"],
   duplicant_amounts: ["duplicant_id", "amount_name", "value"],
   buildings: [
+    "game_object_id", "prefab_id", "position_x", "position_y",
+    "element_id", "units", "temperature", "disease_id", "disease_count",
+  ],
+  world_objects: [
     "game_object_id", "prefab_id", "position_x", "position_y",
     "element_id", "units", "temperature", "disease_id", "disease_count",
   ],

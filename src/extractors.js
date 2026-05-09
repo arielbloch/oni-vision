@@ -6,27 +6,41 @@
 // Each behavior has { name, templateData?, extraData?, extraRaw? }.
 //
 // We:
-//   * Always emit a row per game object into `gameObjects`.
+//   * Always emit a row per game object into `game_objects`.
 //   * Always emit a row per behavior into `behaviors` (templateData/extraData
 //     stringified to JSON), so Claude can fall back to raw JSON for anything
 //     we don't have a typed extractor for.
 //   * Specialized extractors lift the most-asked-about fields into typed
-//     tables: duplicants + their traits/skills/attributes/effects/amounts,
-//     buildings + storage_contents, geysers, critters.
+//     tables. Classification:
+//       - Minion prefab                -> duplicants + traits/skills/...
+//       - Has MinionModifiers behavior -> critters (covers all critter types
+//         + their eggs + babies, robust against new ONI updates)
+//       - Prefab starts with "Geyser"  -> geysers
+//       - Has BuildingComplete         -> buildings (placed structures)
+//       - Has PrimaryElement only      -> world_objects (debris, food,
+//         dropped items, plants, raw materials)
+
+import {
+  KPrefabIDBehavior,
+  MinionIdentityBehavior,
+  MinionResumeBehavior,
+  MinionModifiersBehavior,
+  AIAttributeLevelsBehavior,
+  AITraitsBehavior,
+  AIEffectsBehavior,
+  PrimaryElementBehavior,
+  StorageBehavior,
+  GeyserBehavior,
+} from "oni-save-parser";
+
+import { safeStringify } from "./utils.js";
 
 const PREFAB_DUPLICANT = "Minion";
-const BEHAVIOR_KPREFAB = "KPrefabID";
-const BEHAVIOR_MINION_IDENTITY = "MinionIdentity";
-const BEHAVIOR_MINION_RESUME = "MinionResume";
-const BEHAVIOR_MINION_MODIFIERS = "MinionModifiers";
-const BEHAVIOR_MODIFIERS = "Klei.AI.Modifiers";
-const BEHAVIOR_ATTR_LEVELS = "Klei.AI.AttributeLevels";
-const BEHAVIOR_TRAITS = "Klei.AI.Traits";
-const BEHAVIOR_EFFECTS = "Klei.AI.Effects";
-const BEHAVIOR_PRIMARY_ELEMENT = "PrimaryElement";
-const BEHAVIOR_STORAGE = "Storage";
-const BEHAVIOR_GEYSER = "Geyser";
-const BEHAVIOR_HEALTH = "Health";
+
+// `BuildingComplete` is not exported by oni-save-parser as a typed
+// behavior constant, so it stays as a string literal here. If the library
+// ever adds an export for it we should switch to that.
+const BEHAVIOR_BUILDING_COMPLETE = "BuildingComplete";
 
 /** Pick the first behavior with a matching name; returns undefined if absent. */
 function findBehavior(go, name) {
@@ -34,40 +48,19 @@ function findBehavior(go, name) {
   return go.behaviors.find((b) => b.name === name);
 }
 
+function hasBehavior(go, name) {
+  return findBehavior(go, name) !== undefined;
+}
+
 function getInstanceId(go) {
-  const b = findBehavior(go, BEHAVIOR_KPREFAB);
+  const b = findBehavior(go, KPrefabIDBehavior);
   const id = b?.templateData?.InstanceID;
   return typeof id === "number" ? id : null;
 }
 
-/** Critter detection: prefabs in the known critter list. */
-const CRITTER_PREFABS = new Set([
-  "Hatch", "HatchHard", "HatchVeggie", "HatchEgg", "HatchHardEgg", "HatchVeggieEgg",
-  "Drecko", "DreckoBaby", "DreckoEgg", "DreckoPlastic", "DreckoPlasticEgg",
-  "Pacu", "PacuBaby", "PacuEgg", "PacuTropical", "PacuTropicalBaby", "PacuTropicalEgg",
-  "PacuCleaner", "PacuCleanerBaby",
-  "Puft", "PuftBaby", "PuftEgg", "PuftAlpha",
-  "Oilfloater", "OilfloaterDecor", "OilfloaterHighTemp",
-  "ColdBreather", "ColdBreatherSeed",
-  "Glom", "LightBug",
-]);
-
 /** Geysers all start with this prefix in ONI. */
 function isGeyserPrefab(name) {
-  return typeof name === "string" && name.startsWith("GeyserGeneric");
-}
-
-/** Stringify safely — circular references replaced with [Circular]. */
-function safeStringify(value) {
-  const seen = new WeakSet();
-  return JSON.stringify(value, (_k, v) => {
-    if (typeof v === "bigint") return v.toString();
-    if (typeof v === "object" && v !== null) {
-      if (seen.has(v)) return "[Circular]";
-      seen.add(v);
-    }
-    return v;
-  });
+  return typeof name === "string" && name.startsWith("Geyser");
 }
 
 export function extractAll(save) {
@@ -83,6 +76,7 @@ export function extractAll(save) {
     duplicant_effects: [],
     duplicant_amounts: [],
     buildings: [],
+    world_objects: [],
     storage_contents: [],
     geysers: [],
     critters: [],
@@ -147,16 +141,20 @@ export function extractAll(save) {
         });
       }
 
-      // Specialized extraction.
+      // Specialized extraction. Order matters: a Minion has MinionModifiers
+      // too, so check duplicant before critter. A geyser has no
+      // MinionModifiers and no BuildingComplete, so order with critters and
+      // buildings doesn't matter.
       if (prefabId === PREFAB_DUPLICANT) {
         extractDuplicant(go, goId, instanceId, tables);
+      } else if (hasBehavior(go, MinionModifiersBehavior)) {
+        extractCritter(go, goId, prefabId, tables);
       } else if (isGeyserPrefab(prefabId)) {
         extractGeyser(go, goId, prefabId, tables);
-      } else if (CRITTER_PREFABS.has(prefabId)) {
-        extractCritter(go, goId, prefabId, tables);
-      } else {
-        // Anything else with a Storage or PrimaryElement+building shape.
-        extractBuildingMaybe(go, goId, prefabId, tables);
+      } else if (hasBehavior(go, BEHAVIOR_BUILDING_COMPLETE)) {
+        extractBuilding(go, goId, prefabId, tables);
+      } else if (hasBehavior(go, PrimaryElementBehavior) || hasBehavior(go, StorageBehavior)) {
+        extractWorldObject(go, goId, prefabId, tables);
       }
     }
   }
@@ -165,9 +163,9 @@ export function extractAll(save) {
 }
 
 function extractDuplicant(go, goId, instanceId, tables) {
-  const identity = findBehavior(go, BEHAVIOR_MINION_IDENTITY)?.templateData ?? {};
-  const resume = findBehavior(go, BEHAVIOR_MINION_RESUME)?.templateData ?? {};
-  const minionMods = findBehavior(go, BEHAVIOR_MINION_MODIFIERS)?.extraData;
+  const identity = findBehavior(go, MinionIdentityBehavior)?.templateData ?? {};
+  const resume = findBehavior(go, MinionResumeBehavior)?.templateData ?? {};
+  const minionMods = findBehavior(go, MinionModifiersBehavior)?.extraData;
   const amounts = minionMods?.amounts ?? [];
 
   // Pull common amounts by name. Names are not localized — they're internal IDs.
@@ -200,7 +198,7 @@ function extractDuplicant(go, goId, instanceId, tables) {
     body_temperature: amountByName.BodyTemperature ?? null,
   });
 
-  for (const trait of findBehavior(go, BEHAVIOR_TRAITS)?.templateData?.TraitIds ?? []) {
+  for (const trait of findBehavior(go, AITraitsBehavior)?.templateData?.TraitIds ?? []) {
     tables.duplicant_traits.push({ duplicant_id: goId, trait });
   }
 
@@ -209,7 +207,7 @@ function extractDuplicant(go, goId, instanceId, tables) {
     if (mastered) tables.duplicant_skills.push({ duplicant_id: goId, skill: skillId });
   }
 
-  for (const lvl of findBehavior(go, BEHAVIOR_ATTR_LEVELS)?.templateData?.saveLoadLevels ?? []) {
+  for (const lvl of findBehavior(go, AIAttributeLevelsBehavior)?.templateData?.saveLoadLevels ?? []) {
     tables.duplicant_attributes.push({
       duplicant_id: goId,
       attribute: lvl.attributeId,
@@ -218,7 +216,7 @@ function extractDuplicant(go, goId, instanceId, tables) {
     });
   }
 
-  for (const eff of findBehavior(go, BEHAVIOR_EFFECTS)?.templateData?.saveLoadEffects ?? []) {
+  for (const eff of findBehavior(go, AIEffectsBehavior)?.templateData?.saveLoadEffects ?? []) {
     tables.duplicant_effects.push({
       duplicant_id: goId,
       effect: eff.id,
@@ -236,8 +234,11 @@ function extractDuplicant(go, goId, instanceId, tables) {
 }
 
 function extractGeyser(go, goId, prefabId, tables) {
-  const geyser = findBehavior(go, BEHAVIOR_GEYSER)?.templateData ?? {};
+  const geyser = findBehavior(go, GeyserBehavior)?.templateData ?? {};
   const cfg = geyser.configuration ?? {};
+  // Note: rate_roll and *_roll fields are 0..1 percentiles against the
+  // geyser type's base range, NOT actual kg/s. Resolving to a real rate
+  // requires the library's geyser const-data. See README "Caveats".
   tables.geysers.push({
     game_object_id: goId,
     prefab_id: prefabId,
@@ -253,12 +254,12 @@ function extractGeyser(go, goId, prefabId, tables) {
 }
 
 function extractCritter(go, goId, prefabId, tables) {
-  const minionMods = findBehavior(go, BEHAVIOR_MINION_MODIFIERS)?.extraData;
+  const minionMods = findBehavior(go, MinionModifiersBehavior)?.extraData;
   const amountByName = {};
   for (const a of minionMods?.amounts ?? []) {
     amountByName[a.name] = a?.value?.value ?? null;
   }
-  const pe = findBehavior(go, BEHAVIOR_PRIMARY_ELEMENT)?.templateData ?? {};
+  const pe = findBehavior(go, PrimaryElementBehavior)?.templateData ?? {};
   tables.critters.push({
     game_object_id: goId,
     prefab_id: prefabId,
@@ -272,13 +273,10 @@ function extractCritter(go, goId, prefabId, tables) {
   });
 }
 
-function extractBuildingMaybe(go, goId, prefabId, tables) {
-  const pe = findBehavior(go, BEHAVIOR_PRIMARY_ELEMENT)?.templateData;
-  const storage = findBehavior(go, BEHAVIOR_STORAGE);
-  // Only emit a building row if it has a PrimaryElement (most placed objects
-  // do; raw materials and tiles too — we keep them all so resource queries
-  // can aggregate across the world).
-  if (!pe && !storage) return;
+/** Placed structures: anything with a BuildingComplete behavior. */
+function extractBuilding(go, goId, prefabId, tables) {
+  const pe = findBehavior(go, PrimaryElementBehavior)?.templateData;
+  const storage = findBehavior(go, StorageBehavior);
 
   tables.buildings.push({
     game_object_id: goId,
@@ -292,11 +290,37 @@ function extractBuildingMaybe(go, goId, prefabId, tables) {
     disease_count: pe?.diseaseCount ?? null,
   });
 
-  // Storage contents come through the Storage behavior's extraData.
+  emitStorageContents(storage, goId, tables);
+}
+
+/**
+ * Loose stuff with mass/temp but not a placed building: dropped resources,
+ * food items, plants, eggs, debris, raw materials.
+ */
+function extractWorldObject(go, goId, prefabId, tables) {
+  const pe = findBehavior(go, PrimaryElementBehavior)?.templateData;
+  const storage = findBehavior(go, StorageBehavior);
+
+  tables.world_objects.push({
+    game_object_id: goId,
+    prefab_id: prefabId,
+    position_x: go.position?.x ?? null,
+    position_y: go.position?.y ?? null,
+    element_id: pe?.ElementID ?? null,
+    units: pe?.Units ?? null,
+    temperature: pe?._Temperature ?? null,
+    disease_id: pe?.diseaseID ?? null,
+    disease_count: pe?.diseaseCount ?? null,
+  });
+
+  emitStorageContents(storage, goId, tables);
+}
+
+function emitStorageContents(storage, ownerGoId, tables) {
   for (const item of storage?.extraData ?? []) {
-    const itemPE = findBehavior(item, BEHAVIOR_PRIMARY_ELEMENT)?.templateData;
+    const itemPE = findBehavior(item, PrimaryElementBehavior)?.templateData;
     tables.storage_contents.push({
-      building_id: goId,
+      building_id: ownerGoId,
       item_prefab_id: item.name ?? null,
       element_id: itemPE?.ElementID ?? null,
       units: itemPE?.Units ?? null,
