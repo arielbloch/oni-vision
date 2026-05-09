@@ -19,6 +19,11 @@ cd oni-watcher
 npm install
 ```
 
+## Config
+
+* Save files are at
+`/Users/ariel/Library/Application Support/unity.Klei.Oxygen Not Included`
+
 
 ## Run the watcher
 
