@@ -1,0 +1,7 @@
+{
+  "_comment": "Copy to ~/.oni-watcher/config.json. All keys optional; missing keys fall back to defaults in src/paths.js.",
+  "saveDir": "/Users/YOU/Library/Application Support/Klei/OxygenNotIncluded/save_files",
+  "outputDir": "/Users/YOU/.oni-watcher/output",
+  "includeAutoSaves": false,
+  "debounceMs": 1500
+}

@@ -1,0 +1,22 @@
+{
+  "name": "oni-watcher",
+  "version": "0.1.0",
+  "description": "Watches Oxygen Not Included save files, parses them, and writes a SQLite database Claude (or any tool) can query efficiently.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "bin": {
+    "oni-watch": "src/index.js",
+    "oni-parse": "src/parse-once.js"
+  },
+  "scripts": {
+    "start": "node --no-warnings=ExperimentalWarning src/index.js",
+    "parse": "node --no-warnings=ExperimentalWarning src/parse-once.js",
+    "smoke": "node --no-warnings=ExperimentalWarning smoke.mjs"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.0",
+    "oni-save-parser": "^14.0.0"
+  }
+}
