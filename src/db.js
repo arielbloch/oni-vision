@@ -1,6 +1,11 @@
 // SQLite writer using node:sqlite (built into Node 22.5+, no native build).
 // Schema is intentionally flat and indexed on the columns Claude is most
 // likely to filter by.
+//
+// Insert SQL is generated from the column lists in TABLE_COLUMNS, and rows
+// are bound by name (`@col`) — so adding a column means updating exactly
+// one place (the schema CREATE TABLE) and one place (the columns array).
+// We never have to keep INSERT SQL and column order in sync by hand.
 
 import { DatabaseSync } from "node:sqlite";
 
@@ -174,26 +179,10 @@ const SCHEMA = [
      GROUP BY element_id`,
 ];
 
-const INSERTS = {
-  save_meta: `INSERT INTO save_meta(key, value) VALUES (?, ?)`,
-  object_groups: `INSERT INTO object_groups(prefab_id, count) VALUES (?, ?)`,
-  game_objects: `INSERT INTO game_objects(id, instance_id, prefab_id, position_x, position_y, position_z, scale_x, scale_y, folder) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  behaviors: `INSERT INTO behaviors(id, game_object_id, name, template_data, extra_data) VALUES (?, ?, ?, ?, ?)`,
-  duplicants: `INSERT INTO duplicants(game_object_id, instance_id, name, gender, arrival_time, voice_idx, current_role, target_role, total_experience, position_x, position_y, stress, calories, stamina, bladder, breath, hp, decor, immune, temperature_dupe, body_temperature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  duplicant_traits: `INSERT INTO duplicant_traits(duplicant_id, trait) VALUES (?, ?)`,
-  duplicant_skills: `INSERT INTO duplicant_skills(duplicant_id, skill) VALUES (?, ?)`,
-  duplicant_attributes: `INSERT INTO duplicant_attributes(duplicant_id, attribute, level, experience) VALUES (?, ?, ?, ?)`,
-  duplicant_effects: `INSERT INTO duplicant_effects(duplicant_id, effect, time_remaining) VALUES (?, ?, ?)`,
-  duplicant_amounts: `INSERT INTO duplicant_amounts(duplicant_id, amount_name, value) VALUES (?, ?, ?)`,
-  buildings: `INSERT INTO buildings(game_object_id, prefab_id, position_x, position_y, element_id, units, temperature, disease_id, disease_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  world_objects: `INSERT INTO world_objects(game_object_id, prefab_id, position_x, position_y, element_id, units, temperature, disease_id, disease_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  storage_contents: `INSERT INTO storage_contents(building_id, item_prefab_id, element_id, units, temperature, disease_id, disease_count) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  geysers: `INSERT INTO geysers(game_object_id, prefab_id, type_id, rate_roll, iteration_length_roll, iteration_percent_roll, year_length_roll, year_percent_roll, position_x, position_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  critters: `INSERT INTO critters(game_object_id, prefab_id, position_x, position_y, age, calories, hp, happiness, temperature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-};
-
-// Maps the column order in INSERTS to the row-object keys produced by extractors.
-const COLUMNS = {
+// Authoritative column lists. Insert SQL is generated from these so adding a
+// new column means editing exactly two places: the CREATE TABLE in SCHEMA
+// above, and the array below.
+export const TABLE_COLUMNS = {
   save_meta: ["key", "value"],
   object_groups: ["prefab_id", "count"],
   game_objects: [
@@ -238,10 +227,21 @@ const COLUMNS = {
   ],
 };
 
+function buildInsertSql(tableName, cols) {
+  const colList = cols.join(", ");
+  const params = cols.map((c) => `@${c}`).join(", ");
+  return `INSERT INTO ${tableName}(${colList}) VALUES (${params})`;
+}
+
 /** Build a fresh SQLite DB at `path`, populated from extractor output. */
 export function writeDatabase(path, tables) {
   const db = new DatabaseSync(path);
-  // Speed: bulk inserts inside a transaction with WAL off (we're rebuilding).
+  // Speed pragmas for bulk insert. SAFETY NOTE: journal_mode=MEMORY +
+  // synchronous=OFF means a process kill mid-COMMIT can leave the DB
+  // file inconsistent. Pipeline.js mitigates this by writing to a temp
+  // path and atomically rename()-ing into place only after this function
+  // returns; readers never see the temp file. So a crash here just
+  // strands an abandoned tmp file, which is fine.
   db.exec("PRAGMA journal_mode = MEMORY");
   db.exec("PRAGMA synchronous = OFF");
   db.exec("BEGIN");
@@ -249,19 +249,28 @@ export function writeDatabase(path, tables) {
 
   for (const [tableName, rows] of Object.entries(tables)) {
     if (!rows?.length) continue;
-    const sql = INSERTS[tableName];
-    const cols = COLUMNS[tableName];
-    if (!sql || !cols) {
-      throw new Error(`No insert defined for table ${tableName}`);
+    const cols = TABLE_COLUMNS[tableName];
+    if (!cols) {
+      throw new Error(`No column list defined for table ${tableName}`);
     }
-    const stmt = db.prepare(sql);
+    const stmt = db.prepare(buildInsertSql(tableName, cols));
     for (const row of rows) {
-      stmt.run(...cols.map((c) => normalize(row[c])));
+      stmt.run(toBindObject(row, cols));
     }
   }
 
   db.exec("COMMIT");
   db.close();
+}
+
+/**
+ * Build a {@col: value} object suitable for named-parameter binding,
+ * normalizing types that node:sqlite can't bind directly.
+ */
+function toBindObject(row, cols) {
+  const out = {};
+  for (const c of cols) out[c] = normalize(row[c]);
+  return out;
 }
 
 function normalize(value) {

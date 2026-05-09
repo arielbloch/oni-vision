@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { parseSaveFile } from "./parser.js";
 import { extractAll } from "./extractors.js";
 import { writeDatabase } from "./db.js";
+import { makeReplacer } from "./utils.js";
 
 export async function buildOutputs({ savePath, outputDir }) {
   await mkdir(outputDir, { recursive: true });
@@ -49,7 +50,7 @@ export async function buildOutputs({ savePath, outputDir }) {
   };
   await writeFile(
     join(outputDir, "current.json"),
-    JSON.stringify(sidecar, jsonReplacer, 2)
+    JSON.stringify(sidecar, makeReplacer(), 2)
   );
 
   // Also keep a copy of the original .sav we parsed so the user can re-parse
@@ -100,9 +101,3 @@ function stripGameData(gd) {
   return out;
 }
 
-function jsonReplacer(_key, value) {
-  if (typeof value === "bigint") return value.toString();
-  if (value instanceof ArrayBuffer) return `[ArrayBuffer ${value.byteLength}B]`;
-  if (ArrayBuffer.isView(value)) return `[${value.constructor.name} ${value.byteLength}B]`;
-  return value;
-}
