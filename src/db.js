@@ -122,8 +122,12 @@ const SCHEMA = [
    )`,
   `CREATE INDEX idx_wo_prefab ON world_objects(prefab_id)`,
   `CREATE INDEX idx_wo_element ON world_objects(element_id)`,
+  // owner_id references either buildings.game_object_id or
+  // world_objects.game_object_id — whichever object owned the Storage
+  // behavior. It used to be called building_id, but after Wave 1 split
+  // out world_objects from buildings the name was lying.
   `CREATE TABLE storage_contents (
-     building_id INTEGER NOT NULL,
+     owner_id INTEGER NOT NULL,
      item_prefab_id TEXT,
      element_id TEXT,
      units REAL,
@@ -131,7 +135,7 @@ const SCHEMA = [
      disease_id TEXT,
      disease_count INTEGER
    )`,
-  `CREATE INDEX idx_sc_building ON storage_contents(building_id)`,
+  `CREATE INDEX idx_sc_owner ON storage_contents(owner_id)`,
   `CREATE INDEX idx_sc_element ON storage_contents(element_id)`,
   `CREATE TABLE geysers (
      game_object_id INTEGER PRIMARY KEY,
@@ -212,7 +216,7 @@ export const TABLE_COLUMNS = {
     "element_id", "units", "temperature", "disease_id", "disease_count",
   ],
   storage_contents: [
-    "building_id", "item_prefab_id", "element_id", "units",
+    "owner_id", "item_prefab_id", "element_id", "units",
     "temperature", "disease_id", "disease_count",
   ],
   geysers: [

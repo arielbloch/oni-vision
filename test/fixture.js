@@ -2,6 +2,9 @@
 // Designed to exercise every extractor branch:
 //   - Minion (duplicant)         -> tests duplicant fields + traits/skills/...
 //   - GeyserGeneric_steam        -> tests geyser routing + roll fields
+//   - BigVolcano                 -> tests behavior-based geyser detection
+//                                   (prefab name doesn't start with "Geyser",
+//                                   classification is via the Geyser behavior)
 //   - BatterySmart               -> placed building (has BuildingComplete)
 //   - StorageLocker              -> placed building w/ Storage contents
 //   - loose Algae pile           -> world_object (PrimaryElement, no BuildingComplete)
@@ -83,6 +86,24 @@ export const FAKE_SAVE = {
             { name: "Geyser", templateData: { configuration: {
               typeId: "steam", rateRoll: 0.5, iterationLengthRoll: 0.4,
               iterationPercentRoll: 0.6, yearLengthRoll: 0.5, yearPercentRoll: 0.55,
+            }}},
+          ],
+        },
+      ],
+    },
+    {
+      // Volcano — its prefab name does NOT start with "Geyser", so prefix
+      // detection would miss it. The Geyser behavior is what classifies it.
+      name: "BigVolcano",
+      gameObjects: [
+        {
+          position: { x: 70, y: 80, z: 0 }, scale: { x: 1, y: 1 },
+          rotation: { x: 0, y: 0, z: 0, w: 1 }, folder: 0,
+          behaviors: [
+            { name: "KPrefabID", templateData: { InstanceID: 2 } },
+            { name: "Geyser", templateData: { configuration: {
+              typeId: "big_volcano", rateRoll: 0.7, iterationLengthRoll: 0.3,
+              iterationPercentRoll: 0.4, yearLengthRoll: 0.6, yearPercentRoll: 0.5,
             }}},
           ],
         },

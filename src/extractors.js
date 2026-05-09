@@ -15,7 +15,9 @@
 //       - Minion prefab                -> duplicants + traits/skills/...
 //       - Has MinionModifiers behavior -> critters (covers all critter types
 //         + their eggs + babies, robust against new ONI updates)
-//       - Prefab starts with "Geyser"  -> geysers
+//       - Has Geyser behavior          -> geysers (covers vanilla geysers,
+//         vents, AND volcanoes — anything Klei wires the Geyser behavior
+//         onto, regardless of prefab name)
 //       - Has BuildingComplete         -> buildings (placed structures)
 //       - Has PrimaryElement only      -> world_objects (debris, food,
 //         dropped items, plants, raw materials)
@@ -56,11 +58,6 @@ function getInstanceId(go) {
   const b = findBehavior(go, KPrefabIDBehavior);
   const id = b?.templateData?.InstanceID;
   return typeof id === "number" ? id : null;
-}
-
-/** Geysers all start with this prefix in ONI. */
-function isGeyserPrefab(name) {
-  return typeof name === "string" && name.startsWith("Geyser");
 }
 
 export function extractAll(save) {
@@ -142,14 +139,15 @@ export function extractAll(save) {
       }
 
       // Specialized extraction. Order matters: a Minion has MinionModifiers
-      // too, so check duplicant before critter. A geyser has no
-      // MinionModifiers and no BuildingComplete, so order with critters and
-      // buildings doesn't matter.
+      // too, so check duplicant before critter. Geyser is checked before
+      // building because some geyser-shaped objects (volcanoes) may also
+      // ship a BuildingComplete behavior in some DLC content; the Geyser
+      // behavior is the more-specific signal so it wins.
       if (prefabId === PREFAB_DUPLICANT) {
         extractDuplicant(go, goId, instanceId, tables);
       } else if (hasBehavior(go, MinionModifiersBehavior)) {
         extractCritter(go, goId, prefabId, tables);
-      } else if (isGeyserPrefab(prefabId)) {
+      } else if (hasBehavior(go, GeyserBehavior)) {
         extractGeyser(go, goId, prefabId, tables);
       } else if (hasBehavior(go, BEHAVIOR_BUILDING_COMPLETE)) {
         extractBuilding(go, goId, prefabId, tables);
@@ -320,7 +318,7 @@ function emitStorageContents(storage, ownerGoId, tables) {
   for (const item of storage?.extraData ?? []) {
     const itemPE = findBehavior(item, PrimaryElementBehavior)?.templateData;
     tables.storage_contents.push({
-      building_id: ownerGoId,
+      owner_id: ownerGoId,
       item_prefab_id: item.name ?? null,
       element_id: itemPE?.ElementID ?? null,
       units: itemPE?.Units ?? null,

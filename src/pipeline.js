@@ -4,12 +4,35 @@
 
 import { mkdir, rename, rm, writeFile, copyFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { parseSaveFile } from "./parser.js";
 import { extractAll } from "./extractors.js";
 import { writeDatabase } from "./db.js";
 import { makeReplacer } from "./utils.js";
+
+/**
+ * Write `bytes` (string or Buffer) to `finalPath` atomically: stage to
+ * `finalPath + ".tmp"` first, then rename(2) into place. Readers never see
+ * a partially-written file. If a stale .tmp exists from a previous crashed
+ * run, we remove it first.
+ */
+async function writeAtomic(finalPath, bytes) {
+  const tmp = `${finalPath}.tmp`;
+  if (existsSync(tmp)) await rm(tmp);
+  await writeFile(tmp, bytes);
+  await rename(tmp, finalPath);
+}
+
+/**
+ * Same idea as writeAtomic but for a copy: copy to .tmp, then rename.
+ */
+async function copyAtomic(srcPath, finalPath) {
+  const tmp = `${finalPath}.tmp`;
+  if (existsSync(tmp)) await rm(tmp);
+  await copyFile(srcPath, tmp);
+  await rename(tmp, finalPath);
+}
 
 export async function buildOutputs({ savePath, outputDir }) {
   await mkdir(outputDir, { recursive: true });
@@ -31,7 +54,10 @@ export async function buildOutputs({ savePath, outputDir }) {
     `[pipeline]   extracted ${countRows(tables)} rows across ${Object.keys(tables).length} tables in ${tExtracted - tParsed} ms`
   );
 
-  // Write SQLite to a temp file, then rename.
+  // Write SQLite to a temp file, then rename. Pipeline atomicity matters:
+  // readers (Claude, sqlite3 CLI) can fire at any moment, and we never want
+  // them to see a partially-written file. The same temp+rename pattern is
+  // applied to current.json and current.sav below.
   const dbTmp = join(outputDir, "current.sqlite.tmp");
   const dbFinal = join(outputDir, "current.sqlite");
   if (existsSync(dbTmp)) await rm(dbTmp);
@@ -48,7 +74,7 @@ export async function buildOutputs({ savePath, outputDir }) {
     sourceFile: savePath,
     parsedAt: new Date().toISOString(),
   };
-  await writeFile(
+  await writeAtomic(
     join(outputDir, "current.json"),
     JSON.stringify(sidecar, makeReplacer(), 2)
   );
@@ -56,7 +82,7 @@ export async function buildOutputs({ savePath, outputDir }) {
   // Also keep a copy of the original .sav we parsed so the user can re-parse
   // out-of-band without hunting for it.
   try {
-    await copyFile(savePath, join(outputDir, "current.sav"));
+    await copyAtomic(savePath, join(outputDir, "current.sav"));
   } catch (err) {
     console.warn(`[pipeline]   could not copy original save: ${err.message}`);
   }

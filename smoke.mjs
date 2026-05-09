@@ -34,7 +34,7 @@ const queries = [
   "SELECT type_id, position_x, position_y FROM geysers",
   "SELECT prefab_id, element_id, units FROM buildings",
   "SELECT prefab_id, element_id, units FROM world_objects",
-  "SELECT building_id, item_prefab_id, element_id, units FROM storage_contents",
+  "SELECT owner_id, item_prefab_id, element_id, units FROM storage_contents",
   "SELECT prefab_id, calories, age FROM critters",
   "SELECT element_id, total_units FROM v_resources_in_storage",
   "SELECT element_id, total_units FROM v_world_objects_by_element",

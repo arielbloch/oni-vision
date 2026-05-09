@@ -87,13 +87,13 @@ describe("round-trip queries", () => {
     assert.equal(piles[0].units, 750);
   });
 
-  test("storage_contents joins via building_id", () => {
+  test("storage_contents joins via owner_id (against either buildings or world_objects)", () => {
     const { db } = buildDb();
     const rows = db
       .prepare(
         `SELECT b.prefab_id AS owner, sc.element_id, sc.units
          FROM buildings b
-         JOIN storage_contents sc ON sc.building_id = b.game_object_id`
+         JOIN storage_contents sc ON sc.owner_id = b.game_object_id`
       )
       .all();
     assert.equal(rows.length, 2);

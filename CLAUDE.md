@@ -22,7 +22,7 @@ For one-off ad-hoc questions, prefer narrow projections (`SELECT col1, col2`) an
 - `duplicant_effects(duplicant_id, effect, time_remaining)` — active status effects.
 - `buildings(game_object_id, prefab_id, position_x, position_y, element_id, units, temperature, ...)` — **placed structures only** (objects with `BuildingComplete`). Querying counts here gives you "how many of building X exist", not polluted by debris.
 - `world_objects(game_object_id, prefab_id, ...)` — same column shape as `buildings`. Loose stuff lying on the map: dropped resources, food items, plants, eggs, raw materials. Reach for this when the user asks about *resources on the floor* or *plants*; reach for `buildings` when they ask about *what they've built*.
-- `storage_contents(building_id, item_prefab_id, element_id, units, temperature, ...)` — items inside a building's or world object's `Storage` behavior. `building_id` joins to either `buildings.game_object_id` or `world_objects.game_object_id`.
+- `storage_contents(owner_id, item_prefab_id, element_id, units, temperature, ...)` — items inside a building's or world object's `Storage` behavior. `owner_id` joins to either `buildings.game_object_id` or `world_objects.game_object_id`.
 - `geysers(game_object_id, prefab_id, type_id, rate_roll, year_percent_roll, position_x, position_y, ...)`. **The `*_roll` columns are 0–1 percentiles, not kg/s.** Don't quote them as flow rates.
 - `critters(game_object_id, prefab_id, age, calories, hp, happiness, temperature, ...)`.
 

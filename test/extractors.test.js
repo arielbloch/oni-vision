@@ -45,9 +45,16 @@ describe("classification", () => {
   });
 
   test("GeyserGeneric_steam goes to geysers", () => {
-    assert.equal(tables.geysers.length, 1);
-    assert.equal(tables.geysers[0].type_id, "steam");
-    assert.equal(tables.geysers[0].rate_roll, 0.5);
+    const steam = tables.geysers.find((g) => g.type_id === "steam");
+    assert.ok(steam, "steam geyser should be in geysers");
+    assert.equal(steam.rate_roll, 0.5);
+  });
+
+  test("BigVolcano goes to geysers via behavior detection (prefab name doesn't start with 'Geyser')", () => {
+    const volcano = tables.geysers.find((g) => g.type_id === "big_volcano");
+    assert.ok(volcano, "BigVolcano should be classified as a geyser");
+    assert.equal(volcano.prefab_id, "BigVolcano");
+    assert.equal(volcano.rate_roll, 0.7);
   });
 
   test("BuildingComplete + PrimaryElement -> buildings", () => {
@@ -105,9 +112,9 @@ describe("duplicant detail tables", () => {
 });
 
 describe("storage extraction", () => {
-  test("StorageLocker contents land in storage_contents and reference the building's game_object_id", () => {
+  test("StorageLocker contents land in storage_contents and reference the owner's game_object_id", () => {
     const locker = tables.buildings.find((b) => b.prefab_id === "StorageLocker");
-    const contents = tables.storage_contents.filter((c) => c.building_id === locker.game_object_id);
+    const contents = tables.storage_contents.filter((c) => c.owner_id === locker.game_object_id);
     assert.equal(contents.length, 2);
     const byElement = Object.fromEntries(contents.map((c) => [c.element_id, c]));
     assert.equal(byElement.Algae.units, 500);
@@ -118,8 +125,8 @@ describe("storage extraction", () => {
 
 describe("generic fallback tables", () => {
   test("every game object emits a row in game_objects", () => {
-    // 7 groups, 1 object each in this fixture.
-    assert.equal(tables.game_objects.length, 7);
+    // 8 groups, 1 object each in this fixture.
+    assert.equal(tables.game_objects.length, 8);
   });
 
   test("behaviors are JSON-stringified into the behaviors table", () => {

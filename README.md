@@ -4,13 +4,10 @@ A small daemon that watches your **Oxygen Not Included** save folder, parses the
 
 Based on https://github.com/RoboPhred/oni-save-parser
 
-
-
 ## Requirements
 
 - Node.js **22.5+** (uses the built-in `node:sqlite` module — no native compilation, no `better-sqlite3`).
-- macOS, Linux, or Windows. Default save path is for macOS; see *Configuration* below.
-
+- macOS, Linux, or Windows. See *Configuration* below for the per-platform save path.
 
 ## Install
 
@@ -19,11 +16,32 @@ cd oni-watcher
 npm install
 ```
 
-## Config
+## Configuration
 
-* Save files are at
-`/Users/ariel/Library/Application Support/unity.Klei.Oxygen Not Included`
+Either set env vars, or drop a JSON file at `~/.oni-watcher/config.json` (or `~/.config/oni-watcher/config.json`). See `config.example.json`.
 
+| Key                 | Default (macOS, recent Steam install)                                                            |
+|---------------------|--------------------------------------------------------------------------------------------------|
+| `saveDir`           | `~/Library/Application Support/Klei/OxygenNotIncluded/save_files`                                |
+| `outputDir`         | `~/.oni-watcher/output`                                                                          |
+| `includeAutoSaves`  | `false` (skip files under `auto_save/`)                                                          |
+| `debounceMs`        | `1500` (wait this long after the last write before parsing)                                      |
+
+Env overrides: `ONI_SAVE_DIR`, `ONI_OUTPUT_DIR`.
+
+**Save path by platform:**
+- macOS (recent Steam installs, all users): `/Users/<USERNAME>/Library/Application Support/unity.Klei.Oxygen Not Included`
+- macOS (older Klei layout): `~/Library/Application Support/Klei/OxygenNotIncluded/save_files`
+- Windows: `%USERPROFILE%/Documents/Klei/OxygenNotIncluded/save_files/`
+- Linux: `~/.config/unity3d/Klei/Oxygen Not Included/save_files/`
+
+If your installation lives at the recent-Steam path on macOS, point the watcher at it explicitly:
+
+```bash
+ONI_SAVE_DIR="/Users/<USERNAME>/Library/Application Support/unity.Klei.Oxygen Not Included" npm start
+```
+
+…or add `"saveDir": "/Users/<USERNAME>/Library/Application Support/unity.Klei.Oxygen Not Included"` to `~/.oni-watcher/config.json`.
 
 ## Run the watcher
 
@@ -77,23 +95,6 @@ For a human-readable look at what the extractor produces, `npm run smoke` runs t
 
 Both run in CI on every push (see `.github/workflows/ci.yml`).
 
-## Configuration
-
-Either set env vars, or drop a JSON file at `~/.oni-watcher/config.json` (or `~/.config/oni-watcher/config.json`). See `config.example.json`.
-
-| Key                 | Default (macOS)                                                                              |
-|---------------------|----------------------------------------------------------------------------------------------|
-| `saveDir`           | `~/Library/Application Support/Klei/OxygenNotIncluded/save_files`                            |
-| `outputDir`         | `~/.oni-watcher/output`                                                                      |
-| `includeAutoSaves`  | `false` (skip files under `auto_save/`)                                                      |
-| `debounceMs`        | `1500` (wait this long after the last write before parsing)                                  |
-
-Env overrides: `ONI_SAVE_DIR`, `ONI_OUTPUT_DIR`.
-
-**Other platforms:**
-- Windows: `%USERPROFILE%/Documents/Klei/OxygenNotIncluded/save_files/`
-- Linux: `~/.config/unity3d/Klei/Oxygen Not Included/save_files/`
-
 ## Querying from Claude Code
 
 Drop the contents of `CLAUDE.md` into your project's `CLAUDE.md` (or somewhere Claude reads). It tells Claude where the DB lives and how to query it. Quick taste:
@@ -123,8 +124,8 @@ Specialized tables (use these first — they're indexed and ergonomic):
 | `duplicant_amounts`      | dupe → every "amount" (Stress, Calories, ...) in case you want raw access. |
 | `buildings`              | **Placed structures only** (objects with a `BuildingComplete` behavior). Element, units (mass), temperature. |
 | `world_objects`          | Loose stuff with mass/temp — debris, food, plants, eggs, raw materials lying on the map. Same column shape as `buildings`. |
-| `storage_contents`       | Items inside a `buildings`/`world_objects` row's `Storage` behavior.        |
-| `geysers`                | All geyser/vent/volcano objects. **Note: `*_roll` columns are 0–1 percentiles, not kg/s** — resolving to actual rates requires the library's geyser const-data. |
+| `storage_contents`       | Items inside a `buildings`/`world_objects` row's `Storage` behavior. `owner_id` joins to either table's `game_object_id`. |
+| `geysers`                | All geyser/vent/volcano objects. Classification is by the `Geyser` behavior, not prefab name, so volcanoes and DLC variants are caught too. **Note: `*_roll` columns are 0–1 percentiles, not kg/s** — resolving to actual rates requires the library's geyser const-data. |
 | `critters`               | Anything that has a `MinionModifiers` behavior and isn't a Minion — covers all critter species, eggs, and babies, including ones added in future updates. |
 
 Generic fallback (full faith access to anything the parser understands):
@@ -163,7 +164,7 @@ oni-watcher/
 ├── src/
 │   ├── index.js         # daemon entry (chokidar watcher inline)
 │   ├── parse-once.js    # one-shot CLI
-│   ├── pipeline.js      # parse → extract → write (atomic rename)
+│   ├── pipeline.js      # parse → extract → write (atomic rename for all outputs)
 │   ├── parser.js        # wraps oni-save-parser
 │   ├── extractors.js    # SaveGame → row arrays (uses behavior constants from oni-save-parser)
 │   ├── db.js            # node:sqlite schema + bulk insert via named-parameter binding
