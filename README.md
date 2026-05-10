@@ -101,6 +101,36 @@ npm run parse                         # parse the newest .sav under saveDir
 node src/parse-once.js path/to.sav    # parse a specific file
 ```
 
+## Quick status
+
+After a parse has happened (daemon or one-shot), `npm run status` prints a human-readable snapshot of the colony — base name, cycle, dupe stress bars, geyser breakdown, top stored elements:
+
+```bash
+npm run status
+```
+
+```
+═══ Cosmic Conundrum · cycle 312 ═══════════════════════════════════════
+
+12 duplicants · 4 critters · 7 geysers · 184 buildings
+Parsed 23s ago from my_colony.sav
+
+Geysers
+  steam                    ×2   chlorine_vent           ×1   …
+
+Stockpile (top elements by mass)
+  Algae               12.4 Tkg   in 8 places
+  Water                8.3 Tkg   in 3 places
+  …
+
+Dupes (sorted by stress)
+  Meep         ████████░░ 76.0%   Digger
+  Stinky       ███░░░░░░░ 32.0%   Chef
+  …
+```
+
+The daemon prints the same block automatically after every save.
+
 ## Where output lands
 
 ```
@@ -192,18 +222,24 @@ sqlite3 ~/.oni-watcher/output/current.sqlite ".schema"
 oni-watcher/
 ├── src/
 │   ├── index.js         # daemon entry (chokidar watcher inline)
-│   ├── parse-once.js    # one-shot CLI
+│   ├── parse-once.js    # one-shot parse CLI
 │   ├── pipeline.js      # parse → extract → write (atomic rename for all outputs)
 │   ├── parser.js        # wraps oni-save-parser
 │   ├── extractors.js    # SaveGame → row arrays (uses behavior constants from oni-save-parser)
 │   ├── db.js            # node:sqlite schema + bulk insert via named-parameter binding
 │   ├── find-latest.js   # newest .sav in tree
-│   ├── paths.js         # platform-aware defaults + user config
-│   └── utils.js         # shared JSON serialization helpers
+│   ├── discover.js      # zero-config save-dir auto-detection
+│   ├── paths.js         # platform-aware defaults + user config + discovery fallback
+│   ├── ui.js            # human-readable status renderer
+│   ├── utils.js         # shared JSON serialization helpers
+│   └── cli/
+│       └── status.js    # `npm run status` entry point
 ├── test/
 │   ├── fixture.js       # synthetic SaveGame used by tests + smoke run
+│   ├── discover.test.js
 │   ├── extractors.test.js
-│   └── db.test.js
+│   ├── db.test.js
+│   └── ui.test.js
 ├── .github/workflows/ci.yml
 ├── smoke.mjs            # human-friendly demo run
 ├── config.example.json

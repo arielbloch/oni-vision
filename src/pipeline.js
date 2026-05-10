@@ -6,10 +6,13 @@ import { mkdir, rename, rm, writeFile, copyFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+import { DatabaseSync } from "node:sqlite";
+
 import { parseSaveFile } from "./parser.js";
 import { extractAll } from "./extractors.js";
 import { writeDatabase } from "./db.js";
 import { makeReplacer } from "./utils.js";
+import { render } from "./ui.js";
 
 /**
  * Write `bytes` (string or Buffer) to `finalPath` atomically: stage to
@@ -89,6 +92,22 @@ export async function buildOutputs({ savePath, outputDir }) {
 
   const tDone = Date.now();
   console.log(`[pipeline]   wrote outputs to ${outputDir} in ${tDone - tExtracted} ms (total ${tDone - t0} ms)`);
+
+  // Print a human-readable status block after each successful parse.
+  // Cheap: reads the DB we just wrote. Skipped on errors so a render
+  // bug never breaks the parse pipeline.
+  try {
+    const db = new DatabaseSync(dbFinal, { readOnly: true });
+    const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
+    const width = process.stdout.columns ?? 80;
+    console.log("");
+    console.log(render(db, { color: useColor, width }));
+    console.log("");
+    db.close();
+  } catch (err) {
+    console.warn(`[pipeline]   render skipped: ${err.message}`);
+  }
+
   return { tables, outputDir, savePath };
 }
 
