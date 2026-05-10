@@ -18,30 +18,50 @@ npm install
 
 ## Configuration
 
-Either set env vars, or drop a JSON file at `~/.oni-watcher/config.json` (or `~/.config/oni-watcher/config.json`). See `config.example.json`.
+The watcher reads a single JSON config file. Drop one at `~/.oni-watcher/config.json` (preferred) or `~/.config/oni-watcher/config.json`. All keys are optional; missing keys fall back to platform defaults from `src/paths.js`. There is **no env-var override** — if you want a non-default value, put it in the file.
 
-| Key                 | Default (macOS, recent Steam install)                                                            |
-|---------------------|--------------------------------------------------------------------------------------------------|
-| `saveDir`           | `~/Library/Application Support/Klei/OxygenNotIncluded/save_files`                                |
-| `outputDir`         | `~/.oni-watcher/output`                                                                          |
-| `includeAutoSaves`  | `false` (skip files under `auto_save/`)                                                          |
-| `debounceMs`        | `1500` (wait this long after the last write before parsing)                                      |
+A pre-configured example lives at [`.config-example.json`](.config-example.json). To use it: copy, then replace `<USERNAME>` with your home folder name.
 
-Env overrides: `ONI_SAVE_DIR`, `ONI_OUTPUT_DIR`.
+```bash
+mkdir -p ~/.oni-watcher
+cp .config-example.json ~/.oni-watcher/config.json
+$EDITOR ~/.oni-watcher/config.json
+```
+
+The full sample (a copy of `.config-example.json`):
+
+```json
+{
+  "_comment": "Copy this file to ~/.oni-watcher/config.json (or ~/.config/oni-watcher/config.json) and edit. All keys are optional — any you omit fall back to the platform defaults in src/paths.js. JSON has no comments, so keys starting with '_' are documentation and are ignored at runtime.",
+
+  "_comment_saveDir": "Path to ONI's save_files directory. Recent Steam installs on macOS use the unity.Klei path below — replace <USERNAME> with your home folder name. Older Klei installs on macOS use ~/Library/Application Support/Klei/OxygenNotIncluded/save_files. Windows: %USERPROFILE%/Documents/Klei/OxygenNotIncluded/save_files. Linux: ~/.config/unity3d/Klei/Oxygen Not Included/save_files.",
+  "saveDir": "/Users/<USERNAME>/Library/Application Support/unity.Klei.Oxygen Not Included",
+
+  "_comment_outputDir": "Where current.sqlite, current.json, and current.sav land. Defaults to ~/.oni-watcher/output, which is fine for most setups. Override only if you want the parsed outputs somewhere else (a project folder, a synced drive, etc.). Path must be absolute.",
+  "outputDir": "/Users/<USERNAME>/.oni-watcher/output",
+
+  "_comment_includeAutoSaves": "If true, the watcher reparses every auto_save (ONI auto-saves every cycle by default — that's noisy). Default false: only manual saves trigger a reparse.",
+  "includeAutoSaves": false,
+
+  "_comment_debounceMs": "How long to wait (ms) after the last write to a .sav file before reparsing. Stops us from racing the game while it's still writing. Default 1500 ms is comfortable for save files up to ~10 MB; bump it if you see truncated-file parse errors.",
+  "debounceMs": 1500
+}
+```
+
+Key reference:
+
+| Key                | Type    | Default                                                              |
+|--------------------|---------|----------------------------------------------------------------------|
+| `saveDir`          | string  | platform-dependent — see *Save path by platform* below               |
+| `outputDir`        | string  | `~/.oni-watcher/output`                                              |
+| `includeAutoSaves` | boolean | `false` (skip files under `auto_save/`)                              |
+| `debounceMs`       | number  | `1500` (wait this long after the last write before parsing)          |
 
 **Save path by platform:**
 - macOS (recent Steam installs, all users): `/Users/<USERNAME>/Library/Application Support/unity.Klei.Oxygen Not Included`
 - macOS (older Klei layout): `~/Library/Application Support/Klei/OxygenNotIncluded/save_files`
 - Windows: `%USERPROFILE%/Documents/Klei/OxygenNotIncluded/save_files/`
 - Linux: `~/.config/unity3d/Klei/Oxygen Not Included/save_files/`
-
-If your installation lives at the recent-Steam path on macOS, point the watcher at it explicitly:
-
-```bash
-ONI_SAVE_DIR="/Users/<USERNAME>/Library/Application Support/unity.Klei.Oxygen Not Included" npm start
-```
-
-…or add `"saveDir": "/Users/<USERNAME>/Library/Application Support/unity.Klei.Oxygen Not Included"` to `~/.oni-watcher/config.json`.
 
 ## Run the watcher
 

@@ -2,9 +2,10 @@
 // One-shot parser. Useful for testing or for parsing a specific save file.
 //
 // Usage:
-//   node src/parse-once.js                       # parse latest in default save dir
+//   node src/parse-once.js                       # parse latest in configured save dir
 //   node src/parse-once.js path/to/your.sav      # parse a specific file
-//   ONI_OUTPUT_DIR=./out node src/parse-once.js  # send output elsewhere
+//
+// Configure via ~/.oni-watcher/config.json (see .config-example.json).
 
 import { existsSync } from "node:fs";
 
@@ -12,11 +13,7 @@ import { resolveConfig } from "./paths.js";
 import { findLatestSave } from "./find-latest.js";
 import { buildOutputs } from "./pipeline.js";
 
-const config = resolveConfig({
-  saveDir: process.env.ONI_SAVE_DIR,
-  outputDir: process.env.ONI_OUTPUT_DIR,
-});
-for (const k of Object.keys(config)) if (config[k] === undefined) delete config[k];
+const config = resolveConfig();
 
 const arg = process.argv[2];
 

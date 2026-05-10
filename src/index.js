@@ -3,7 +3,8 @@
 // settle event, finds the newest .sav and re-builds current.sqlite + current.json.
 //
 // Run: npm start
-// Override save dir via ONI_SAVE_DIR env, output dir via ONI_OUTPUT_DIR.
+// Override defaults by dropping a config file at ~/.oni-watcher/config.json
+// (or ~/.config/oni-watcher/config.json). See .config-example.json.
 
 import { existsSync, statSync } from "node:fs";
 import chokidar from "chokidar";
@@ -12,12 +13,7 @@ import { resolveConfig } from "./paths.js";
 import { findLatestSave } from "./find-latest.js";
 import { buildOutputs } from "./pipeline.js";
 
-const config = resolveConfig({
-  saveDir: process.env.ONI_SAVE_DIR,
-  outputDir: process.env.ONI_OUTPUT_DIR,
-});
-// Strip undefined overrides so defaults from paths.js stick.
-for (const k of Object.keys(config)) if (config[k] === undefined) delete config[k];
+const config = resolveConfig();
 
 console.log(`[watcher] save dir:   ${config.saveDir}`);
 console.log(`[watcher] output dir: ${config.outputDir}`);
