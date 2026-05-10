@@ -156,7 +156,9 @@ Both run in CI on every push (see `.github/workflows/ci.yml`).
 
 ## Querying from Claude Code
 
-Drop the contents of `CLAUDE.md` into your project's `CLAUDE.md` (or somewhere Claude reads). It tells Claude where the DB lives and how to query it. Quick taste:
+Two paths, depending on how heavyweight you want to go:
+
+**Drop-in `CLAUDE.md` (lightweight).** Drop the contents of `CLAUDE.md` into your project's `CLAUDE.md` (or somewhere Claude reads). It tells Claude where the DB lives and how to query it raw via the `sqlite3` CLI:
 
 ```bash
 sqlite3 ~/.oni-watcher/output/current.sqlite \
@@ -167,6 +169,8 @@ sqlite3 ~/.oni-watcher/output/current.sqlite \
 sqlite3 ~/.oni-watcher/output/current.sqlite \
   "SELECT type_id, COUNT(*) FROM geysers GROUP BY type_id"
 ```
+
+**MCP plugin (full-fat).** [`oni-watcher-plugin/`](./oni-watcher-plugin) is a Claude Code / Cowork plugin that wraps this DB behind an MCP server. Six typed tools (`oni_save_meta`, `oni_freshness`, `oni_dupes`, `oni_geysers`, `oni_resources`) plus a SELECT-only `oni_query` escape hatch, plus a SKILL.md that teaches the model when to reach for which tool. Read-only, single-statement-only, no need to write SQL by hand. See the plugin's own README for install instructions.
 
 ## Schema overview
 

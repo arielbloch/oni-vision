@@ -1,0 +1,18 @@
+{
+  "name": "oni-watcher",
+  "version": "0.1.0",
+  "description": "Query your live Oxygen Not Included colony save from Claude Code or Cowork. Provides typed read-only tools (dupes, geysers, resources) plus a SQL escape hatch over the SQLite database produced by the oni-watcher daemon.",
+  "author": "Ariel Bloch",
+  "homepage": "https://github.com/ArielBloch/oni-watcher",
+  "license": "MIT",
+  "mcpServers": {
+    "oni-watcher": {
+      "command": "node",
+      "args": ["./mcp/server.js"],
+      "env": {}
+    }
+  },
+  "skills": [
+    "./skills/oni-watcher"
+  ]
+}
