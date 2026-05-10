@@ -13,8 +13,22 @@ import { resolveConfig } from "./paths.js";
 import { findLatestSave } from "./find-latest.js";
 import { buildOutputs } from "./pipeline.js";
 
-const config = resolveConfig();
+const config = await resolveConfig();
 
+if (config._autoDetected?.saveDir) {
+  console.log(`[watcher] auto-detected save dir: ${config.saveDir}`);
+  console.log(
+    `[watcher]   newest save: ${config._autoDetected.sourceFile}` +
+    ` (${new Date(config._autoDetected.mtimeMs).toISOString()})`
+  );
+} else if (config._autoDetected) {
+  // Discovery ran but found nothing.
+  console.warn(
+    `[watcher] no save folder auto-detected. Tried:\n` +
+    config._autoDetected.probed.map((p) => `  - ${p}`).join("\n") +
+    `\nFalling back to platform default: ${config.saveDir}`
+  );
+}
 console.log(`[watcher] save dir:   ${config.saveDir}`);
 console.log(`[watcher] output dir: ${config.outputDir}`);
 console.log(`[watcher] include auto saves: ${config.includeAutoSaves}`);
@@ -23,7 +37,8 @@ console.log(`[watcher] debounce:   ${config.debounceMs} ms`);
 if (!existsSync(config.saveDir)) {
   console.error(
     `[watcher] FATAL: save directory does not exist: ${config.saveDir}\n` +
-    `Set ONI_SAVE_DIR or edit ~/.oni-watcher/config.json to point at the correct folder.`
+    `Drop a config file at ~/.oni-watcher/config.json pointing at the correct folder. ` +
+    `See .config-example.json in the project root for a template.`
   );
   process.exit(1);
 }

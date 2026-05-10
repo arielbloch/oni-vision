@@ -18,6 +18,15 @@ npm install
 
 ## Configuration
 
+**The first run usually needs no config.** On startup, if no config file is present, the watcher probes a list of well-known locations for a `cloud_save_files` or `save_files` folder containing a `.sav`, and picks the most recent one. You'll see a line like:
+
+```
+[watcher] auto-detected save dir: /Users/you/Library/Application Support/unity.Klei.Oxygen Not Included/abc123/save_files
+[watcher]   newest save: .../my_colony.sav (2026-05-09T17:32:11.000Z)
+```
+
+If discovery finds nothing, the daemon prints the candidate paths it tried and falls back to the platform default. At that point you'll want a config file.
+
 The watcher reads a single JSON config file. Drop one at `~/.oni-watcher/config.json` (preferred) or `~/.config/oni-watcher/config.json`. All keys are optional; missing keys fall back to platform defaults from `src/paths.js`. There is **no env-var override** — if you want a non-default value, put it in the file.
 
 A pre-configured example lives at [`.config-example.json`](.config-example.json). To use it: copy, then replace `<USERNAME>` with your home folder name.

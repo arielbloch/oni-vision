@@ -13,7 +13,7 @@ import { resolveConfig } from "./paths.js";
 import { findLatestSave } from "./find-latest.js";
 import { buildOutputs } from "./pipeline.js";
 
-const config = resolveConfig();
+const config = await resolveConfig();
 
 const arg = process.argv[2];
 
@@ -25,8 +25,15 @@ if (arg) {
   }
   savePath = arg;
 } else {
+  if (config._autoDetected?.saveDir) {
+    console.log(`[parse-once] auto-detected save dir: ${config.saveDir}`);
+  }
   if (!existsSync(config.saveDir)) {
-    console.error(`[parse-once] save directory not found: ${config.saveDir}`);
+    console.error(
+      `[parse-once] save directory not found: ${config.saveDir}\n` +
+      `Drop a config file at ~/.oni-watcher/config.json pointing at the correct folder. ` +
+      `See .config-example.json in the project root for a template.`
+    );
     process.exit(1);
   }
   const latest = await findLatestSave(config.saveDir, {
