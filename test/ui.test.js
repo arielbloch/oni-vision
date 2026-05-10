@@ -109,6 +109,53 @@ describe("renderDupes", () => {
     assert.match(out, /12\.5/);
     assert.match(out, /Digger/);
   });
+
+  test("dupes with null stress render an em-dash, not a bogus 0% bar", () => {
+    // Build a DB where the dupe has no stress value. We can do this by
+    // feeding a fixture with no Stress amount.
+    const dir = mkdtempSync(join(tmpdir(), "oni-ui-test-null-"));
+    const dbPath = join(dir, "test.sqlite");
+    const tables = {
+      save_meta: [
+        { key: "baseName", value: "Empty Base" },
+        { key: "numberOfCycles", value: "1" },
+      ],
+      object_groups: [],
+      game_objects: [],
+      behaviors: [],
+      duplicants: [{
+        game_object_id: 1,
+        name: "Stoic",
+        gender: "MALE",
+        arrival_time: 0,
+        voice_idx: 0,
+        current_role: "Researcher",
+        target_role: null,
+        total_experience: 0,
+        position_x: 0, position_y: 0,
+        stress: null, calories: null, stamina: null, bladder: null,
+        breath: null, hp: null, decor: null, immune: null,
+        temperature_dupe: null, body_temperature: null,
+      }],
+      duplicant_traits: [],
+      duplicant_skills: [],
+      duplicant_attributes: [],
+      duplicant_effects: [],
+      duplicant_amounts: [],
+      buildings: [],
+      world_objects: [],
+      storage_contents: [],
+      geysers: [],
+      critters: [],
+    };
+    writeDatabase(dbPath, tables);
+    const db = new DatabaseSync(dbPath);
+    const out = renderDupes(db);
+    // Bar should be a dashed line, not block elements.
+    assert.match(out, /Stoic/);
+    assert.match(out, /─/);
+    assert.doesNotMatch(out, /0\.0%/); // never quote a fake 0% for missing data
+  });
 });
 
 describe("render", () => {

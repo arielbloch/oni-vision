@@ -2,7 +2,9 @@
 
 This document is the design north star for the next round of features after Wave 5 (config-file-only). Each section is a self-contained mini-design: what we want, the rough shape of the solution, what ships, and what we still need to decide. Pick them up in any order; #1 is the natural next step because it pays off for every other feature.
 
-## 1. Zero-config save-dir discovery
+> **Status (post Wave 11):** all four features are implemented and committed. This doc is kept as the design rationale; the §"Open questions" notes capture the calls actually made during implementation.
+
+## 1. Zero-config save-dir discovery — ✅ implemented (Wave 6)
 
 ### Goal
 A first-time user should be able to run `npm start` with no config file and have the watcher figure out which save folder to watch. No copy-paste from the README, no `<USERNAME>` substitution. If we find a save, we use it; if we find none, we print a clear error with the candidate paths we tried.
@@ -43,7 +45,7 @@ For each root we look for two child folder names: `cloud_save_files` first (Stea
 
 ---
 
-## 2. UX: world summary
+## 2. UX: world summary — ✅ implemented (Wave 7)
 
 ### Goal
 Right now `npm start` prints log lines. After "wrote outputs" we should print a human-readable snapshot of the parsed save: the world name, cycle, dupe count, top stressors, geyser types, etc. The same view should be available as a one-shot CLI (`npm run status`) that reads `current.sqlite` without re-parsing.
@@ -89,7 +91,7 @@ A second pass turns the static print into a `blessed` or `ink`-driven TUI: arrow
 
 ---
 
-## 3. MCP plugin for Claude Code / Cowork
+## 3. MCP plugin for Claude Code / Cowork — ✅ implemented (Wave 8)
 
 ### Goal
 Ship oni-watcher as a Claude plugin so any Claude session (Cowork or Claude Code) can answer "what's going on in my colony" without the user manually piping `sqlite3` queries. The plugin bundles an MCP server that exposes typed tools and a SKILL.md that teaches the model how to use them.
@@ -135,7 +137,7 @@ Modeled on the existing `CLAUDE.md` but reframed for tool use rather than raw SQ
 
 ---
 
-## 4. Professional ONI architect skill
+## 4. Professional ONI architect skill — ✅ implemented (Wave 9)
 
 ### Goal
 A SKILL.md that turns the model into a colony-design-and-debugging copilot for Oxygen Not Included. The data plumbing (Feature 3) tells the model what's in your colony; this skill tells the model what to *do* with that information.

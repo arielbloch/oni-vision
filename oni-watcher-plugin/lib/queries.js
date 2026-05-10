@@ -81,13 +81,20 @@ export function dupes(db, { sort = "stress", limit = 50 } = {}) {
   ]);
   const col = allowed.has(sort) ? sort : "stress";
   const direction = col === "name" ? "ASC" : "DESC";
+  // Project every column the SKILL.md advertises as a sort key. Without
+  // this, sorting by `decor` would silently work but the user couldn't
+  // see the values driving the sort order in the result rows.
   const sql = `
     SELECT name, gender, current_role, target_role,
            ROUND(stress, 2) AS stress,
            ROUND(calories, 0) AS calories,
            ROUND(stamina, 1) AS stamina,
+           ROUND(bladder, 1) AS bladder,
            ROUND(breath, 1) AS breath,
-           ROUND(hp, 1) AS hp
+           ROUND(hp, 1) AS hp,
+           ROUND(decor, 1) AS decor,
+           ROUND(immune, 1) AS immune,
+           ROUND(body_temperature, 2) AS body_temperature
     FROM duplicants
     ORDER BY ${col} IS NULL, ${col} ${direction}
     LIMIT ?`;
