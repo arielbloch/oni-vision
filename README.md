@@ -170,7 +170,7 @@ sqlite3 ~/.oni-watcher/output/current.sqlite \
   "SELECT type_id, COUNT(*) FROM geysers GROUP BY type_id"
 ```
 
-**MCP plugin (full-fat).** [`oni-watcher-plugin/`](./oni-watcher-plugin) is a Claude Code / Cowork plugin that wraps this DB behind an MCP server. Six typed tools (`oni_save_meta`, `oni_freshness`, `oni_dupes`, `oni_geysers`, `oni_resources`) plus a SELECT-only `oni_query` escape hatch, plus a SKILL.md that teaches the model when to reach for which tool. Read-only, single-statement-only, no need to write SQL by hand. See the plugin's own README for install instructions.
+**MCP plugin (full-fat).** [`oni-watcher-plugin/`](./oni-watcher-plugin) is a Claude Code / Cowork plugin that wraps this DB behind an MCP server. Six typed tools (`oni_save_meta`, `oni_freshness`, `oni_dupes`, `oni_geysers`, `oni_resources`) plus a SELECT-only `oni_query` escape hatch, plus two skills: **`oni-watcher`** (when/how to use the data tools) and **`oni-architect`** (ONI design and debugging advice — geyser tameability math, dupe stress diagnosis, build-order benchmarks, throughput and heat reference tables). The architect grounds advice in your actual save when the watcher data is fresh, falls back to general design patterns otherwise. See the plugin's own README for install instructions.
 
 ## Schema overview
 

@@ -11,13 +11,28 @@ oni-watcher-plugin/
 ├── mcp/
 │   └── server.js         # stdio MCP server, exposes 6 tools
 ├── skills/
-│   └── oni-watcher/
-│       └── SKILL.md      # how-to for the model
+│   ├── oni-watcher/
+│   │   └── SKILL.md      # how-to for the data tools
+│   └── oni-architect/
+│       ├── SKILL.md      # ONI design / strategy advisor
+│       └── references/   # progressive-disclosure reference docs
+│           ├── throughput.md
+│           ├── geysers.md
+│           ├── duplicants.md
+│           ├── plants-and-critters.md
+│           └── common-asks.md
 └── lib/
     └── queries.js        # pure query layer (testable without MCP)
 ```
 
-## Tools the MCP exposes
+## What's in the box
+
+**Two skills:**
+
+- **`oni-watcher`** — teaches the model when and how to use the MCP tools below to answer questions about the user's *current* colony.
+- **`oni-architect`** — a curated knowledge base for ONI strategy, debugging, and design advice. Loads `references/*.md` on demand (progressive disclosure). When `oni-watcher` data is available the architect grounds advice in actual numbers; otherwise it falls back to general design patterns.
+
+**Six MCP tools:**
 
 | Tool             | What                                                              |
 |------------------|-------------------------------------------------------------------|

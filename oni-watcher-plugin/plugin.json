@@ -13,6 +13,7 @@
     }
   },
   "skills": [
-    "./skills/oni-watcher"
+    "./skills/oni-watcher",
+    "./skills/oni-architect"
   ]
 }
