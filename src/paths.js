@@ -2,6 +2,10 @@
 // Reads ~/.oni-watcher/config.json (or ~/.config/oni-watcher/config.json),
 // merges over platform defaults, and — if no saveDir is configured —
 // auto-detects from a list of well-known locations (see discover.js).
+//
+// Every function takes optional `home` and `platform` overrides so tests
+// can drive resolution against a synthetic filesystem without mucking
+// with process.env.HOME.
 
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -9,15 +13,13 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { discoverSaveDir } from "./discover.js";
 
-const HOME = homedir();
-
 /** ONI's default save directory by platform. Used as a last-resort fallback
  *  when no config is present and discovery fails. */
-function defaultSaveDir() {
-  switch (process.platform) {
+function defaultSaveDir({ home, platform }) {
+  switch (platform) {
     case "darwin":
       return join(
-        HOME,
+        home,
         "Library",
         "Application Support",
         "Klei",
@@ -26,11 +28,11 @@ function defaultSaveDir() {
       );
     case "win32":
       // %USERPROFILE%/Documents/Klei/OxygenNotIncluded/save_files
-      return join(HOME, "Documents", "Klei", "OxygenNotIncluded", "save_files");
+      return join(home, "Documents", "Klei", "OxygenNotIncluded", "save_files");
     default:
       // Linux uses unity3d's path layout.
       return join(
-        HOME,
+        home,
         ".config",
         "unity3d",
         "Klei",
@@ -40,35 +42,40 @@ function defaultSaveDir() {
   }
 }
 
-const DEFAULTS = {
-  saveDir: defaultSaveDir(),
-  // Where we write parsed output. Long-running daemon overwrites these.
-  outputDir: join(HOME, ".oni-watcher", "output"),
-  // Whether to also crawl the auto_save subdir.
-  includeAutoSaves: false,
-  // Wait this long after the last write before parsing (avoids partial files).
-  debounceMs: 1500,
-};
+function buildDefaults({ home, platform }) {
+  return {
+    saveDir: defaultSaveDir({ home, platform }),
+    // Where we write parsed output. Long-running daemon overwrites these.
+    outputDir: join(home, ".oni-watcher", "output"),
+    // Whether to also crawl the auto_save subdir.
+    includeAutoSaves: false,
+    // Wait this long after the last write before parsing (avoids partial files).
+    debounceMs: 1500,
+  };
+}
 
-function loadUserConfig() {
+/**
+ * Read the first user config file that exists, strip documentation keys
+ * (anything starting with "_"), and return the cleaned object. Returns
+ * an empty object if no config file is present or all of them fail to
+ * parse.
+ */
+export function loadUserConfig({ home = homedir() } = {}) {
   const candidates = [
-    join(HOME, ".oni-watcher", "config.json"),
-    join(HOME, ".config", "oni-watcher", "config.json"),
+    join(home, ".oni-watcher", "config.json"),
+    join(home, ".config", "oni-watcher", "config.json"),
   ];
   for (const path of candidates) {
-    if (existsSync(path)) {
-      try {
-        const raw = JSON.parse(readFileSync(path, "utf8"));
-        // Strip documentation keys (any key starting with "_") so they
-        // never accidentally collide with real config fields.
-        const clean = {};
-        for (const [k, v] of Object.entries(raw)) {
-          if (!k.startsWith("_")) clean[k] = v;
-        }
-        return clean;
-      } catch (err) {
-        console.warn(`[paths] failed to parse ${path}: ${err.message}`);
+    if (!existsSync(path)) continue;
+    try {
+      const raw = JSON.parse(readFileSync(path, "utf8"));
+      const clean = {};
+      for (const [k, v] of Object.entries(raw)) {
+        if (!k.startsWith("_")) clean[k] = v;
       }
+      return clean;
+    } catch (err) {
+      console.warn(`[paths] failed to parse ${path}: ${err.message}`);
     }
   }
   return {};
@@ -86,19 +93,23 @@ function loadUserConfig() {
  * probed) is returned under `_autoDetected` so callers can log either
  * "found X" or "tried Y, none had .sav files".
  */
-export async function resolveConfig() {
-  const user = loadUserConfig();
+export async function resolveConfig({
+  home = homedir(),
+  platform = process.platform,
+} = {}) {
+  const defaults = buildDefaults({ home, platform });
+  const user = loadUserConfig({ home });
 
   // Explicit user saveDir wins; no discovery needed.
   if (typeof user.saveDir === "string") {
-    return { ...DEFAULTS, ...user, _autoDetected: null };
+    return { ...defaults, ...user, _autoDetected: null };
   }
 
-  const discovered = await discoverSaveDir();
+  const discovered = await discoverSaveDir({ home, platform });
   return {
-    ...DEFAULTS,
+    ...defaults,
     ...user,
-    saveDir: discovered.saveDir ?? DEFAULTS.saveDir,
+    saveDir: discovered.saveDir ?? defaults.saveDir,
     _autoDetected: discovered,
   };
 }

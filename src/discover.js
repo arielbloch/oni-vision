@@ -109,7 +109,12 @@ export async function discoverSaveDir(opts = {}) {
 
     const folders = saveDirsUnder(root, probed);
     for (const folder of folders) {
-      const latest = await findLatestSave(folder);
+      // Look at every .sav, including those under auto_save/, so a save
+      // folder containing only auto-saves is still identifiable as the
+      // user's active save location. The user's runtime preference for
+      // whether to *reparse* on auto-saves is a separate concern handled
+      // by the watcher in index.js.
+      const latest = await findLatestSave(folder, { includeAutoSaves: true });
       if (latest && (!best || latest.mtimeMs > best.mtimeMs)) {
         best = {
           saveDir: folder,

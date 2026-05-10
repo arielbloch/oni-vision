@@ -91,13 +91,11 @@ const TOOLS = [
 function openDb() {
   const path = resolveDbPath();
   if (!existsSync(path)) {
-    const err = new Error(
+    throw new Error(
       `oni-watcher database not found at ${path}. ` +
       `Has the watcher run yet? Run 'npm start' in the oni-watcher repo, ` +
       `or 'npm run parse' for a one-shot.`
     );
-    err.code = "ONI_DB_MISSING";
-    throw err;
   }
   return new DatabaseSync(path, { readOnly: true });
 }

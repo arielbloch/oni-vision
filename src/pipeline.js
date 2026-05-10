@@ -3,7 +3,6 @@
 // readers (Claude / sqlite3 CLI) never see a half-written file.
 
 import { mkdir, rename, rm, writeFile, copyFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { DatabaseSync } from "node:sqlite";
@@ -15,14 +14,28 @@ import { makeReplacer } from "./utils.js";
 import { render } from "./ui.js";
 
 /**
+ * Best-effort removal of a stale tmp file. Swallows errors because the
+ * file may disappear between our existsSync check and the rm syscall
+ * (race), or it may be locked by another process — neither blocks the
+ * caller from re-creating the tmp.
+ */
+async function rmIfExists(path) {
+  try {
+    await rm(path, { force: true });
+  } catch {
+    // ignore — writeFile/copyFile below will fail loudly if it matters
+  }
+}
+
+/**
  * Write `bytes` (string or Buffer) to `finalPath` atomically: stage to
  * `finalPath + ".tmp"` first, then rename(2) into place. Readers never see
  * a partially-written file. If a stale .tmp exists from a previous crashed
- * run, we remove it first.
+ * run we remove it first; if removal fails, writeFile will overwrite it.
  */
 async function writeAtomic(finalPath, bytes) {
   const tmp = `${finalPath}.tmp`;
-  if (existsSync(tmp)) await rm(tmp);
+  await rmIfExists(tmp);
   await writeFile(tmp, bytes);
   await rename(tmp, finalPath);
 }
@@ -32,7 +45,7 @@ async function writeAtomic(finalPath, bytes) {
  */
 async function copyAtomic(srcPath, finalPath) {
   const tmp = `${finalPath}.tmp`;
-  if (existsSync(tmp)) await rm(tmp);
+  await rmIfExists(tmp);
   await copyFile(srcPath, tmp);
   await rename(tmp, finalPath);
 }
@@ -63,7 +76,7 @@ export async function buildOutputs({ savePath, outputDir }) {
   // applied to current.json and current.sav below.
   const dbTmp = join(outputDir, "current.sqlite.tmp");
   const dbFinal = join(outputDir, "current.sqlite");
-  if (existsSync(dbTmp)) await rm(dbTmp);
+  await rmIfExists(dbTmp);
   writeDatabase(dbTmp, tables);
   await rename(dbTmp, dbFinal);
 

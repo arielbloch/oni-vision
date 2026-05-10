@@ -64,7 +64,16 @@ export function freshness(db) {
   return { parsed_at: meta.parsed_at, age_seconds: age };
 }
 
-/** Duplicant rows with optional sort/limit. */
+/**
+ * Duplicant rows with optional sort/limit.
+ *
+ * SQL safety: the `sort` argument is interpolated into the query
+ * (SQLite doesn't allow column names as bound parameters), so we
+ * validate it against an allowlist BEFORE interpolation. Anything
+ * not in `allowed` falls back to the default sort key — so an
+ * adversarial caller passing `sort: "DROP TABLE; --"` gets stress
+ * sort instead of a SQL injection.
+ */
 export function dupes(db, { sort = "stress", limit = 50 } = {}) {
   const allowed = new Set([
     "stress", "calories", "stamina", "bladder", "breath",

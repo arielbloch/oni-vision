@@ -43,6 +43,15 @@ function pad(s, n) {
   return s + " ".repeat(n - s.length);
 }
 
+/** Pad-or-clip to exactly n columns. Long strings get an ellipsis. */
+function fit(s, n) {
+  s = String(s);
+  if (s.length === n) return s;
+  if (s.length < n) return s + " ".repeat(n - s.length);
+  if (n <= 1) return s.slice(0, n);
+  return s.slice(0, n - 1) + "…";
+}
+
 function lpad(s, n) {
   s = String(s);
   if (s.length >= n) return s;
@@ -154,12 +163,15 @@ export function renderDupes(db, { color = false, limit = 12 } = {}) {
 
   const header = paint("Dupes (sorted by stress)", ANSI.bold + ANSI.yellow, color);
   const lines = rows.map((r) => {
-    const stress = r.stress ?? 0;
+    const hasStress = r.stress != null;
+    const stress = hasStress ? r.stress : 0;
     const c = stressColor(stress, color);
     const reset = color ? ANSI.reset : "";
-    const bar10 = `${c}${bar(stress / 100)}${reset}`;
-    const pct = `${lpad(stress.toFixed(1), 5)}%`;
-    return `  ${pad(r.name ?? "(unnamed)", 12)} ${bar10} ${pct}   ${r.current_role ?? ""}`;
+    const bar10 = hasStress
+      ? `${c}${bar(stress / 100)}${reset}`
+      : paint("──────────", ANSI.dim, color);
+    const pct = hasStress ? `${lpad(stress.toFixed(1), 5)}%` : `   — `;
+    return `  ${fit(r.name ?? "(unnamed)", 12)} ${bar10} ${pct}   ${r.current_role ?? ""}`;
   });
   return [header, ...lines].join("\n");
 }
@@ -198,13 +210,15 @@ export function render(db, opts = {}) {
   return sections.join("\n");
 }
 
-/** Format a mass in raw "Units" (kg in ONI) into a compact string. */
+/**
+ * Format a mass in raw ONI "units" (which are kg) into a compact string.
+ * Tiers: kg → t (tonnes, 1000 kg) → kt (kilotonnes, 1000 t).
+ */
 function formatMass(units) {
   if (units == null) return "?";
   const u = Number(units);
   if (Number.isNaN(u)) return "?";
-  if (u >= 1_000_000) return `${(u / 1_000_000).toFixed(1)} Mkg`;
-  if (u >= 10_000) return `${(u / 1_000).toFixed(1)} Tkg`;
-  if (u >= 1_000) return `${(u / 1_000).toFixed(2)} Tkg`;
+  if (u >= 1_000_000) return `${(u / 1_000_000).toFixed(2)} kt`;
+  if (u >= 1_000) return `${(u / 1_000).toFixed(2)} t`;
   return `${u.toFixed(0)} kg`;
 }

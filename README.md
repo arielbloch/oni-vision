@@ -119,8 +119,8 @@ Geysers
   steam                    ×2   chlorine_vent           ×1   …
 
 Stockpile (top elements by mass)
-  Algae               12.4 Tkg   in 8 places
-  Water                8.3 Tkg   in 3 places
+  Algae                  12.40 t   in 8 places
+  Water                   8.30 t   in 3 places
   …
 
 Dupes (sorted by stress)

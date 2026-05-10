@@ -6,7 +6,7 @@
 // Override defaults by dropping a config file at ~/.oni-watcher/config.json
 // (or ~/.config/oni-watcher/config.json). See .config-example.json.
 
-import { existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import chokidar from "chokidar";
 
 import { resolveConfig } from "./paths.js";
