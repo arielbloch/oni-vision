@@ -55,11 +55,10 @@ The detail lives in `references/`. Load them progressively — most questions on
 ## Patterns
 
 **"Am I on track for cycle 100?"**
-1. `oni_save_meta` — read cycle, dupe count, base name.
-2. `oni_dupes` — check stress distribution; if anyone is above 60%, that's the headline.
-3. `oni_resources({location: "both"})` — check Algae / Water / Food reserves.
-4. `oni_query` `SELECT prefab_id, COUNT(*) FROM buildings GROUP BY prefab_id ORDER BY 2 DESC LIMIT 30;` — look for SPOM components, batteries, research stations.
-5. Compare against `references/common-asks.md` checklist.
+1. `oni_status()` — single call returns cycle, dupe count, top stressed dupes, geyser types, and top elements. Usually enough to answer.
+2. If the user wants per-dupe detail on the worst-off person: `oni_dupe({ name })`.
+3. For a building inventory check: `oni_query` with `SELECT prefab_id, COUNT(*) FROM buildings GROUP BY prefab_id ORDER BY 2 DESC LIMIT 30;`, ideally with `format: "tsv"` to keep tokens down.
+4. Compare against `references/common-asks.md` checklist.
 
 **"My power keeps browning out."**
 1. `oni_query` to total wattage of placed buildings — sum from a hardcoded prefab→watts table in `references/throughput.md`.

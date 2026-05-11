@@ -49,10 +49,12 @@ export function resolveDbPath() {
  * Token efficiency vs JSON-array-of-objects: ~50% fewer tokens because
  * column names appear once in the header instead of repeating per row.
  *
- * Safe to use on the columns we project (no values contain tabs or
- * newlines — names, role IDs, prefab IDs, element IDs are all
- * identifier-shaped). If we ever start projecting free-form text we'd
- * need to add escaping.
+ * Cell values that contain tabs, newlines, or carriage returns are
+ * escaped (`\t`, `\n`, `\r`, `\\`) so the format stays parseable. Most
+ * of our columns (names, prefab IDs, element IDs) never need escaping;
+ * the edge cases that do are `oni_query` results (`behaviors.template_data`
+ * is JSON-stringified and may contain newlines) and user-supplied free
+ * text (colony base name, theoretically).
  */
 export function toTsv(rows) {
   if (!Array.isArray(rows) || rows.length === 0) return "";
@@ -61,18 +63,29 @@ export function toTsv(rows) {
   const cols = Object.keys(rows[0]);
   const header = cols.join("\t");
   const body = rows
-    .map((r) => cols.map((c) => formatCell(r[c])).join("\t"))
+    .map((r) => cols.map((c) => escapeTsv(r[c])).join("\t"))
     .join("\n");
   return `${header}\n${body}`;
 }
 
-function formatCell(v) {
+/** Collapse newlines/CRs in a value for single-line contexts. */
+function oneLine(v) {
   if (v == null) return "";
-  if (typeof v === "number") {
-    // SQLite's REAL serialization can produce trailing zeros. Drop them.
-    return Number.isInteger(v) ? String(v) : String(v);
+  return String(v).replace(/[\r\n]+/g, " ");
+}
+
+/** Stringify a cell value for TSV output, escaping format-breaking chars. */
+function escapeTsv(v) {
+  if (v == null) return "";
+  const s = typeof v === "number" ? String(v) : String(v);
+  if (s.indexOf("\\") < 0 && s.indexOf("\t") < 0 && s.indexOf("\n") < 0 && s.indexOf("\r") < 0) {
+    return s; // fast path — the vast majority of cells are clean
   }
-  return String(v);
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/\t/g, "\\t")
+    .replace(/\r/g, "\\r")
+    .replace(/\n/g, "\\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -361,13 +374,17 @@ export function status(db, { dupeLimit = 5, geyserLimit = 10, resourceLimit = 5 
   const topResources = resources(db, { location: "both", limit: resourceLimit });
 
   const sections = [];
-  sections.push(`base_name=${meta.base_name ?? ""}`);
-  sections.push(`cycle=${meta.cycle ?? ""}`);
-  sections.push(`save_version=${meta.save_version ?? ""}`);
-  sections.push(`duplicants=${counts.duplicants}`);
-  sections.push(`critters=${counts.critters}`);
-  sections.push(`geysers=${counts.geysers}`);
-  sections.push(`buildings=${counts.buildings}`);
+  // Header lines are key=value. Escape any newline/CR in the value side
+  // so a multi-line value (an unlikely-but-possible base name) can't
+  // break the format by introducing a stray newline mid-block.
+  const kv = (k, v) => `${k}=${oneLine(v)}`;
+  sections.push(kv("base_name", meta.base_name ?? ""));
+  sections.push(kv("cycle", meta.cycle ?? ""));
+  sections.push(kv("save_version", meta.save_version ?? ""));
+  sections.push(kv("duplicants", counts.duplicants));
+  sections.push(kv("critters", counts.critters));
+  sections.push(kv("geysers", counts.geysers));
+  sections.push(kv("buildings", counts.buildings));
   if (fresh.age_seconds != null) {
     sections.push(`parsed_at_age_seconds=${fresh.age_seconds}`);
   }

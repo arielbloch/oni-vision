@@ -275,6 +275,21 @@ describe("toTsv", () => {
     assert.equal(out, "a\tb\n1\t");
   });
 
+  test("escapes tab, newline, CR, and backslash in cell values", () => {
+    const out = toTsv([{ s: "a\tb\nc\rd\\e" }]);
+    const lines = out.split("\n");
+    // Header on line 1, single row on line 2 (escaped — so no extra lines).
+    assert.equal(lines.length, 2);
+    assert.equal(lines[0], "s");
+    assert.equal(lines[1], "a\\tb\\nc\\rd\\\\e");
+  });
+
+  test("clean values use the fast path (no escaping noise)", () => {
+    const out = toTsv([{ name: "Meep", stress: 12.5 }]);
+    // Sanity: no backslashes in clean output.
+    assert.doesNotMatch(out, /\\/);
+  });
+
   test("returns empty string for empty input", () => {
     assert.equal(toTsv([]), "");
     assert.equal(toTsv(null), "");
@@ -314,6 +329,30 @@ describe("status", () => {
     // Section headers still present; just fewer rows.
     assert.match(out, /# top dupes/);
     assert.match(out, /# geyser types/);
+  });
+
+  test("collapses newlines in header values so the format stays line-oriented", () => {
+    // Build a DB whose baseName contains a newline (defensive coverage —
+    // ONI doesn't allow this in practice, but if it ever did, the
+    // status block must not get split into bogus extra lines).
+    const tables = extractAll(FAKE_SAVE);
+    const idx = tables.save_meta.findIndex((r) => r.key === "baseName");
+    tables.save_meta[idx] = { key: "baseName", value: "Line1\nLine2" };
+    tables.save_meta.push({ key: "parsed_at", value: new Date().toISOString() });
+    const dir = mkdtempSync(join(tmpdir(), "oni-mcp-test-multiline-"));
+    const dbPath = join(dir, "test.sqlite");
+    writeDatabase(dbPath, tables);
+    const db = new DatabaseSync(dbPath);
+    const out = status(db);
+    // The base_name line must be a single line and must contain both
+    // parts joined by a space (newline collapsed). And there must NOT
+    // be a separate line containing only "Line2" — that would mean we
+    // failed to collapse and the format leaked.
+    const lines = out.split("\n");
+    const baseLine = lines.find((l) => l.startsWith("base_name="));
+    assert.equal(baseLine, "base_name=Line1 Line2");
+    // No standalone "Line2" line.
+    assert.ok(!lines.includes("Line2"));
   });
 });
 

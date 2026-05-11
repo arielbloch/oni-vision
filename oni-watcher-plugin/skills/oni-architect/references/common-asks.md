@@ -4,11 +4,10 @@ The user-facing patterns this skill is designed to handle well. For each, the pl
 
 ## "Am I on track for cycle X?"
 
-**Data to pull:**
-- `oni_save_meta()` → cycle, dupe count, base name.
-- `oni_dupes({sort: "stress"})` → who's stressed.
-- `oni_resources({location: "both"})` → top 10 elements + amounts.
-- `oni_query` → `SELECT prefab_id, COUNT(*) FROM buildings GROUP BY prefab_id ORDER BY 2 DESC LIMIT 30;`.
+**Data to pull (in order of preference):**
+- `oni_status()` — single call, returns cycle / dupe count / top stressed dupes / geyser types / top elements / parse staleness in one TSV-block. **This is enough for ~80% of "am I ok" questions.**
+- `oni_dupe({ name })` for the worst-stressed individual if the user wants detail.
+- `oni_query` with `SELECT prefab_id, COUNT(*) FROM buildings GROUP BY prefab_id ORDER BY 2 DESC LIMIT 30;` (use `format: "tsv"` to halve the response size) to inspect what's been built.
 
 **Cycle-by-cycle benchmarks (rough, 3-dupe start):**
 
