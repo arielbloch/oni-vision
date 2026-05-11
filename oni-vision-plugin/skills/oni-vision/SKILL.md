@@ -1,11 +1,11 @@
 ---
-name: oni-watcher
+name: oni-vision
 description: Query the user's live Oxygen Not Included colony save. Use whenever the user asks about their dupes, geysers, resources, cycle, base name, or anything else about their current ONI save state. Has typed tools for the most common asks plus a SELECT-only SQL escape hatch for everything else.
 ---
 
 # Oxygen Not Included colony queries
 
-This skill exposes read-only access to a freshly-parsed ONI save via the `oni-watcher` MCP server. The watcher daemon (`oni-watcher` GitHub repo) reparses the user's save into SQLite every time the game writes one.
+This skill exposes read-only access to a freshly-parsed ONI save via the `oni-vision` MCP server. The oni-vision daemon (GitHub: `arielbloch/oni-vision`) reparses the user's save into SQLite every time the game writes one.
 
 ## When to use
 
@@ -40,7 +40,7 @@ Headline facts. Always cheap — start here when in doubt:
 ```
 
 ### `oni_freshness()`
-Seconds since `parsed_at`. Use this when the user's question is time-sensitive ("are my dupes ok *right now*?"). If `age_seconds` is large (e.g. > 600) or the field is null, mention it in your answer and suggest the user run `npm start` in their oni-watcher repo.
+Seconds since `parsed_at`. Use this when the user's question is time-sensitive ("are my dupes ok *right now*?"). If `age_seconds` is large (e.g. > 600) or the field is null, mention it in your answer and suggest the user run `npm start` in their oni-vision repo.
 
 ### `oni_status({ dupeLimit?, geyserLimit?, resourceLimit? })`
 **Preferred entry point.** Compact TSV-block snapshot covering cycle/dupe-count/critters/geyser-count, top stressed dupes, geyser type counts, top elements by mass, parse staleness. Default limits are tuned for "give me a one-screen overview". Bump them only when needed.
@@ -109,8 +109,8 @@ Convenience views: `v_resources_in_storage`, `v_world_objects_by_element`, `v_ge
 
 ## Error handling
 
-If a tool returns `Error: oni-watcher database not found...`, the watcher hasn't run yet. Tell the user:
+If a tool returns `Error: oni-vision database not found...`, oni-vision hasn't run yet. Tell the user:
 
-> Your oni-watcher daemon hasn't produced any data yet. Run `npm start` in your oni-watcher repo while ONI is open, save the game, then ask again.
+> Your oni-vision daemon hasn't produced any data yet. Run `npm start` in your oni-vision repo while ONI is open, save the game, then ask again.
 
 Don't keep retrying.

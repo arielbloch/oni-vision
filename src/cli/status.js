@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// One-shot world-status renderer. Reads ~/.oni-watcher/output/current.sqlite
+// One-shot world-status renderer. Reads ~/.oni-vision/output/current.sqlite
 // (or a path passed as the first arg) and prints the formatted status
-// block. Does NOT re-parse — it just queries what the watcher already
-// produced.
+// block. Does NOT re-parse — it just queries what the oni-vision daemon
+// already produced.
 //
 //   npm run status                # uses configured outputDir
 //   node src/cli/status.js path/to/current.sqlite
@@ -26,7 +26,7 @@ if (argPath) {
 if (!existsSync(dbPath)) {
   console.error(
     `[status] no SQLite found at ${dbPath}\n` +
-    `Has the watcher run yet? Try 'npm start' first, or 'npm run parse' for a one-shot.`
+    `Has oni-vision run yet? Try 'npm start' first, or 'npm run parse' for a one-shot.`
   );
   process.exit(1);
 }

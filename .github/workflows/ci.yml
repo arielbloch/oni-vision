@@ -28,8 +28,8 @@ jobs:
         run: |
           set -e
           for f in src/*.js src/cli/*.js \
-                   oni-watcher-plugin/lib/*.js \
-                   oni-watcher-plugin/mcp/*.js; do
+                   oni-vision-plugin/lib/*.js \
+                   oni-vision-plugin/mcp/*.js; do
             node --check "$f"
           done
 

@@ -56,9 +56,9 @@ describe("freshness", () => {
     assert.ok(f.age_seconds >= 0 && f.age_seconds < 60);
   });
 
-  test("returns null fields when parsed_at is missing (older watcher version)", () => {
+  test("returns null fields when parsed_at is missing (older oni-vision version)", () => {
     // Build a DB whose save_meta has no parsed_at row, simulating
-    // a SQLite produced by a pre-Wave-1 oni-watcher.
+    // a SQLite produced by a pre-Wave-1 oni-vision.
     const tables = extractAll(FAKE_SAVE);
     // Note: deliberately NOT pushing { key: "parsed_at", ... }.
     const dir = mkdtempSync(join(tmpdir(), "oni-mcp-test-noparsed-"));

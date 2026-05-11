@@ -1,5 +1,5 @@
 // Path resolution: where ONI saves live, where we put parsed output.
-// Reads ~/.oni-watcher/config.json (or ~/.config/oni-watcher/config.json),
+// Reads ~/.oni-vision/config.json (or ~/.config/oni-vision/config.json),
 // merges over platform defaults, and — if no saveDir is configured —
 // auto-detects from a list of well-known locations (see discover.js).
 //
@@ -46,7 +46,7 @@ function buildDefaults({ home, platform }) {
   return {
     saveDir: defaultSaveDir({ home, platform }),
     // Where we write parsed output. Long-running daemon overwrites these.
-    outputDir: join(home, ".oni-watcher", "output"),
+    outputDir: join(home, ".oni-vision", "output"),
     // Whether to also crawl the auto_save subdir.
     includeAutoSaves: false,
     // Wait this long after the last write before parsing (avoids partial files).
@@ -62,8 +62,8 @@ function buildDefaults({ home, platform }) {
  */
 export function loadUserConfig({ home = homedir() } = {}) {
   const candidates = [
-    join(home, ".oni-watcher", "config.json"),
-    join(home, ".config", "oni-watcher", "config.json"),
+    join(home, ".oni-vision", "config.json"),
+    join(home, ".config", "oni-vision", "config.json"),
   ];
   for (const path of candidates) {
     if (!existsSync(path)) continue;

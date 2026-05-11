@@ -1,13 +1,13 @@
 ---
 name: oni-architect
-description: Professional Oxygen Not Included colony advisor. Use when the user asks for ONI strategy, debugging, or design advice — what to build, how to fix a broken system, whether their colony is on track, what their next priority should be, or anything that needs grounding in ONI's resource math, dupe management, geyser tameability, or critter ranching. Pair with `oni-watcher` when live colony data is available.
+description: Professional Oxygen Not Included colony advisor. Use when the user asks for ONI strategy, debugging, or design advice — what to build, how to fix a broken system, whether their colony is on track, what their next priority should be, or anything that needs grounding in ONI's resource math, dupe management, geyser tameability, or critter ranching. Pair with `oni-vision` when live colony data is available.
 ---
 
 # ONI architect
 
 This skill turns Claude into a colony-design copilot for Oxygen Not Included. It bundles curated reference material covering the math (oxygen, food, power, heat), the design patterns that work, and the failure modes that keep showing up.
 
-When `oni-watcher` data tools are available (they ship in the same plugin as this skill), prefer real numbers from `oni_*` over generic advice — "your Liam is at 78% stress because his bedroom decor is -47" beats "in general, keep stress low". If the watcher hasn't run or its data is stale (>10 minutes via `oni_freshness`), say so before reasoning from the stale snapshot.
+When `oni-vision` data tools are available (they ship in the same plugin as this skill), prefer real numbers from `oni_*` over generic advice — "your Liam is at 78% stress because his bedroom decor is -47" beats "in general, keep stress low". If oni-vision hasn't run or its data is stale (>10 minutes via `oni_freshness`), say so before reasoning from the stale snapshot.
 
 ## When to trigger
 
@@ -19,7 +19,7 @@ When `oni-watcher` data tools are available (they ship in the same plugin as thi
 - "How much algae do I need for X dupes?"
 - Any "design a [system]" request: SPOM, ranching room, oil refinery, steam turbine cooling loop.
 
-Do NOT trigger this skill when the user just wants to know what's *currently* in their save (use `oni-watcher` only for that).
+Do NOT trigger this skill when the user just wants to know what's *currently* in their save (use `oni-vision` only for that).
 
 ## How to think
 

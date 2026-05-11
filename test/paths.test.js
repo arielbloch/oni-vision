@@ -15,7 +15,7 @@ function tmpHome() {
 }
 
 function writeConfig(home, contents) {
-  const dir = join(home, ".oni-watcher");
+  const dir = join(home, ".oni-vision");
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "config.json"), JSON.stringify(contents, null, 2));
 }
@@ -27,7 +27,7 @@ describe("loadUserConfig", () => {
     assert.deepEqual(cfg, {});
   });
 
-  test("reads ~/.oni-watcher/config.json when present", () => {
+  test("reads ~/.oni-vision/config.json when present", () => {
     const home = tmpHome();
     writeConfig(home, { saveDir: "/tmp/explicit", debounceMs: 9999 });
     const cfg = loadUserConfig({ home });
@@ -50,8 +50,8 @@ describe("loadUserConfig", () => {
 
   test("returns {} (with a warning to stderr) if config is malformed JSON", () => {
     const home = tmpHome();
-    mkdirSync(join(home, ".oni-watcher"), { recursive: true });
-    writeFileSync(join(home, ".oni-watcher", "config.json"), "{ not valid json");
+    mkdirSync(join(home, ".oni-vision"), { recursive: true });
+    writeFileSync(join(home, ".oni-vision", "config.json"), "{ not valid json");
     const cfg = loadUserConfig({ home });
     assert.deepEqual(cfg, {});
   });
@@ -62,7 +62,7 @@ describe("resolveConfig", () => {
     const home = tmpHome();
     const cfg = await resolveConfig({ home, platform: "darwin" });
     assert.match(cfg.saveDir, /OxygenNotIncluded\/save_files$/);
-    assert.match(cfg.outputDir, /\.oni-watcher\/output$/);
+    assert.match(cfg.outputDir, /\.oni-vision\/output$/);
     assert.equal(cfg.includeAutoSaves, false);
     assert.equal(cfg.debounceMs, 1500);
     // Discovery ran but returned null because no folders exist under the synthetic home.

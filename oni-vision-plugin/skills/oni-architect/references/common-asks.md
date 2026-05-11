@@ -85,5 +85,5 @@ Around cycle 80–120. Triggers: you have at least 3 dupes able to wear atmo sui
 
 - Lead with the verdict, then the math.
 - Give the user 2–3 paths (cheap-now / medium / proper) and the cost of each.
-- If `oni-watcher` data is available, ground every statement in actual numbers from the user's save. Don't say "your stress might be high" if you can say "Liam is at 78%, Jorge at 64%".
+- If `oni-vision` data is available, ground every statement in actual numbers from the user's save. Don't say "your stress might be high" if you can say "Liam is at 78%, Jorge at 64%".
 - Never invent numbers. If you don't know the exact watts, say "around" or fall through to the wiki link.

@@ -1,7 +1,7 @@
 {
-  "name": "oni-watcher-plugin",
+  "name": "oni-vision-plugin",
   "version": "0.1.0",
-  "description": "MCP server + skill that lets Claude query an oni-watcher SQLite database.",
+  "description": "MCP server + skill that lets Claude query an oni-vision SQLite database.",
   "type": "module",
   "private": true,
   "engines": {

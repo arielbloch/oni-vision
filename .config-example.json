@@ -1,13 +1,13 @@
 {
-  "_comment": "Copy this file to ~/.oni-watcher/config.json (or ~/.config/oni-watcher/config.json) and edit. All keys are optional — any you omit fall back to the platform defaults in src/paths.js. JSON has no comments, so keys starting with '_' are documentation and are ignored at runtime.",
+  "_comment": "Copy this file to ~/.oni-vision/config.json (or ~/.config/oni-vision/config.json) and edit. All keys are optional — any you omit fall back to the platform defaults in src/paths.js. JSON has no comments, so keys starting with '_' are documentation and are ignored at runtime.",
 
   "_comment_saveDir": "Path to ONI's save_files directory. Recent Steam installs on macOS use the unity.Klei path below — replace <USERNAME> with your home folder name. Older Klei installs on macOS use ~/Library/Application Support/Klei/OxygenNotIncluded/save_files. Windows: %USERPROFILE%/Documents/Klei/OxygenNotIncluded/save_files. Linux: ~/.config/unity3d/Klei/Oxygen Not Included/save_files.",
   "saveDir": "/Users/<USERNAME>/Library/Application Support/unity.Klei.Oxygen Not Included",
 
-  "_comment_outputDir": "Where current.sqlite, current.json, and current.sav land. Defaults to ~/.oni-watcher/output, which is fine for most setups. Override only if you want the parsed outputs somewhere else (a project folder, a synced drive, etc.). Path must be absolute.",
-  "outputDir": "/Users/<USERNAME>/.oni-watcher/output",
+  "_comment_outputDir": "Where current.sqlite, current.json, and current.sav land. Defaults to ~/.oni-vision/output, which is fine for most setups. Override only if you want the parsed outputs somewhere else (a project folder, a synced drive, etc.). Path must be absolute.",
+  "outputDir": "/Users/<USERNAME>/.oni-vision/output",
 
-  "_comment_includeAutoSaves": "If true, the watcher reparses every auto_save (ONI auto-saves every cycle by default — that's noisy). Default false: only manual saves trigger a reparse.",
+  "_comment_includeAutoSaves": "If true, oni-vision reparses every auto_save (ONI auto-saves every cycle by default — that's noisy). Default false: only manual saves trigger a reparse.",
   "includeAutoSaves": false,
 
   "_comment_debounceMs": "How long to wait (ms) after the last write to a .sav file before reparsing. Stops us from racing the game while it's still writing. Default 1500 ms is comfortable for save files up to ~10 MB; bump it if you see truncated-file parse errors.",

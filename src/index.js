@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// oni-watcher daemon. Watches the ONI save_files directory; on every file
+// oni-vision daemon. Watches the ONI save_files directory; on every file
 // settle event, finds the newest .sav and re-builds current.sqlite + current.json.
 //
 // Run: npm start
-// Override defaults by dropping a config file at ~/.oni-watcher/config.json
-// (or ~/.config/oni-watcher/config.json). See .config-example.json.
+// Override defaults by dropping a config file at ~/.oni-vision/config.json
+// (or ~/.config/oni-vision/config.json). See .config-example.json.
 
 import { existsSync } from "node:fs";
 import chokidar from "chokidar";
@@ -16,28 +16,28 @@ import { buildOutputs } from "./pipeline.js";
 const config = await resolveConfig();
 
 if (config._autoDetected?.saveDir) {
-  console.log(`[watcher] auto-detected save dir: ${config.saveDir}`);
+  console.log(`[vision] auto-detected save dir: ${config.saveDir}`);
   console.log(
-    `[watcher]   newest save: ${config._autoDetected.sourceFile}` +
+    `[vision]   newest save: ${config._autoDetected.sourceFile}` +
     ` (${new Date(config._autoDetected.mtimeMs).toISOString()})`
   );
 } else if (config._autoDetected) {
   // Discovery ran but found nothing.
   console.warn(
-    `[watcher] no save folder auto-detected. Tried:\n` +
+    `[vision] no save folder auto-detected. Tried:\n` +
     config._autoDetected.probed.map((p) => `  - ${p}`).join("\n") +
     `\nFalling back to platform default: ${config.saveDir}`
   );
 }
-console.log(`[watcher] save dir:   ${config.saveDir}`);
-console.log(`[watcher] output dir: ${config.outputDir}`);
-console.log(`[watcher] include auto saves: ${config.includeAutoSaves}`);
-console.log(`[watcher] debounce:   ${config.debounceMs} ms`);
+console.log(`[vision] save dir:   ${config.saveDir}`);
+console.log(`[vision] output dir: ${config.outputDir}`);
+console.log(`[vision] include auto saves: ${config.includeAutoSaves}`);
+console.log(`[vision] debounce:   ${config.debounceMs} ms`);
 
 if (!existsSync(config.saveDir)) {
   console.error(
-    `[watcher] FATAL: save directory does not exist: ${config.saveDir}\n` +
-    `Drop a config file at ~/.oni-watcher/config.json pointing at the correct folder. ` +
+    `[vision] FATAL: save directory does not exist: ${config.saveDir}\n` +
+    `Drop a config file at ~/.oni-vision/config.json pointing at the correct folder. ` +
     `See .config-example.json in the project root for a template.`
   );
   process.exit(1);
@@ -57,15 +57,15 @@ async function runOnce(reason) {
       includeAutoSaves: config.includeAutoSaves,
     });
     if (!latest) {
-      console.log(`[watcher] no .sav files in ${config.saveDir} yet`);
+      console.log(`[vision] no .sav files in ${config.saveDir} yet`);
       return;
     }
     console.log(
-      `[watcher] (${reason}) latest save: ${latest.path} (${(latest.size / 1024 / 1024).toFixed(2)} MB)`
+      `[vision] (${reason}) latest save: ${latest.path} (${(latest.size / 1024 / 1024).toFixed(2)} MB)`
     );
     await buildOutputs({ savePath: latest.path, outputDir: config.outputDir });
   } catch (err) {
-    console.error(`[watcher] parse failed: ${err.stack || err.message}`);
+    console.error(`[vision] parse failed: ${err.stack || err.message}`);
   } finally {
     busy = false;
     if (queued) {
@@ -103,14 +103,14 @@ watcher.on("change", (p) => {
   if (p.endsWith(".sav")) runOnce(`change ${p}`);
 });
 watcher.on("error", (err) => {
-  console.error(`[watcher] chokidar error: ${err.message}`);
+  console.error(`[vision] chokidar error: ${err.message}`);
 });
 
-console.log("[watcher] running. Ctrl-C to stop.");
+console.log("[vision] running. Ctrl-C to stop.");
 
 // Tidy shutdown.
 function shutdown() {
-  console.log("[watcher] shutting down...");
+  console.log("[vision] shutting down...");
   watcher.close().finally(() => process.exit(0));
 }
 process.on("SIGINT", shutdown);

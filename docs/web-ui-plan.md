@@ -1,13 +1,13 @@
 # Web UI plan
 
-A small browser dashboard for oni-watcher. Three design options, ordered from "smallest first cut" to "nicest experience". All three serve the same content; they differ in how the page is delivered and how it refreshes.
+A small browser dashboard for oni-vision. Three design options, ordered from "smallest first cut" to "nicest experience". All three serve the same content; they differ in how the page is delivered and how it refreshes.
 
 ## What it shows
 
 The minimum viable surface, captured in `npm run status` already:
 
 - **Header.** Colony name (big), cycle number (big).
-- **Status strip.** "Parsed N seconds ago from `<save-file>`" plus a "live" indicator (green when the watcher is running, dim when stale).
+- **Status strip.** "Parsed N seconds ago from `<save-file>`" plus a "live" indicator (green when oni-vision is running, dim when stale).
 - **Headline counts.** Duplicants / critters / geysers / buildings.
 - **Top stressed dupes.** Name, stress bar, role. 5 rows.
 - **Geyser type counts.** `steam ×2`, `chlorine_vent ×1`, etc.
@@ -48,19 +48,19 @@ Dark mode by default. Monospace for the bars and numbers. No JavaScript librarie
 
 ## Design A: Static HTML + JSON sidecar (smallest)
 
-**How it works.** The watcher writes one additional file alongside `current.sqlite`: `current.status.json`, a small structured blob with everything the UI needs. The UI is a single static HTML file (`web/index.html`) that fetches `current.status.json` over `fetch()` every N seconds.
+**How it works.** The daemon writes one additional file alongside `current.sqlite`: `current.status.json`, a small structured blob with everything the UI needs. The UI is a single static HTML file (`web/index.html`) that fetches `current.status.json` over `fetch()` every N seconds.
 
 **Serving.** Open the HTML via `file://` in a browser — except that browsers block `file://` → `file://` fetch for security. So we need *some* HTTP server. The lightest:
 
 ```bash
-npx http-server ~/.oni-watcher/output -p 8080
+npx http-server ~/.oni-vision/output -p 8080
 # or:
-python3 -m http.server -d ~/.oni-watcher/output 8080
+python3 -m http.server -d ~/.oni-vision/output 8080
 ```
 
-The user opens `http://localhost:8080/index.html` (the watcher writes the index.html there too on first run, or it's copied from `web/`).
+The user opens `http://localhost:8080/index.html` (the daemon writes the index.html there too on first run, or it's copied from `web/`).
 
-**Refresh.** `setInterval(fetchStatus, 5000)`. The watcher updates the JSON atomically; the browser reads it atomically.
+**Refresh.** `setInterval(fetchStatus, 5000)`. The daemon updates the JSON atomically; the browser reads it atomically.
 
 **Pros.**
 - Zero new daemon logic except writing one extra file. ~30 lines added to `pipeline.js`.
@@ -74,14 +74,14 @@ The user opens `http://localhost:8080/index.html` (the watcher writes the index.
 
 ---
 
-## Design B: In-watcher HTTP server with polling (recommended MVP)
+## Design B: In-daemon HTTP server with polling (recommended MVP)
 
-**How it works.** The watcher process starts a tiny HTTP server on `localhost:8080` (configurable) alongside chokidar. The server has two endpoints:
+**How it works.** The oni-vision daemon process starts a tiny HTTP server on `localhost:8080` (configurable) alongside chokidar. The server has two endpoints:
 
 - `GET /` — serves the static HTML page.
 - `GET /api/status` — opens `current.sqlite` read-only, runs the same query set as `npm run status`, returns JSON.
 
-**Refresh.** Same polling as Design A, but the server is in the same process as the watcher, so a user runs **one** command (`npm start --web`) and gets both. The HTTP server is `node:http`-based — no Express, no dependency churn.
+**Refresh.** Same polling as Design A, but the server is in the same process as the daemon, so a user runs **one** command (`npm start --web`) and gets both. The HTTP server is `node:http`-based — no Express, no dependency churn.
 
 **Pros.**
 - Single process, single command. Best user experience.
@@ -101,7 +101,7 @@ import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import { status as renderStatus } from "../oni-watcher-plugin/lib/queries.js";
+import { status as renderStatus } from "../oni-vision-plugin/lib/queries.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -117,7 +117,7 @@ export function startWeb({ port, outputDir }) {
         } finally { db.close(); }
       } catch (err) {
         res.writeHead(503, { "Content-Type": "text/plain" });
-        res.end(`watcher hasn't produced data yet: ${err.message}`);
+        res.end(`oni-vision hasn't produced data yet: ${err.message}`);
       }
       return;
     }
@@ -148,7 +148,7 @@ And `.config-example.json` grows a `web: { enabled: true, port: 8080 }` block.
 
 **How it works.** Builds on Design B but adds a third endpoint:
 
-- `GET /api/events` — Server-Sent Events stream. The watcher's `pipeline.js` fires an event after every successful parse; the SSE handler broadcasts to all open clients.
+- `GET /api/events` — Server-Sent Events stream. The daemon's `pipeline.js` fires an event after every successful parse; the SSE handler broadcasts to all open clients.
 
 The HTML uses `new EventSource("/api/events")` to subscribe; on each `parsed` event it re-fetches `/api/status` and updates the DOM. No polling — the page reflects the save the instant the daemon finishes parsing it.
 
@@ -194,7 +194,7 @@ if (req.url === "/api/events") {
 
 **Start with Design B.** Single-process, single-command UX matters more than the extra polish of SSE. Design B is ~150 LOC total (server + HTML) and ships value immediately. Upgrading to Design C is purely additive — same server, same endpoints, just a new `/api/events` route — so we don't lose anything by deferring it.
 
-Design A is interesting only if we anticipate users wanting the UI on a different machine from the watcher, or wanting to host it via a CDN-style setup. Neither is a real use case today.
+Design A is interesting only if we anticipate users wanting the UI on a different machine from the daemon, or wanting to host it via a CDN-style setup. Neither is a real use case today.
 
 ## Implementation plan if we go with Design B
 

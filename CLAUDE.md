@@ -1,13 +1,13 @@
 # Oxygen Not Included save data
 
-Parsed save data lives at `~/.oni-watcher/output/current.sqlite` (a SQLite DB) with a `current.json` sidecar in the same directory for non-tabular bits. The `oni-watcher` daemon refreshes both files atomically every time the game writes a save. Always prefer SQL queries over reading the JSON.
+Parsed save data lives at `~/.oni-vision/output/current.sqlite` (a SQLite DB) with a `current.json` sidecar in the same directory for non-tabular bits. The `oni-vision` daemon refreshes both files atomically every time the game writes a save. Always prefer SQL queries over reading the JSON.
 
 ## Querying
 
 Use the `sqlite3` CLI (preinstalled on macOS). Paths in your output are stable; you do not need to confirm them every turn.
 
 ```bash
-sqlite3 ~/.oni-watcher/output/current.sqlite "SELECT ..."
+sqlite3 ~/.oni-vision/output/current.sqlite "SELECT ..."
 ```
 
 For one-off ad-hoc questions, prefer narrow projections (`SELECT col1, col2`) and aggregations (`COUNT/SUM/AVG`) over `SELECT *`. SQLite's output mode `-json` or `-csv` is helpful when you want to feed results back into reasoning.
@@ -92,6 +92,6 @@ SELECT skill  FROM duplicant_skills WHERE duplicant_id = (SELECT game_object_id 
 
 `current.json` has the save header (`gameInfo` — cycle, base name, version), `settings` (game/sandbox state), and a stripped `gameData` (with the giant binary blobs replaced by markers). Read it only when the question is clearly about save metadata or game settings.
 
-## When the watcher isn't running
+## When oni-vision isn't running
 
-If the file is stale or missing, ask the user to start it: `npm start` from the `oni-watcher/` directory. For a one-off parse without the daemon: `npm run parse`.
+If the file is stale or missing, ask the user to start it: `npm start` from the `oni-vision/` directory. For a one-off parse without the daemon: `npm run parse`.

@@ -1,6 +1,6 @@
 # MCP token-usage optimization plan
 
-A focused plan to reduce the token footprint of the `oni-watcher-plugin` MCP tools without making them harder for the model (or the user) to use. The current tools are correct and well-documented; the issue is they return more bytes than the model usually needs to answer the question.
+A focused plan to reduce the token footprint of the `oni-vision-plugin` MCP tools without making them harder for the model (or the user) to use. The current tools are correct and well-documented; the issue is they return more bytes than the model usually needs to answer the question.
 
 ## Problem statement
 
@@ -130,7 +130,7 @@ duplicant_traits: duplicant_id, trait
 v_buildings_by_prefab: prefab_id, count
 ```
 
-One call, ~200 tokens, replaces dozens of lines in skills/oni-watcher/SKILL.md. Idempotent and safe to call once at the start of a session.
+One call, ~200 tokens, replaces dozens of lines in skills/oni-vision/SKILL.md. Idempotent and safe to call once at the start of a session.
 
 ### G. `oni_dupe` — single-dupe deep dive
 
@@ -168,7 +168,7 @@ For "tell me everything about Meep" — currently the model has to call `oni_dup
 4. Lower default limits on `dupes` and `resources`.
 5. Integer-round large totals in `resources`.
 6. Implement `oni_status`, `oni_schema`, `oni_dupe`.
-7. Update `skills/oni-watcher/SKILL.md` to point at the new tools and params.
+7. Update `skills/oni-vision/SKILL.md` to point at the new tools and params.
 8. Tests for every new code path: format=tsv output shape, fields projection, oni_status content, oni_schema list, oni_dupe deep dive.
 
 Each step is independent and could ship as its own commit.
@@ -193,6 +193,6 @@ Order-of-magnitude targets:
 
 ## Documentation impact
 
-- `skills/oni-watcher/SKILL.md`: add a "minimal-token patterns" section near the top. Show the `fields` projection idiom for `oni_dupes`, and `oni_status` as the default for general colony questions.
+- `skills/oni-vision/SKILL.md`: add a "minimal-token patterns" section near the top. Show the `fields` projection idiom for `oni_dupes`, and `oni_status` as the default for general colony questions.
 - `CLAUDE.md` (parent project): unchanged — it's already the lightweight raw-SQL path.
-- `oni-watcher-plugin/README.md`: add the three new tools to the tools table, plus a note about `format: "tsv"` on the existing tools.
+- `oni-vision-plugin/README.md`: add the three new tools to the tools table, plus a note about `format: "tsv"` on the existing tools.

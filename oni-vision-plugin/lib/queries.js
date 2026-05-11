@@ -11,9 +11,9 @@ import { join } from "node:path";
 const HOME = homedir();
 
 /**
- * Find the path to the oni-watcher's current.sqlite. Reads
- * ~/.oni-watcher/config.json (same convention as the watcher itself)
- * and falls back to ~/.oni-watcher/output/current.sqlite.
+ * Find the path to the oni-vision's current.sqlite. Reads
+ * ~/.oni-vision/config.json (same convention as the daemon itself)
+ * and falls back to ~/.oni-vision/output/current.sqlite.
  *
  * NOTE: this intentionally duplicates the JSON-parsing / _-key-stripping
  * logic in ../../src/paths.js rather than importing from it. The plugin
@@ -23,8 +23,8 @@ const HOME = homedir();
  */
 export function resolveDbPath() {
   const candidates = [
-    join(HOME, ".oni-watcher", "config.json"),
-    join(HOME, ".config", "oni-watcher", "config.json"),
+    join(HOME, ".oni-vision", "config.json"),
+    join(HOME, ".config", "oni-vision", "config.json"),
   ];
   for (const path of candidates) {
     if (!existsSync(path)) continue;
@@ -41,7 +41,7 @@ export function resolveDbPath() {
       // fall through
     }
   }
-  return join(HOME, ".oni-watcher", "output", "current.sqlite");
+  return join(HOME, ".oni-vision", "output", "current.sqlite");
 }
 
 // ---------------------------------------------------------------------------

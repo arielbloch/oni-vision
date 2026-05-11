@@ -1,4 +1,4 @@
-# oni-watcher — feature plan
+# oni-vision — feature plan
 
 This document is the design north star for the next round of features after Wave 5 (config-file-only). Each section is a self-contained mini-design: what we want, the rough shape of the solution, what ships, and what we still need to decide. Pick them up in any order; #1 is the natural next step because it pays off for every other feature.
 
@@ -7,7 +7,7 @@ This document is the design north star for the next round of features after Wave
 ## 1. Zero-config save-dir discovery — ✅ implemented (Wave 6)
 
 ### Goal
-A first-time user should be able to run `npm start` with no config file and have the watcher figure out which save folder to watch. No copy-paste from the README, no `<USERNAME>` substitution. If we find a save, we use it; if we find none, we print a clear error with the candidate paths we tried.
+A first-time user should be able to run `npm start` with no config file and have the daemon figure out which save folder to watch. No copy-paste from the README, no `<USERNAME>` substitution. If we find a save, we use it; if we find none, we print a clear error with the candidate paths we tried.
 
 ### What to probe
 The save-files directory varies by platform, by Steam vs. standalone, by Cloud Save vs. local, and by ONI patch. Modern installs have either `save_files` (local) or `cloud_save_files` (Steam Cloud sync) under one of these roots, depending on the install:
@@ -41,7 +41,7 @@ For each root we look for two child folder names: `cloud_save_files` first (Stea
 
 ### Open questions
 - Should we cache the discovered dir somewhere so we don't re-probe every startup? Probably not — it's cheap, and the source of truth changes if you reinstall.
-- Should we surface the auto-detected path back into `~/.oni-watcher/config.json` automatically? My instinct is no — magical config-rewriting is surprising. Better to print "to lock this in, copy to ~/.oni-watcher/config.json" and let the user decide.
+- Should we surface the auto-detected path back into `~/.oni-vision/config.json` automatically? My instinct is no — magical config-rewriting is surprising. Better to print "to lock this in, copy to ~/.oni-vision/config.json" and let the user decide.
 
 ---
 
@@ -76,7 +76,7 @@ Dupes (sorted by stress)
 
 ### Deliverables
 - `src/ui.js` — pure formatting functions, take a SQLite handle and a width hint, return strings.
-- `src/cli/status.js` — entry point for `npm run status`; opens `~/.oni-watcher/output/current.sqlite` (or a `--db` arg), invokes `ui.render(db)`, prints.
+- `src/cli/status.js` — entry point for `npm run status`; opens `~/.oni-vision/output/current.sqlite` (or a `--db` arg), invokes `ui.render(db)`, prints.
 - `src/pipeline.js` — at the end of `buildOutputs`, print the same summary so the daemon shows it after every save.
 - `package.json` — add `"status": "node --no-warnings=ExperimentalWarning src/cli/status.js"`.
 - Tests under `test/ui.test.js` — snapshot the rendered text against the FAKE_SAVE fixture.
@@ -94,17 +94,17 @@ A second pass turns the static print into a `blessed` or `ink`-driven TUI: arrow
 ## 3. MCP plugin for Claude Code / Cowork — ✅ implemented (Wave 8)
 
 ### Goal
-Ship oni-watcher as a Claude plugin so any Claude session (Cowork or Claude Code) can answer "what's going on in my colony" without the user manually piping `sqlite3` queries. The plugin bundles an MCP server that exposes typed tools and a SKILL.md that teaches the model how to use them.
+Ship oni-vision as a Claude plugin so any Claude session (Cowork or Claude Code) can answer "what's going on in my colony" without the user manually piping `sqlite3` queries. The plugin bundles an MCP server that exposes typed tools and a SKILL.md that teaches the model how to use them.
 
 ### Plugin contents
 
 ```
-oni-watcher-plugin/
+oni-vision-plugin/
 ├── plugin.json                # plugin manifest (name, version, author, mcps[], skills[])
 ├── mcp/
 │   └── server.js              # node MCP server (tools below)
 ├── skills/
-│   └── oni-watcher/
+│   └── oni-vision/
 │       └── SKILL.md           # how-to for the model
 └── README.md
 ```
@@ -121,18 +121,18 @@ oni-watcher-plugin/
 
 ### Lifecycle
 - The MCP server opens `current.sqlite` in read-only mode each call. Stateless.
-- Discovery: the server reads its own config from `~/.oni-watcher/config.json` to find `outputDir`. No second source of truth.
-- Errors when `current.sqlite` is missing return a structured "watcher hasn't run yet" payload, not an exception, so the model can handle it gracefully.
+- Discovery: the server reads its own config from `~/.oni-vision/config.json` to find `outputDir`. No second source of truth.
+- Errors when `current.sqlite` is missing return a structured "daemon hasn't run yet" payload, not an exception, so the model can handle it gracefully.
 
 ### SKILL.md
 Modeled on the existing `CLAUDE.md` but reframed for tool use rather than raw SQL. It tells the model: when the user asks colony questions, prefer typed tools (`oni_dupes`, `oni_geysers`, etc.) over `oni_query`; only reach for `oni_query` when the typed tools don't cover what's needed; always check `oni_freshness` if a question is time-sensitive.
 
 ### Distribution
-- Publish under the user's GitHub `arielbloch/oni-watcher-plugin` (or as a subfolder of this repo).
+- Publish under the user's GitHub `arielbloch/oni-vision-plugin` (or as a subfolder of this repo).
 - Once functional, submit to the Cowork plugin marketplace.
 
 ### Open questions
-- Should the MCP server bundle the watcher daemon or assume it's running separately? Bundle: simpler for users; separate: respects the existing project boundary. My vote: separate — the plugin only reads what oni-watcher writes, and the user runs the daemon however they want (`npm start`, launchctl, etc.).
+- Should the MCP server bundle the oni-vision daemon or assume it's running separately? Bundle: simpler for users; separate: respects the existing project boundary. My vote: separate — the plugin only reads what oni-vision writes, and the user runs the daemon however they want (`npm start`, launchctl, etc.).
 - Read-only SQL safety on `oni_query`: parse the query and reject any non-SELECT statement, or use a separate connection with `PRAGMA query_only = ON`. Both are fine.
 
 ---

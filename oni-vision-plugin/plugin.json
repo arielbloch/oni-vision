@@ -1,0 +1,19 @@
+{
+  "name": "oni-vision",
+  "version": "0.1.0",
+  "description": "Query your live Oxygen Not Included colony save from Claude Code or Cowork. Provides typed read-only tools (dupes, geysers, resources) plus a SQL escape hatch over the SQLite database produced by the oni-vision daemon.",
+  "author": "Ariel Bloch",
+  "homepage": "https://github.com/ArielBloch/oni-vision",
+  "license": "MIT",
+  "mcpServers": {
+    "oni-vision": {
+      "command": "node",
+      "args": ["./mcp/server.js"],
+      "env": {}
+    }
+  },
+  "skills": [
+    "./skills/oni-vision",
+    "./skills/oni-architect"
+  ]
+}

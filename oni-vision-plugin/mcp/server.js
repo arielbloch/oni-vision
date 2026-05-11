@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MCP server exposing typed read-only tools over the oni-watcher
+// MCP server exposing typed read-only tools over the oni-vision
 // SQLite database. Speaks the standard MCP stdio transport — point
 // any MCP-aware client at this script.
 //
@@ -142,8 +142,8 @@ function openDb() {
   const path = resolveDbPath();
   if (!existsSync(path)) {
     throw new Error(
-      `oni-watcher database not found at ${path}. ` +
-      `Has the watcher run yet? Run 'npm start' in the oni-watcher repo, ` +
+      `oni-vision database not found at ${path}. ` +
+      `Has oni-vision run yet? Run 'npm start' in the oni-vision repo, ` +
       `or 'npm run parse' for a one-shot.`
     );
   }
@@ -176,7 +176,7 @@ function renderPayload(data, format) {
 }
 
 const server = new Server(
-  { name: "oni-watcher", version: "0.1.0" },
+  { name: "oni-vision", version: "0.1.0" },
   { capabilities: { tools: {} } }
 );
 

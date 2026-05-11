@@ -5,7 +5,7 @@
 //   node src/parse-once.js                       # parse latest in configured save dir
 //   node src/parse-once.js path/to/your.sav      # parse a specific file
 //
-// Configure via ~/.oni-watcher/config.json (see .config-example.json).
+// Configure via ~/.oni-vision/config.json (see .config-example.json).
 
 import { existsSync } from "node:fs";
 
@@ -31,7 +31,7 @@ if (arg) {
   if (!existsSync(config.saveDir)) {
     console.error(
       `[parse-once] save directory not found: ${config.saveDir}\n` +
-      `Drop a config file at ~/.oni-watcher/config.json pointing at the correct folder. ` +
+      `Drop a config file at ~/.oni-vision/config.json pointing at the correct folder. ` +
       `See .config-example.json in the project root for a template.`
     );
     process.exit(1);
