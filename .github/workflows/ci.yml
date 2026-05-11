@@ -26,7 +26,12 @@ jobs:
 
       - name: Syntax-check sources
         run: |
-          for f in src/*.js; do node --check "$f" || exit 1; done
+          set -e
+          for f in src/*.js src/cli/*.js \
+                   oni-watcher-plugin/lib/*.js \
+                   oni-watcher-plugin/mcp/*.js; do
+            node --check "$f"
+          done
 
       - name: Run tests
         run: npm test

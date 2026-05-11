@@ -51,6 +51,20 @@ describe("freshness", () => {
     assert.ok(f.parsed_at);
     assert.ok(f.age_seconds >= 0 && f.age_seconds < 60);
   });
+
+  test("returns null fields when parsed_at is missing (older watcher version)", () => {
+    // Build a DB whose save_meta has no parsed_at row, simulating
+    // a SQLite produced by a pre-Wave-1 oni-watcher.
+    const tables = extractAll(FAKE_SAVE);
+    // Note: deliberately NOT pushing { key: "parsed_at", ... }.
+    const dir = mkdtempSync(join(tmpdir(), "oni-mcp-test-noparsed-"));
+    const dbPath = join(dir, "test.sqlite");
+    writeDatabase(dbPath, tables);
+    const db = new DatabaseSync(dbPath);
+    const f = freshness(db);
+    assert.equal(f.parsed_at, null);
+    assert.equal(f.age_seconds, null);
+  });
 });
 
 describe("dupes", () => {
@@ -137,6 +151,25 @@ describe("query (SELECT-only)", () => {
       db,
       "SELECT name FROM duplicants WHERE stress > ? AND stress < ?",
       [10, 100]
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].name, "Meep");
+  });
+
+  test("treats null/undefined params as no params", () => {
+    const db = buildDb();
+    const a = query(db, "SELECT name FROM duplicants", null);
+    const b = query(db, "SELECT name FROM duplicants", undefined);
+    assert.equal(a.length, 1);
+    assert.equal(b.length, 1);
+  });
+
+  test("supports named params via an object", () => {
+    const db = buildDb();
+    const rows = query(
+      db,
+      "SELECT name FROM duplicants WHERE name = $name",
+      { $name: "Meep" }
     );
     assert.equal(rows.length, 1);
     assert.equal(rows[0].name, "Meep");

@@ -178,6 +178,9 @@ export function query(db, sql, params = []) {
   // PRAGMA, ATTACH, DETACH could in principle appear after WITH, but
   // sqlite parses them as separate statements; the single-statement
   // check above covers it.
-  const paramList = Array.isArray(params) ? params : [params];
+  let paramList;
+  if (params == null) paramList = [];
+  else if (Array.isArray(params)) paramList = params;
+  else paramList = [params]; // object → named-param binding, scalar → bind as the first ?
   return db.prepare(trimmed).all(...paramList).map((r) => ({ ...r }));
 }

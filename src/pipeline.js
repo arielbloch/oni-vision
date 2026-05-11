@@ -108,17 +108,23 @@ export async function buildOutputs({ savePath, outputDir }) {
 
   // Print a human-readable status block after each successful parse.
   // Cheap: reads the DB we just wrote. Skipped on errors so a render
-  // bug never breaks the parse pipeline.
+  // bug never breaks the parse pipeline. Wrapped in try/finally so the
+  // DB handle is always released — a throw inside render() must not
+  // leak the handle.
+  let renderDb = null;
   try {
-    const db = new DatabaseSync(dbFinal, { readOnly: true });
+    renderDb = new DatabaseSync(dbFinal, { readOnly: true });
     const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
     const width = process.stdout.columns ?? 80;
     console.log("");
-    console.log(render(db, { color: useColor, width }));
+    console.log(render(renderDb, { color: useColor, width }));
     console.log("");
-    db.close();
   } catch (err) {
     console.warn(`[pipeline]   render skipped: ${err.message}`);
+  } finally {
+    if (renderDb) {
+      try { renderDb.close(); } catch { /* ignore */ }
+    }
   }
 
   return { tables, outputDir, savePath };

@@ -33,9 +33,12 @@ if (!existsSync(dbPath)) {
 
 const db = new DatabaseSync(dbPath, { readOnly: true });
 
-const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
-const width = process.stdout.columns ?? 80;
-
-console.log(render(db, { color: useColor, width }));
-
-db.close();
+try {
+  const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
+  const width = process.stdout.columns ?? 80;
+  console.log(render(db, { color: useColor, width }));
+} finally {
+  // Ensure the handle is released even if render throws. Important for
+  // long-running shells where this script might be invoked many times.
+  try { db.close(); } catch { /* ignore */ }
+}

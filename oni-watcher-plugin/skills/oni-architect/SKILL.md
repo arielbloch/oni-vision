@@ -7,7 +7,7 @@ description: Professional Oxygen Not Included colony advisor. Use when the user 
 
 This skill turns Claude into a colony-design copilot for Oxygen Not Included. It bundles curated reference material covering the math (oxygen, food, power, heat), the design patterns that work, and the failure modes that keep showing up.
 
-When the user has the `oni-watcher` skill installed too, prefer real data from `oni_*` tools over generic advice — "your Liam is at 78% stress because his bedroom decor is -47" beats "in general, keep stress low".
+When `oni-watcher` data tools are available (they ship in the same plugin as this skill), prefer real numbers from `oni_*` over generic advice — "your Liam is at 78% stress because his bedroom decor is -47" beats "in general, keep stress low". If the watcher hasn't run or its data is stale (>10 minutes via `oni_freshness`), say so before reasoning from the stale snapshot.
 
 ## When to trigger
 
