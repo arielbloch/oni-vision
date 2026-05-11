@@ -61,13 +61,14 @@ The detail lives in `references/`. Load them progressively — most questions on
 4. Compare against `references/common-asks.md` checklist.
 
 **"My power keeps browning out."**
-1. `oni_query` to total wattage of placed buildings — sum from a hardcoded prefab→watts table in `references/throughput.md`.
-2. Check battery count + capacity.
+1. `oni_query` with `format: "tsv"` to total wattage of placed buildings — sum from a hardcoded prefab→watts table in `references/throughput.md`.
+2. Check battery count + capacity (also via `oni_query` against `buildings` filtered by prefab containing `Battery`).
 3. Diagnose: is the *generator* underprovisioned, or is the *battery buffer* too small for the dupe-asleep peak draw?
 
 **"What's a good cycle 30 build order?"**
-1. Use `references/common-asks.md`.
-2. If `oni-watcher` data is available, calibrate to what the user already has.
+1. `oni_status()` to see where the colony is right now — cycle, dupe count, top stressors, what's already stockpiled.
+2. Cross-reference against `references/common-asks.md`'s cycle-30 row.
+3. Specific shortfalls (oxygen, food, power, cooling) become the priority list.
 
 ## What this skill does NOT do
 

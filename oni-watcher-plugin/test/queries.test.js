@@ -118,6 +118,27 @@ describe("dupes", () => {
     const rows = dupes(db); // no limit override
     assert.equal(rows.length, 1);
   });
+
+  test("sort column doesn't need to be in fields (SQLite allows ORDER BY on unprojected columns)", () => {
+    const db = buildDb();
+    const rows = dupes(db, { sort: "stress", fields: ["name"] });
+    assert.equal(rows.length, 1);
+    assert.deepEqual(Object.keys(rows[0]), ["name"]);
+    assert.equal(rows[0].name, "Meep");
+  });
+
+  test("explicit fields covering every DUPE_COLUMN matches the default projection", () => {
+    const db = buildDb();
+    const explicit = dupes(db, {
+      fields: [
+        "name", "gender", "current_role", "target_role",
+        "stress", "calories", "stamina", "bladder", "breath",
+        "hp", "decor", "immune", "body_temperature",
+      ],
+    });
+    const def = dupes(db);
+    assert.deepEqual(Object.keys(explicit[0]).sort(), Object.keys(def[0]).sort());
+  });
 });
 
 describe("dupeDetail", () => {

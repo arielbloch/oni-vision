@@ -120,6 +120,6 @@ When a user complains "Liam is stressed", check `duplicant_effects` first — us
 
 If 1 fails outright, pass. Don't keep dupes for cosmetic reasons — every body is calories, oxygen, and morale demand for the rest of the game.
 
-**"Why is my dupe stressed?"** — Run `oni_query` against `duplicant_effects` for that dupe; if any of the negative-effect IDs appear, that's your answer. Otherwise check decor (need at least +10 in bedroom and 0 in workspaces).
+**"Why is my dupe stressed?"** — Use `oni_dupe({ name })` — it returns the dupe's traits + skills + attributes + active effects in one payload. Check the `effects` list for any negative-effect IDs (SoreBack, WetFeet, etc.); that's usually your answer. If effects are clean, check decor (need at least +10 in bedroom and 0 in workspaces).
 
 **"How many dupes should I print?"** — Rule of thumb: 1 dupe per cycle 5 until cycle 30, then 1 per ~10 cycles, capping around 12–16 for a balanced base. SPOM-equivalent oxygen and food production scales with dupes; don't get ahead of those.

@@ -14,6 +14,12 @@ const HOME = homedir();
  * Find the path to the oni-watcher's current.sqlite. Reads
  * ~/.oni-watcher/config.json (same convention as the watcher itself)
  * and falls back to ~/.oni-watcher/output/current.sqlite.
+ *
+ * NOTE: this intentionally duplicates the JSON-parsing / _-key-stripping
+ * logic in ../../src/paths.js rather than importing from it. The plugin
+ * is designed to be installable on its own — it must not depend on any
+ * parent-repo source at runtime. If the config schema ever changes, both
+ * places need to update.
  */
 export function resolveDbPath() {
   const candidates = [
