@@ -35,18 +35,18 @@ A 12-dupe colony needs ≈12,000 kcal/cycle. Pepper Bread × 3 dupe-cycles per l
 
 ## Power
 
-Common building wattages:
+Common building wattages. **Sign convention: positive = consumer (draw), negative = producer (generation).**
 
 | Building              | Watts |
 |-----------------------|-------|
 | Algae Deoxidizer      | 120   |
 | Electrolyzer          | 120   |
-| Hydrogen Generator    | -800 (production) consuming 100 g/s H2 |
-| Coal Generator        | -600 production, 1 kg/s coal           |
-| Petroleum Generator   | -2000 production, 2 kg/s petroleum     |
-| Solar Panel           | -380 max                              |
-| Manual Generator      | -400 (with 1 dupe)                    |
-| Steam Turbine         | -850 max, consuming 2 kg/s steam      |
+| Hydrogen Generator    | -800 (consuming 100 g/s H2)            |
+| Coal Generator        | -600 (consuming 1 kg/s coal)           |
+| Petroleum Generator   | -2000 (consuming 2 kg/s petroleum)     |
+| Solar Panel           | -380 (max, daylight only)              |
+| Manual Generator      | -400 (with 1 dupe operating)           |
+| Steam Turbine         | -850 (max, consuming 2 kg/s ≥125 °C steam) |
 | Microbe Musher        | 240   |
 | Electric Grill        | 240   |
 | Atmo Suit Dock        | 480   |

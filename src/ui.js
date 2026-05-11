@@ -83,9 +83,10 @@ export function renderBanner(db, { color = false, width = 80 } = {}) {
   const right = meta.cycle != null ? `cycle ${meta.cycle}` : "(unknown cycle)";
   const middle = ` · `;
   const line = `${left}${middle}${right}`;
-  const bar = "═".repeat(Math.max(0, width - line.length - 8));
-  const headline = `═══ ${paint(line, ANSI.bold + ANSI.cyan, color)} ${paint(bar, ANSI.dim, color)}═══`;
-  return headline;
+  // Trailing horizontal rule. Local name `trail` avoids shadowing the
+  // module-level `bar()` function for stress bars.
+  const trail = "═".repeat(Math.max(0, width - line.length - 8));
+  return `═══ ${paint(line, ANSI.bold + ANSI.cyan, color)} ${paint(trail, ANSI.dim, color)}═══`;
 }
 
 /** "12 duplicants · 4 critters · 7 geysers". */

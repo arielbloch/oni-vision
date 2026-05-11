@@ -124,6 +124,24 @@ describe("query (SELECT-only)", () => {
     assert.equal(rows[0].name, "Meep");
   });
 
+  test("binds positional params correctly (regression: array was being passed as a single value)", () => {
+    const db = buildDb();
+    const rows = query(db, "SELECT name FROM duplicants WHERE name = ?", ["Meep"]);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].name, "Meep");
+  });
+
+  test("supports multiple positional params", () => {
+    const db = buildDb();
+    const rows = query(
+      db,
+      "SELECT name FROM duplicants WHERE stress > ? AND stress < ?",
+      [10, 100]
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].name, "Meep");
+  });
+
   test("rejects DROP", () => {
     const db = buildDb();
     assert.throws(() => query(db, "DROP TABLE duplicants"), /Only SELECT/);

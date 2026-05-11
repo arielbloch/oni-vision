@@ -157,6 +157,11 @@ export function resources(db, { location = "both", limit = 25 } = {}) {
  * Run a free-form SELECT. Refuses anything that isn't a single SELECT
  * statement so a confused or adversarial caller can't DROP/UPDATE/
  * ATTACH/DETACH/PRAGMA the DB.
+ *
+ * `params` is bound as positional `?` parameters. We must spread it into
+ * the all() call — node:sqlite's all() takes varargs, so passing the
+ * array directly would try to bind the array as a single value (which
+ * fails with "Unknown named parameter '0'").
  */
 export function query(db, sql, params = []) {
   const trimmed = String(sql).trim().replace(/;$/, "");
@@ -173,5 +178,6 @@ export function query(db, sql, params = []) {
   // PRAGMA, ATTACH, DETACH could in principle appear after WITH, but
   // sqlite parses them as separate statements; the single-statement
   // check above covers it.
-  return db.prepare(trimmed).all(params).map((r) => ({ ...r }));
+  const paramList = Array.isArray(params) ? params : [params];
+  return db.prepare(trimmed).all(...paramList).map((r) => ({ ...r }));
 }
