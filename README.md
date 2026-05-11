@@ -28,7 +28,7 @@ Save-file decoding is done by [`oni-save-parser`](https://github.com/RoboPhred/o
 ## Build
 
 ```bash
-git clone git@github.com:ArielBloch/oni-watcher.git
+git clone git@github.com:arielbloch/oni-watcher.git
 cd oni-watcher
 npm install
 ```
