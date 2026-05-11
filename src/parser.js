@@ -1,7 +1,11 @@
 // Thin wrapper around oni-save-parser.
 // parseSaveGame takes an ArrayBuffer and returns a SaveGame object whose shape
 // is fully described in node_modules/oni-save-parser/dts/save-structure/.
+//
+// `./_polyfills.js` MUST be imported before `oni-save-parser` so that
+// util.isObject (removed in recent Node versions) is shimmed in time.
 
+import "./_polyfills.js";
 import { readFile } from "node:fs/promises";
 import { parseSaveGame } from "oni-save-parser";
 
