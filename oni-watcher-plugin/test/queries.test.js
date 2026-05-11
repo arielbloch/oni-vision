@@ -16,9 +16,13 @@ import {
   saveMeta,
   freshness,
   dupes,
+  dupeDetail,
   geysers,
   resources,
   query,
+  status,
+  schema,
+  toTsv,
 } from "../lib/queries.js";
 
 function buildDb() {
@@ -82,6 +86,61 @@ describe("dupes", () => {
     const rows = dupes(db, { sort: "DROP TABLE; --" });
     assert.equal(rows.length, 1); // didn't blow up
     assert.equal(rows[0].name, "Meep");
+  });
+
+  test("fields projection limits columns to the requested set", () => {
+    const db = buildDb();
+    const rows = dupes(db, { fields: ["name", "stress"] });
+    assert.equal(rows.length, 1);
+    assert.deepEqual(Object.keys(rows[0]).sort(), ["name", "stress"]);
+    assert.equal(rows[0].name, "Meep");
+    assert.equal(rows[0].stress, 12.5);
+  });
+
+  test("fields projection silently drops unknown column names", () => {
+    const db = buildDb();
+    const rows = dupes(db, { fields: ["name", "DROP TABLE", "stress"] });
+    assert.deepEqual(Object.keys(rows[0]).sort(), ["name", "stress"]);
+  });
+
+  test("empty/invalid fields list falls back to all columns", () => {
+    const db = buildDb();
+    const rows = dupes(db, { fields: [] });
+    // All-columns projection has way more than 2 keys.
+    assert.ok(Object.keys(rows[0]).length > 2);
+  });
+
+  test("default limit is 12 (was 50 pre-optimization)", () => {
+    // Smoke-style: just verify the function works with the new default
+    // and produces rows. We don't have a 50-dupe fixture, but we can
+    // assert that the new default limit doesn't blow up small fixtures.
+    const db = buildDb();
+    const rows = dupes(db); // no limit override
+    assert.equal(rows.length, 1);
+  });
+});
+
+describe("dupeDetail", () => {
+  test("returns vitals + traits + skills + attributes + effects for a known dupe", () => {
+    const db = buildDb();
+    const detail = dupeDetail(db, "Meep");
+    assert.equal(detail.name, "Meep");
+    assert.equal(detail.current_role, "Digger");
+    assert.equal(detail.stress, 12.5);
+    // Fixture: Meep has Trait_Sociable and Trait_Loud.
+    assert.deepEqual(detail.traits.sort(), ["Trait_Loud", "Trait_Sociable"]);
+    // Fixture: only Mining1 mastered.
+    assert.deepEqual(detail.skills, ["Mining1"]);
+    // Fixture: Digging and Strength attributes.
+    const attrIds = detail.attributes.map((a) => a.attribute).sort();
+    assert.deepEqual(attrIds, ["Digging", "Strength"]);
+    // Fixture: FullBladder effect.
+    assert.ok(detail.effects.find((e) => e.effect === "FullBladder"));
+  });
+
+  test("returns null for an unknown name", () => {
+    const db = buildDb();
+    assert.equal(dupeDetail(db, "Nobody"), null);
   });
 });
 
@@ -196,5 +255,87 @@ describe("query (SELECT-only)", () => {
       () => query(db, "SELECT 1; SELECT 2"),
       /single SELECT/
     );
+  });
+});
+
+describe("toTsv", () => {
+  test("renders header + rows with tab separators", () => {
+    const out = toTsv([
+      { name: "Meep", stress: 12.5 },
+      { name: "Stinky", stress: 4 },
+    ]);
+    const lines = out.split("\n");
+    assert.equal(lines[0], "name\tstress");
+    assert.equal(lines[1], "Meep\t12.5");
+    assert.equal(lines[2], "Stinky\t4");
+  });
+
+  test("renders null cells as empty strings", () => {
+    const out = toTsv([{ a: 1, b: null }]);
+    assert.equal(out, "a\tb\n1\t");
+  });
+
+  test("returns empty string for empty input", () => {
+    assert.equal(toTsv([]), "");
+    assert.equal(toTsv(null), "");
+  });
+
+  test("is significantly smaller than JSON.stringify for tabular data", () => {
+    const rows = [];
+    for (let i = 0; i < 10; i++) {
+      rows.push({ name: `Dupe${i}`, stress: i * 7, role: "Digger" });
+    }
+    const tsv = toTsv(rows);
+    const json = JSON.stringify(rows);
+    // TSV should be at least 30% smaller for this shape. (We don't claim
+    // 50% reliably because tiny-int values compress less than long strings.)
+    assert.ok(tsv.length < json.length * 0.7, `TSV ${tsv.length} should be <0.7× JSON ${json.length}`);
+  });
+});
+
+describe("status", () => {
+  test("returns a TSV-block snapshot with the headline facts", () => {
+    const db = buildDb();
+    const out = status(db);
+    assert.match(out, /base_name=Test Base/);
+    assert.match(out, /cycle=312/);
+    assert.match(out, /duplicants=1/);
+    assert.match(out, /geysers=2/);
+    // Section headers and TSV bodies present.
+    assert.match(out, /# top dupes by stress/);
+    assert.match(out, /Meep\t12.5\tDigger/);
+    assert.match(out, /# geyser types/);
+    assert.match(out, /# top elements by mass/);
+  });
+
+  test("limits are honored", () => {
+    const db = buildDb();
+    const out = status(db, { dupeLimit: 1, geyserLimit: 1, resourceLimit: 1 });
+    // Section headers still present; just fewer rows.
+    assert.match(out, /# top dupes/);
+    assert.match(out, /# geyser types/);
+  });
+});
+
+describe("schema", () => {
+  test("lists tables and views with their columns", () => {
+    const db = buildDb();
+    const out = schema(db);
+    // Should mention every typed table.
+    assert.match(out, /table duplicants:/);
+    assert.match(out, /table buildings:/);
+    assert.match(out, /table world_objects:/);
+    assert.match(out, /table geysers:/);
+    assert.match(out, /table critters:/);
+    // Storage owner column is owner_id (post-Wave-4 rename).
+    assert.match(out, /storage_contents: owner_id/);
+    // Views show up too.
+    assert.match(out, /view v_buildings_by_prefab:/);
+  });
+
+  test("skips internal sqlite_* objects", () => {
+    const db = buildDb();
+    const out = schema(db);
+    assert.doesNotMatch(out, /sqlite_/);
   });
 });

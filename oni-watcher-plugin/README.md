@@ -32,16 +32,21 @@ oni-watcher-plugin/
 - **`oni-watcher`** — teaches the model when and how to use the MCP tools below to answer questions about the user's *current* colony.
 - **`oni-architect`** — a curated knowledge base for ONI strategy, debugging, and design advice. Loads `references/*.md` on demand (progressive disclosure). When `oni-watcher` data is available the architect grounds advice in actual numbers; otherwise it falls back to general design patterns.
 
-**Six MCP tools:**
+**Nine MCP tools:**
 
 | Tool             | What                                                              |
 |------------------|-------------------------------------------------------------------|
+| `oni_status`     | **Preferred entry point.** Compact one-shot snapshot — cycle, headcounts, top stressed dupes, geyser types, top elements |
+| `oni_schema`     | Tables / views and their columns. Call once before composing `oni_query` if you don't already know the schema |
 | `oni_save_meta`  | Base name, cycle, dupe count, save version, parsed_at staleness   |
 | `oni_freshness`  | Seconds since the watcher last reparsed                           |
-| `oni_dupes`      | Duplicants with vitals, sortable                                  |
+| `oni_dupes`      | Duplicants with vitals. Sortable; `fields` to project; `format` for tsv |
+| `oni_dupe`       | Single dupe deep dive — vitals + traits + skills + attributes + effects |
 | `oni_geysers`    | Every geyser/vent/volcano, with type and roll percentiles         |
-| `oni_resources`  | Element totals — storage / world / both                           |
-| `oni_query`      | SELECT-only SQL escape hatch                                      |
+| `oni_resources`  | Element totals — storage / world / both. Integer-rounded ≥100 kg  |
+| `oni_query`      | SELECT-only SQL escape hatch. `format: "tsv"` for large returns   |
+
+Token efficiency: responses use compact JSON by default (no pretty-print). Tabular tools accept `format: "tsv"` for an additional ~50% size reduction. See `docs/mcp-optimization.md` in the parent repo for the design.
 
 ## Install
 
