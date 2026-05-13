@@ -11,5 +11,12 @@
   "includeAutoSaves": false,
 
   "_comment_debounceMs": "How long to wait (ms) after the last write to a .sav file before reparsing. Stops us from racing the game while it's still writing. Default 1500 ms is comfortable for save files up to ~10 MB; bump it if you see truncated-file parse errors.",
-  "debounceMs": 1500
+  "debounceMs": 1500,
+
+  "_comment_web": "Optional in-process web dashboard. When enabled, the daemon binds an HTTP server (127.0.0.1 only by default — no auth) and serves a single-page status view at http://localhost:<port>/. The page polls /api/status every 5s. Disabled by default; turn on for a glanceable browser-tab status.",
+  "web": {
+    "enabled": false,
+    "port": 8080,
+    "host": "127.0.0.1"
+  }
 }

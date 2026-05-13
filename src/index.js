@@ -12,6 +12,7 @@ import chokidar from "chokidar";
 import { resolveConfig } from "./paths.js";
 import { findLatestSave } from "./find-latest.js";
 import { buildOutputs } from "./pipeline.js";
+import { startWeb } from "./web.js";
 
 const config = await resolveConfig();
 
@@ -106,12 +107,30 @@ watcher.on("error", (err) => {
   console.error(`[vision] chokidar error: ${err.message}`);
 });
 
+// Optional web dashboard. Off by default; opt in via config.web.enabled.
+let webServer = null;
+if (config.web?.enabled) {
+  try {
+    webServer = await startWeb({
+      port: config.web.port ?? 8080,
+      host: config.web.host ?? "127.0.0.1",
+      outputDir: config.outputDir,
+    });
+  } catch (err) {
+    console.error(`[vision] web server failed to start: ${err.message}`);
+  }
+}
+
 console.log("[vision] running. Ctrl-C to stop.");
 
 // Tidy shutdown.
 function shutdown() {
   console.log("[vision] shutting down...");
-  watcher.close().finally(() => process.exit(0));
+  const tasks = [watcher.close()];
+  if (webServer) {
+    tasks.push(new Promise((resolve) => webServer.close(() => resolve())));
+  }
+  Promise.allSettled(tasks).finally(() => process.exit(0));
 }
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

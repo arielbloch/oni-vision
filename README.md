@@ -14,7 +14,7 @@ Save-file decoding is done by [`oni-save-parser`](https://github.com/RoboPhred/o
 - **Atomic refresh.** Every save event reparses and atomically renames `current.sqlite`, `current.json`, and `current.sav` into place — readers never see a half-written file.
 - **One DB schema, indexed for the common questions.** Typed tables for duplicants (plus traits/skills/attributes/effects), buildings, world objects, storage contents, geysers, critters; plus a generic-fallback `behaviors` table with stringified JSON for anything we haven't lifted.
 - **Cross-platform.** macOS (recent Steam + older Klei layouts), Windows, Linux.
-- **Human-readable status.** `npm run status` prints a one-screen snapshot (cycle, dupe stress bars, geyser breakdown, top stored elements). The daemon prints the same block after every save.
+- **Human-readable status.** `npm run status` prints a one-screen snapshot (cycle, dupe stress bars, geyser breakdown, top stored elements). The daemon prints the same block after every save. An optional in-process web dashboard at `http://localhost:8080` renders the same data live (turn on with `web.enabled: true` in your config).
 - **Claude Code / Cowork plugin.** [`oni-vision-plugin/`](./oni-vision-plugin) ships an MCP server with typed read-only tools (`oni_status`, `oni_dupe`, `oni_dupes`, `oni_geysers`, `oni_resources`, `oni_save_meta`, `oni_freshness`, `oni_schema`, `oni_query`) plus two skills: `oni-vision` (data access) and `oni-architect` (ONI strategy / design advice grounded in your actual save). Responses default to compact JSON; tabular tools support `format: "tsv"` for further token savings.
 - **No native compilation.** Uses Node 22.5+'s built-in `node:sqlite` module — no `better-sqlite3`, no rebuild on `nvm install`.
 - **Tested.** ~107 tests across the main project and plugin, run on Node 22.x and 24.x in CI.
@@ -70,6 +70,8 @@ node src/parse-once.js path/to.sav    # a specific file
 ```bash
 npm run status
 ```
+
+**Web dashboard (optional).** Enable in your config (`"web": { "enabled": true }`) and the daemon also serves a browser dashboard at `http://localhost:8080` (configurable). Single-page view of the same status block, polled every 5 seconds. Localhost-only by default — no auth.
 
 **Query from the shell.** Output lives at `~/.oni-vision/output/`:
 

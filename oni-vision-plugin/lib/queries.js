@@ -361,7 +361,24 @@ export function query(db, sql, params = []) {
  * named TSV tables separated by blank lines). Token efficiency: one
  * tool call replaces 4-5 separate ones plus their envelopes.
  */
-export function status(db, { dupeLimit = 5, geyserLimit = 10, resourceLimit = 5 } = {}) {
+export function status(db, opts = {}) {
+  const o = statusObject(db, opts);
+  return formatStatusBlock(o);
+}
+
+/**
+ * Same data as `status()` but as a structured object for non-TSV consumers
+ * (the web UI's /api/status endpoint, future GUIs, etc.). Returns:
+ *
+ *   {
+ *     base_name, cycle, save_version, parsed_at, age_seconds, source_file,
+ *     counts: { duplicants, critters, geysers, buildings },
+ *     top_dupes: [{ name, stress, current_role }, ...],
+ *     geyser_types: [{ type_id, count }, ...],
+ *     top_resources: [{ element_id, total_units, items }, ...],
+ *   }
+ */
+export function statusObject(db, { dupeLimit = 5, geyserLimit = 10, resourceLimit = 5 } = {}) {
   const meta = saveMeta(db);
   const fresh = freshness(db);
 
@@ -372,43 +389,59 @@ export function status(db, { dupeLimit = 5, geyserLimit = 10, resourceLimit = 5 
     buildings: db.prepare("SELECT COUNT(*) AS n FROM buildings").get().n,
   };
 
-  const topDupes = dupes(db, { sort: "stress", fields: ["name", "stress", "current_role"], limit: dupeLimit });
-  const geyserTypes = db
+  const top_dupes = dupes(db, { sort: "stress", fields: ["name", "stress", "current_role"], limit: dupeLimit });
+  const geyser_types = db
     .prepare("SELECT type_id, COUNT(*) AS count FROM geysers GROUP BY type_id ORDER BY count DESC, type_id LIMIT ?")
     .all(geyserLimit)
     .map((r) => ({ ...r }));
-  const topResources = resources(db, { location: "both", limit: resourceLimit });
+  const top_resources = resources(db, { location: "both", limit: resourceLimit });
 
+  return {
+    base_name: meta.base_name,
+    cycle: meta.cycle,
+    save_version: meta.save_version,
+    parsed_at: meta.parsed_at,
+    age_seconds: fresh.age_seconds,
+    source_file: meta.source_file,
+    counts,
+    top_dupes,
+    geyser_types,
+    top_resources,
+  };
+}
+
+/** Render a statusObject() result as the TSV-block format used by oni_status. */
+function formatStatusBlock(o) {
   const sections = [];
   // Header lines are key=value. Escape any newline/CR in the value side
   // so a multi-line value (an unlikely-but-possible base name) can't
   // break the format by introducing a stray newline mid-block.
   const kv = (k, v) => `${k}=${oneLine(v)}`;
-  sections.push(kv("base_name", meta.base_name ?? ""));
-  sections.push(kv("cycle", meta.cycle ?? ""));
-  sections.push(kv("save_version", meta.save_version ?? ""));
-  sections.push(kv("duplicants", counts.duplicants));
-  sections.push(kv("critters", counts.critters));
-  sections.push(kv("geysers", counts.geysers));
-  sections.push(kv("buildings", counts.buildings));
-  if (fresh.age_seconds != null) {
-    sections.push(`parsed_at_age_seconds=${fresh.age_seconds}`);
+  sections.push(kv("base_name", o.base_name ?? ""));
+  sections.push(kv("cycle", o.cycle ?? ""));
+  sections.push(kv("save_version", o.save_version ?? ""));
+  sections.push(kv("duplicants", o.counts.duplicants));
+  sections.push(kv("critters", o.counts.critters));
+  sections.push(kv("geysers", o.counts.geysers));
+  sections.push(kv("buildings", o.counts.buildings));
+  if (o.age_seconds != null) {
+    sections.push(`parsed_at_age_seconds=${o.age_seconds}`);
   }
 
-  if (topDupes.length > 0) {
+  if (o.top_dupes.length > 0) {
     sections.push("");
     sections.push("# top dupes by stress");
-    sections.push(toTsv(topDupes));
+    sections.push(toTsv(o.top_dupes));
   }
-  if (geyserTypes.length > 0) {
+  if (o.geyser_types.length > 0) {
     sections.push("");
     sections.push("# geyser types");
-    sections.push(toTsv(geyserTypes));
+    sections.push(toTsv(o.geyser_types));
   }
-  if (topResources.length > 0) {
+  if (o.top_resources.length > 0) {
     sections.push("");
     sections.push("# top elements by mass");
-    sections.push(toTsv(topResources));
+    sections.push(toTsv(o.top_resources));
   }
 
   return sections.join("\n");
