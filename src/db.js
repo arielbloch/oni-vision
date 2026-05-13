@@ -259,7 +259,19 @@ export function writeDatabase(path, tables) {
     }
     const stmt = db.prepare(buildInsertSql(tableName, cols));
     for (const row of rows) {
-      stmt.run(toBindObject(row, cols));
+      const bound = toBindObject(row, cols);
+      try {
+        stmt.run(bound);
+      } catch (err) {
+        // node:sqlite gives us "Provided value cannot be bound to SQLite
+        // parameter N" with no hint of which table/column N corresponds
+        // to. Surface enough context to debug it.
+        throw new Error(
+          `Insert into "${tableName}" failed: ${err.message}. ` +
+          `Bound row: ${diagnosticRowDump(bound, cols)}`,
+          { cause: err }
+        );
+      }
     }
   }
 
@@ -277,9 +289,55 @@ function toBindObject(row, cols) {
   return out;
 }
 
+/**
+ * Coerce arbitrary JS values into something node:sqlite can bind.
+ *
+ * SQLite can bind null, number, string, BigInt (with caveats), and
+ * Uint8Array. Everything else needs translation:
+ *   - undefined → null
+ *   - boolean → 0/1 (SQLite has no native bool type)
+ *   - bigint → string (we don't want to surface int-vs-bigint quirks
+ *     downstream; a string preserves the value losslessly for keys)
+ *   - Symbol → its description, or the Symbol's stringified form
+ *   - Date → ISO timestamp
+ *   - function → null (shouldn't happen but be defensive)
+ *   - any other object/array (e.g. a Map or DLC-shaped composite value
+ *     that leaked through an extractor) → JSON-stringified, so the row
+ *     loads as a TEXT cell instead of crashing the whole pipeline.
+ *
+ * This is intentionally permissive: if an extractor accidentally emits
+ * a non-primitive value for a column that should be scalar, the insert
+ * still succeeds and the table is queryable. The downstream cost is
+ * the column may carry a JSON string instead of the expected type —
+ * better than losing 300k rows because of one weird save.
+ */
 function normalize(value) {
-  if (value === undefined) return null;
-  if (typeof value === "boolean") return value ? 1 : 0;
-  if (typeof value === "bigint") return value.toString();
-  return value;
+  if (value === undefined || value === null) return null;
+  const t = typeof value;
+  if (t === "number" || t === "string") return value;
+  if (t === "boolean") return value ? 1 : 0;
+  if (t === "bigint") return value.toString();
+  if (t === "symbol") return value.description ?? String(value);
+  if (t === "function") return null;
+  if (value instanceof Date) return value.toISOString();
+  // Object, array, Map, Set, etc. JSON.stringify handles arrays and
+  // plain objects; Map/Set become "{}" by default, so convert first.
+  try {
+    if (value instanceof Map) return JSON.stringify(Object.fromEntries(value));
+    if (value instanceof Set) return JSON.stringify([...value]);
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/** Format up to 6 fields of a bound row for an error message. */
+function diagnosticRowDump(bound, cols) {
+  const preview = cols.slice(0, 12).map((c) => {
+    const v = bound[c];
+    let s = v === null ? "null" : typeof v === "string" ? JSON.stringify(v.slice(0, 60)) : String(v);
+    if (s.length > 80) s = s.slice(0, 77) + "...";
+    return `${c}=${s} (${typeof v})`;
+  });
+  return `{ ${preview.join(", ")}${cols.length > 12 ? ", ..." : ""} }`;
 }

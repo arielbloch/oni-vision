@@ -25,6 +25,83 @@ function buildDb() {
   return { db: new DatabaseSync(dbPath), tables };
 }
 
+describe("normalize / writeDatabase value coercion", () => {
+  // Build a minimal in-memory tables object that lets us exercise normalize()
+  // indirectly by writing weird values and reading them back.
+  function writeAndRead(saveMetaRows) {
+    const dir = mkdtempSync(join(tmpdir(), "oni-db-normalize-"));
+    const dbPath = join(dir, "test.sqlite");
+    const tables = {
+      save_meta: saveMetaRows,
+      object_groups: [], game_objects: [], behaviors: [],
+      duplicants: [], duplicant_traits: [], duplicant_skills: [],
+      duplicant_attributes: [], duplicant_effects: [], duplicant_amounts: [],
+      buildings: [], world_objects: [], storage_contents: [],
+      geysers: [], critters: [],
+    };
+    writeDatabase(dbPath, tables);
+    const db = new DatabaseSync(dbPath);
+    return db.prepare("SELECT key, value FROM save_meta").all();
+  }
+
+  test("undefined and null both store as SQL NULL", () => {
+    const rows = writeAndRead([
+      { key: "u", value: undefined },
+      { key: "n", value: null },
+    ]);
+    assert.equal(rows.find((r) => r.key === "u").value, null);
+    assert.equal(rows.find((r) => r.key === "n").value, null);
+  });
+
+  test("booleans become 0/1", () => {
+    const rows = writeAndRead([
+      { key: "t", value: true },
+      { key: "f", value: false },
+    ]);
+    // save_meta.value is TEXT — SQLite may render a bound number as
+    // "1" or "1.0" depending on its affinity rules. parseFloat
+    // collapses both to the integer we care about.
+    assert.equal(parseFloat(rows.find((r) => r.key === "t").value), 1);
+    assert.equal(parseFloat(rows.find((r) => r.key === "f").value), 0);
+  });
+
+  test("bigint stringifies losslessly", () => {
+    const rows = writeAndRead([{ key: "big", value: 9007199254740993n }]);
+    assert.equal(rows.find((r) => r.key === "big").value, "9007199254740993");
+  });
+
+  test("Date becomes an ISO string", () => {
+    const rows = writeAndRead([{ key: "d", value: new Date("2026-01-02T03:04:05Z") }]);
+    assert.equal(rows.find((r) => r.key === "d").value, "2026-01-02T03:04:05.000Z");
+  });
+
+  test("Symbol uses its description", () => {
+    const rows = writeAndRead([{ key: "s", value: Symbol("hello") }]);
+    assert.equal(rows.find((r) => r.key === "s").value, "hello");
+  });
+
+  test("plain object is JSON-stringified (rather than crashing the insert)", () => {
+    const rows = writeAndRead([{ key: "o", value: { foo: 1, bar: "x" } }]);
+    assert.equal(rows.find((r) => r.key === "o").value, '{"foo":1,"bar":"x"}');
+  });
+
+  test("Map becomes JSON of its entries (defensive against extractor leaks)", () => {
+    const m = new Map([["a", 1], ["b", 2]]);
+    const rows = writeAndRead([{ key: "m", value: m }]);
+    assert.equal(rows.find((r) => r.key === "m").value, '{"a":1,"b":2}');
+  });
+
+  test("Set becomes JSON of its values", () => {
+    const rows = writeAndRead([{ key: "set", value: new Set([1, 2, 3]) }]);
+    assert.equal(rows.find((r) => r.key === "set").value, "[1,2,3]");
+  });
+
+  test("function silently becomes null (shouldn't happen but defensive)", () => {
+    const rows = writeAndRead([{ key: "fn", value: () => 42 }]);
+    assert.equal(rows.find((r) => r.key === "fn").value, null);
+  });
+});
+
 describe("schema shape", () => {
   test("every table the extractors produce has matching TABLE_COLUMNS, and every row's keys are a subset of those columns", () => {
     const tables = extractAll(FAKE_SAVE);
