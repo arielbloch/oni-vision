@@ -123,12 +123,22 @@ if (config.web?.enabled) {
 
 console.log("[vision] running. Ctrl-C to stop.");
 
-// Tidy shutdown.
+// Tidy shutdown. close() on the HTTP server waits for in-flight requests
+// to drain — with HTTP/1.1 keep-alive that can hang on idle browser tabs.
+// Hard-deadline at 2 seconds, then destroy any remaining sockets.
 function shutdown() {
   console.log("[vision] shutting down...");
   const tasks = [watcher.close()];
   if (webServer) {
-    tasks.push(new Promise((resolve) => webServer.close(() => resolve())));
+    tasks.push(new Promise((resolve) => {
+      const t = setTimeout(() => {
+        if (typeof webServer.closeAllConnections === "function") {
+          webServer.closeAllConnections();
+        }
+        resolve();
+      }, 2000);
+      webServer.close(() => { clearTimeout(t); resolve(); });
+    }));
   }
   Promise.allSettled(tasks).finally(() => process.exit(0));
 }

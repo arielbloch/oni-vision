@@ -101,6 +101,8 @@
 </header>
 
 <main id="main">
+  <div id="err-banner" class="err" hidden></div>
+
   <div class="counts" id="counts"></div>
 
   <h2>Top stressed dupes</h2>
@@ -215,7 +217,9 @@
   }
 
   function escapeHtml(s) {
-    return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
   }
 
   function setLiveness(state, label) {
@@ -223,12 +227,17 @@
     setText("liveness", label);
   }
 
-  function renderError(msg) {
-    setText("base-name", "—");
-    setText("cycle", "");
-    setText("source-file", "");
+  function showError(msg) {
+    const el = $("err-banner");
+    if (!el) return;
+    el.textContent = msg;
+    el.hidden = false;
     setLiveness("cold", "no data");
-    document.getElementById("main").innerHTML = `<div class="err">${escapeHtml(msg)}</div>`;
+  }
+
+  function clearError() {
+    const el = $("err-banner");
+    if (el) el.hidden = true;
   }
 
   async function refresh() {
@@ -236,20 +245,15 @@
       const res = await fetch("/api/status", { cache: "no-store" });
       if (res.status === 503) {
         const body = await res.json();
-        renderError(body.message || body.error || "watcher hasn't produced data yet");
+        showError(body.message || body.error || "oni-vision hasn't produced data yet");
         return;
       }
       if (!res.ok) {
-        renderError(`HTTP ${res.status}`);
+        showError(`HTTP ${res.status}`);
         return;
       }
       const data = await res.json();
-
-      // Restore the main panel structure if we previously errored.
-      if (!document.getElementById("counts")) {
-        location.reload();
-        return;
-      }
+      clearError();
 
       setText("base-name", data.base_name || "(unnamed colony)");
       setText("cycle", data.cycle != null ? `cycle ${data.cycle}` : "(unknown cycle)");
@@ -269,7 +273,7 @@
       renderGeysers(data.geyser_types || []);
       renderResources(data.top_resources || []);
     } catch (err) {
-      renderError(`fetch failed: ${err.message}`);
+      showError(`fetch failed: ${err.message}`);
     }
   }
 

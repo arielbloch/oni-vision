@@ -21,6 +21,7 @@ import {
   resources,
   query,
   status,
+  statusObject,
   schema,
   toTsv,
 } from "../lib/queries.js";
@@ -374,6 +375,45 @@ describe("status", () => {
     assert.equal(baseLine, "base_name=Line1 Line2");
     // No standalone "Line2" line.
     assert.ok(!lines.includes("Line2"));
+  });
+});
+
+describe("statusObject", () => {
+  test("returns the structured shape consumed by the web UI", () => {
+    const db = buildDb();
+    const o = statusObject(db);
+
+    // Top-level keys exist and have the right types.
+    assert.equal(o.base_name, "Test Base");
+    assert.equal(o.cycle, 312);
+    assert.equal(typeof o.save_version, "string");
+    assert.ok(o.parsed_at);
+    assert.equal(typeof o.age_seconds, "number");
+    assert.ok(o.counts);
+    assert.equal(o.counts.duplicants, 1);
+    assert.equal(o.counts.geysers, 2);
+    // Arrays of the right shape.
+    assert.ok(Array.isArray(o.top_dupes));
+    assert.equal(o.top_dupes[0].name, "Meep");
+    assert.ok(Array.isArray(o.geyser_types));
+    assert.ok(Array.isArray(o.top_resources));
+  });
+
+  test("limits flow through to the sub-queries", () => {
+    const db = buildDb();
+    const o = statusObject(db, { dupeLimit: 1, geyserLimit: 1, resourceLimit: 1 });
+    assert.ok(o.top_dupes.length <= 1);
+    assert.ok(o.geyser_types.length <= 1);
+    assert.ok(o.top_resources.length <= 1);
+  });
+
+  test("status(db) is just the TSV-block formatting of statusObject(db) (same data)", () => {
+    const db = buildDb();
+    const o = statusObject(db);
+    const block = status(db);
+    // The TSV block must reflect statusObject's counts and top dupes.
+    assert.match(block, new RegExp(`duplicants=${o.counts.duplicants}`));
+    if (o.top_dupes[0]) assert.match(block, new RegExp(o.top_dupes[0].name));
   });
 });
 
