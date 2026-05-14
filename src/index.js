@@ -14,6 +14,7 @@ import { ensureConfig } from "./config-writer.js";
 import { findLatestSave } from "./find-latest.js";
 import { buildOutputs } from "./pipeline.js";
 import { startWeb } from "./web.js";
+import { openBrowser } from "./browser.js";
 
 const config = await resolveConfig();
 ensureConfig({ config });
@@ -67,6 +68,12 @@ async function runOnce(reason) {
       `[vision] (${reason}) latest save: ${latest.path} (${(latest.size / 1024 / 1024).toFixed(2)} MB)`
     );
     await buildOutputs({ savePath: latest.path, outputDir: config.outputDir });
+    // Open the dashboard on the first successful parse, if we haven't yet.
+    if (webServer) {
+      const addr = webServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : (config.web?.port ?? 8080);
+      openBrowser(`http://127.0.0.1:${port}`);
+    }
   } catch (err) {
     console.error(`[vision] parse failed: ${err.stack || err.message}`);
   } finally {

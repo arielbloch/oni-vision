@@ -14,6 +14,8 @@
     "start": "node --no-warnings=ExperimentalWarning src/index.js",
     "parse": "node --no-warnings=ExperimentalWarning src/parse-once.js",
     "status": "node --no-warnings=ExperimentalWarning src/cli/status.js",
+    "setup": "node --no-warnings=ExperimentalWarning src/cli/setup.js",
+    "uninstall": "node --no-warnings=ExperimentalWarning src/cli/uninstall.js",
     "smoke": "node --no-warnings=ExperimentalWarning smoke.mjs",
     "test": "node --no-warnings=ExperimentalWarning --test test/*.test.js oni-vision-plugin/test/*.test.js"
   },
