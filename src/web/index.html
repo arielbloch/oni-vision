@@ -161,10 +161,10 @@
 
 <script>
   // ── Name lookup tables ───────────────────────────────────────────────────────
-  // SimHash integers → human-readable names. Same data as src/elements.js and
-  // the GEYSER_NAMES map in src/ui.js. Keys stored as strings because JS Maps
-  // compare object keys by identity, not value — using a plain Object is safe
-  // here since all keys are integers (no collision with inherited properties).
+  // SimHash integers → human-readable names. Seeded from src/elements.js via
+  // the API (/api/status → element_names). The hardcoded copy below is a
+  // fast first-render fallback; Object.assign() in refresh() merges any
+  // additions from the server so this file never needs manual updates.
 
   const ELEMENT_NAMES = {
     // Gases
@@ -653,6 +653,10 @@
       } else {
         setLiveness("live", `parsed ${fmtAge(age)}`);
       }
+
+      // Merge server-side element names into the local lookup so any IDs not
+      // in the hardcoded table resolve correctly without a frontend change.
+      if (data.element_names) Object.assign(ELEMENT_NAMES, data.element_names);
 
       renderCounts(data.counts || {});
       renderDupes(data.top_dupes || []);

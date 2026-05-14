@@ -70,12 +70,6 @@ async function runOnce(reason) {
     await buildOutputs({ savePath: latest.path, outputDir: config.outputDir });
     // Push a "parse" event to any open browser tabs so they refresh instantly.
     notifyClients();
-    // Open the dashboard on the first successful parse, if we haven't yet.
-    if (webServer) {
-      const addr = webServer.address();
-      const port = typeof addr === "object" && addr ? addr.port : (config.web?.port ?? 8080);
-      openBrowser(`http://127.0.0.1:${port}`);
-    }
   } catch (err) {
     console.error(`[vision] parse failed: ${err.stack || err.message}`);
   } finally {
@@ -127,6 +121,9 @@ if (config.web?.enabled !== false) {
       host: config.web?.host ?? "127.0.0.1",
       outputDir: config.outputDir,
     });
+    const addr = webServer.address();
+    const port = typeof addr === "object" && addr ? addr.port : (config.web?.port ?? 8080);
+    openBrowser(`http://127.0.0.1:${port}`);
   } catch (err) {
     console.error(`[vision] web server failed to start: ${err.message}`);
   }

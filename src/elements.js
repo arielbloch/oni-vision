@@ -51,6 +51,7 @@ export const ELEMENT_NAMES = new Map([
   [183408504,   "Sedimentary Rock"],
   [1608833498,  "Iron Ore"],
   [-758990593,  "Phosphorite"],
+  [-877427037,  "Phosphorite"],    // alternate SimHash (Phosphorite tag)
   [-839728230,  "Bleach Stone"],
   [381665462,   "Salt"],
   [118518245,   "Carbon Fibre"],
@@ -59,6 +60,10 @@ export const ELEMENT_NAMES = new Map([
   [245514112,   "Fullerene"],
   [1757792140,  "Fossil"],
   [-527922989,  "Fulgurite"],
+  [867327137,   "Clay"],
+  [947100397,   "Carbon"],
+  [1262005685,  "Oxylite"],
+  [-1396791454, "Fertilizer"],
 
   // Refined metals
   [1306370440,  "Iron"],

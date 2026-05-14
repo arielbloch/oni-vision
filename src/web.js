@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
 import { statusObject } from "../oni-vision-plugin/lib/queries.js";
+import { ELEMENT_NAMES } from "./elements.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(HERE, "web");
@@ -156,7 +157,7 @@ function serveStatus(res, outputDir) {
   let db;
   try {
     db = new DatabaseSync(dbPath, { readOnly: true });
-    const payload = statusObject(db, { dupeLimit: 9999 });
+    const payload = statusObject(db, { dupeLimit: 50 });
 
     // ── Dupe enrichment: skills + active effects ──────────────────────────────
     // Two bulk queries keyed by dupe name (unique within a colony per ONI rules).
@@ -236,6 +237,11 @@ function serveStatus(res, outputDir) {
       } catch { /* malformed JSON, skip */ }
     }
     payload.stockpile_filters = [...stockpileFilters];
+
+    // ── Element name map (single source of truth from elements.js) ────────────
+    // The frontend uses this to resolve SimHash integer IDs to display names,
+    // eliminating its own hardcoded copy that would inevitably drift.
+    payload.element_names = Object.fromEntries(ELEMENT_NAMES);
 
     res.writeHead(200, {
       "Content-Type": "application/json",

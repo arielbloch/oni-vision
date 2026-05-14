@@ -10,7 +10,7 @@
 // All paths are resolved from this file's location so the script works
 // whether the project is cloned into any directory.
 
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";

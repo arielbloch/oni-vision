@@ -17,10 +17,16 @@
     "setup": "node --no-warnings=ExperimentalWarning src/cli/setup.js",
     "uninstall": "node --no-warnings=ExperimentalWarning src/cli/uninstall.js",
     "smoke": "node --no-warnings=ExperimentalWarning smoke.mjs",
+    "lint": "eslint src oni-vision-plugin",
     "test": "node --no-warnings=ExperimentalWarning --test test/*.test.js oni-vision-plugin/test/*.test.js"
   },
   "dependencies": {
     "chokidar": "^4.0.0",
     "oni-save-parser": "^14.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.3.0",
+    "globals": "^17.6.0"
   }
 }

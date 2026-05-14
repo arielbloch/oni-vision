@@ -139,7 +139,7 @@ function countRows(tables) {
 function stripWorld(world) {
   // World data includes the entire tilemap (huge, binary). Drop it.
   if (!world) return null;
-  const { worldDetails, ...rest } = world;
+  const { worldDetails: _worldDetails, ...rest } = world;
   return rest;
 }
 
