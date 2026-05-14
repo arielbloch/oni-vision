@@ -1,0 +1,26 @@
+{
+  "name": "oni-vision",
+  "version": "0.1.0",
+  "description": "Watches Oxygen Not Included save files, parses them, and writes a SQLite database Claude (or any tool) can query efficiently.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "bin": {
+    "oni-vision": "src/index.js",
+    "oni-vision-parse": "src/parse-once.js"
+  },
+  "scripts": {
+    "start": "node --no-warnings=ExperimentalWarning src/index.js",
+    "parse": "node --no-warnings=ExperimentalWarning src/parse-once.js",
+    "status": "node --no-warnings=ExperimentalWarning src/cli/status.js",
+    "setup": "node --no-warnings=ExperimentalWarning src/cli/setup.js",
+    "uninstall": "node --no-warnings=ExperimentalWarning src/cli/uninstall.js",
+    "smoke": "node --no-warnings=ExperimentalWarning smoke.mjs",
+    "test": "node --no-warnings=ExperimentalWarning --test test/*.test.js oni-vision-plugin/test/*.test.js"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.0",
+    "oni-save-parser": "^14.0.0"
+  }
+}

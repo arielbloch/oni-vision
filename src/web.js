@@ -195,15 +195,16 @@ function serveStatus(res, outputDir) {
        ORDER BY type_id, rate_roll DESC`
     ).all();
 
-    // ── Per-dupe calorie levels ───────────────────────────────────────────────
-    // From duplicant_amounts (the live amount values tracked per dupe).
-    // Sorted hungriest-first so critical dupes surface at the top.
+    // ── Food by type in storage ───────────────────────────────────────────────
+    // Counts stacks of each food item across all storage buildings.
+    // The client maps item_prefab_id → { name, kcal, morale } for display.
     payload.food = db.prepare(
-      `SELECT d.name, da.value AS calories
-       FROM duplicant_amounts da
-       JOIN duplicants d ON d.game_object_id = da.duplicant_id
-       WHERE da.amount_name = 'Calories'
-       ORDER BY da.value ASC`
+      `SELECT item_prefab_id, COUNT(*) AS qty
+       FROM storage_contents
+       WHERE item_prefab_id IS NOT NULL AND element_id IS NULL
+       GROUP BY item_prefab_id
+       ORDER BY qty DESC
+       LIMIT 30`
     ).all();
 
     // ── All stored elements (for the user-configurable stockpile picker) ──────
@@ -219,6 +220,22 @@ function serveStatus(res, outputDir) {
        GROUP BY element_id
        ORDER BY total_units DESC`
     ).all();
+
+    // ── In-game storage filter settings (TreeFilterable) ─────────────────────
+    // Union of all element hashes accepted by any storage building. Used as
+    // the default stockpile display in the UI before the user customises it.
+    const stockpileFilters = new Set();
+    for (const row of db.prepare(
+      `SELECT template_data FROM behaviors WHERE name = 'TreeFilterable'`
+    ).all()) {
+      try {
+        const parsed = JSON.parse(row.template_data || "{}");
+        for (const tag of parsed.acceptedTagSet ?? []) {
+          if (tag.hash != null) stockpileFilters.add(tag.hash);
+        }
+      } catch { /* malformed JSON, skip */ }
+    }
+    payload.stockpile_filters = [...stockpileFilters];
 
     res.writeHead(200, {
       "Content-Type": "application/json",

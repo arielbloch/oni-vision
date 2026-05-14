@@ -88,9 +88,28 @@
     .counts   { grid-template-columns: repeat(2, 1fr); }
     .three-up { grid-template-columns: 1fr; }
   }
+  .app-header {
+    display: flex; align-items: center; gap: 9px;
+    padding-bottom: 10px; margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .app-name {
+    font-size: 17px; font-weight: 700; letter-spacing: 0.02em;
+    color: var(--accent);
+  }
 </style>
 </head>
 <body>
+
+<div class="app-header">
+  <!-- Logo: oxygen bubble (outer circle) + vision (eye path + pupil) -->
+  <svg viewBox="0 0 24 24" width="28" height="28" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="10" stroke="var(--accent)" stroke-width="1.5"/>
+    <path d="M5.5 12 Q12 5.5 18.5 12 Q12 18.5 5.5 12" stroke="var(--accent)" stroke-width="1.5"/>
+    <circle cx="12" cy="12" r="2.8" fill="var(--accent)"/>
+  </svg>
+  <span class="app-name">ONI-vision</span>
+</div>
 
 <header>
   <div class="row">
@@ -119,7 +138,7 @@
       <div class="card" id="geysers-card"><div class="empty">loading…</div></div>
     </div>
     <div>
-      <h2>Calories</h2>
+      <h2>Food</h2>
       <div class="card" id="food-card"><div class="empty">loading…</div></div>
     </div>
     <div>
@@ -266,6 +285,33 @@
     "MinorAilment":         { label: "Ill",             cls: "warn" },
     "MajorAilment":         { label: "Sick",            cls: "bad"  },
     "Pathogen_FoodPoisoning":{ label: "Food Poisoned",  cls: "bad"  },
+  };
+
+  // Food lookup: prefab ID → { name, kcal per item, morale bonus }.
+  // Morale values match the game's Food Morale tooltip (+N / -N).
+  const FOOD = {
+    "MushBar":          { name: "Mush Bar",         kcal: 1000, morale: -1 },
+    "MushFry":          { name: "Mush Fry",          kcal: 1200, morale:  0 },
+    "FriedMushroom":    { name: "Fried Mushroom",    kcal: 1600, morale:  1 },
+    "BasicForagePlant": { name: "Mealwood Shoot",    kcal:  600, morale:  0 },
+    "Mushroom":         { name: "Raw Mushroom",      kcal:  600, morale:  0 },
+    "RawEgg":           { name: "Raw Egg",           kcal:  700, morale: -1 },
+    "CookedEgg":        { name: "Cooked Egg",        kcal: 2000, morale:  2 },
+    "Meat":             { name: "Raw Meat",          kcal: 1600, morale: -1 },
+    "CookedMeat":       { name: "Cooked Meat",       kcal: 2400, morale:  2 },
+    "PlantMeat":        { name: "Plant Meat",        kcal: 1600, morale:  2 },
+    "Tofu":             { name: "Tofu",              kcal: 1600, morale:  2 },
+    "MeatPlanks":       { name: "Jerky",             kcal: 4800, morale:  4 },
+    "ColdWheatBread":   { name: "Cold Wheat Bread",  kcal: 1600, morale:  2 },
+    "PrickleFig":       { name: "Prickle Muffin",    kcal: 1200, morale:  2 },
+    "SpiceBread":       { name: "Spice Bread",       kcal: 2400, morale:  4 },
+    "PepperbreadMeal":  { name: "Pepper Bread",      kcal: 3200, morale:  4 },
+    "SpicyTofu":        { name: "Spicy Tofu",        kcal: 3200, morale:  4 },
+    "MushroomWrap":     { name: "Mushroom Wrap",     kcal: 4000, morale:  4 },
+    "WormBasicFood":    { name: "Stuffed Berry",     kcal: 4000, morale:  4 },
+    "Burger":           { name: "Barbecue",          kcal: 4000, morale:  4 },
+    "SurfAndTurf":      { name: "Surf 'n' Turf",     kcal: 6000, morale:  8 },
+    "FruitCake":        { name: "Frost Burger",      kcal: 6000, morale:  8 },
   };
 
   // Skill branch prefix → display label (mirrors SKILL_LABELS in src/ui.js).
@@ -453,7 +499,8 @@
     if (raw) stockpileSelection = new Set(JSON.parse(raw));
   } catch { /**/ }
 
-  let allElements = []; // populated from latest API response
+  let allElements = [];   // populated from latest API response
+  let inGameFilters = null; // Set<string> | null — from TreeFilterable in the save
 
   function togglePicker() {
     const el = $("stockpile-picker");
@@ -493,27 +540,26 @@
 
   // ── Renderers ─────────────────────────────────────────────────────────────────
 
-  /** Show per-dupe calorie levels (hungriest first). */
   function renderFood(rows) {
-    if (!rows || rows.length === 0) {
-      setHTML("food-card", `<div class="empty">no calorie data</div>`);
+    const known = (rows ?? [])
+      .map(r => ({ info: FOOD[r.item_prefab_id], qty: r.qty }))
+      .filter(r => r.info)
+      .sort((a, b) => (b.qty * b.info.kcal) - (a.qty * a.info.kcal));
+
+    if (known.length === 0) {
+      setHTML("food-card", `<div class="empty">no food in storage</div>`);
       return;
     }
-    // Dupe stomach capacity in ONI is 4000 kcal.
-    const MAX_KCAL = 4000;
-    const html = rows.map(r => {
-      const kcal = Number(r.calories ?? 0);
-      const pct  = Math.max(0, Math.min(100, (kcal / MAX_KCAL) * 100));
-      // Invert stress-bar colours: low calories = bad (red), high = good (green).
-      const cls  = pct < 25 ? "high" : pct < 55 ? "med" : "";
+
+    const html = known.map(r => {
+      const totalKcal = r.qty * r.info.kcal;
+      const m = r.info.morale;
+      const mLabel = m > 0 ? `+${m}` : String(m);
+      const mColor = m > 0 ? "var(--good)" : m < 0 ? "var(--bad)" : "var(--fg-muted)";
       return `<tr>
-        <td class="name">${escapeHtml(r.name ?? "(unnamed)")}</td>
-        <td class="bar">
-          <div class="bar-track">
-            <div class="bar-fill ${cls}" style="width:${pct.toFixed(1)}%"></div>
-          </div>
-        </td>
-        <td class="pct">${fmtKcal(kcal)}</td>
+        <td style="font-size:12px">${escapeHtml(r.info.name)}</td>
+        <td class="metric">${fmtKcal(totalKcal)}</td>
+        <td class="metric" style="color:${mColor};width:28px">${mLabel}</td>
       </tr>`;
     }).join("");
     setHTML("food-card", `<table><tbody>${html}</tbody></table>`);
@@ -522,14 +568,22 @@
   function renderResources(rows) {
     allElements = rows ?? [];
 
-    // Apply user selection; fall back to top 8 by mass if nothing selected.
-    let display = allElements;
+    // Priority: user-configured selection > in-game filter > top 8 by mass.
+    let display;
     if (stockpileSelection !== null && stockpileSelection.size > 0) {
+      // User has manually chosen specific elements via the picker.
       display = allElements.filter(r => {
         const id = String(Math.trunc(Number(r.element_id)));
         return stockpileSelection.has(id);
       });
+    } else if (inGameFilters !== null && inGameFilters.size > 0) {
+      // Default: mirror the in-game storage filter settings from the save.
+      display = allElements.filter(r => {
+        const id = String(Math.trunc(Number(r.element_id)));
+        return inGameFilters.has(id);
+      });
     } else {
+      // Last resort: top 8 elements by total mass.
       display = allElements.slice(0, 8);
     }
 
@@ -597,6 +651,13 @@
       renderDupes(data.top_dupes || []);
       renderGeysers(data.geyser_types || []);
       renderFood(data.food || []);
+
+      // Update in-game filter defaults before rendering resources.
+      if (data.stockpile_filters && data.stockpile_filters.length > 0) {
+        inGameFilters = new Set(
+          data.stockpile_filters.map(h => String(Math.trunc(Number(h))))
+        );
+      }
       renderResources(data.all_resources || []);
     } catch (err) {
       showError(`fetch failed: ${err.message}`);
