@@ -83,8 +83,9 @@ describe("renderGeysers", () => {
   test("lists each geyser type with a count", () => {
     const db = buildDb();
     const out = renderGeysers(db);
-    assert.match(out, /steam/);
-    assert.match(out, /big_volcano/);
+    // type_id hashes are now resolved to display names.
+    assert.match(out, /Steam Vent/);
+    assert.match(out, /Volcano/);
     assert.match(out, /×1/);
   });
 });
@@ -107,7 +108,8 @@ describe("renderDupes", () => {
     assert.match(out, /Meep/);
     // Meep's stress is 12.5 in the fixture; should appear with 1 decimal.
     assert.match(out, /12\.5/);
-    assert.match(out, /Digger/);
+    // Meep has Mining1 mastered in the fixture → rendered as "Miner I"
+    assert.match(out, /Miner I/);
   });
 
   test("dupes with null stress render an em-dash, not a bogus 0% bar", () => {

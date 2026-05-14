@@ -45,13 +45,16 @@ describe("classification", () => {
   });
 
   test("GeyserGeneric_steam goes to geysers", () => {
-    const steam = tables.geysers.find((g) => g.type_id === "steam");
+    // type_id is now stored as a SimHash integer extracted from { hash: N }.
+    // -899515856 is the SDBM hash of "steam".
+    const steam = tables.geysers.find((g) => g.type_id === -899515856);
     assert.ok(steam, "steam geyser should be in geysers");
     assert.equal(steam.rate_roll, 0.5);
   });
 
   test("BigVolcano goes to geysers via behavior detection (prefab name doesn't start with 'Geyser')", () => {
-    const volcano = tables.geysers.find((g) => g.type_id === "big_volcano");
+    // -1592417549 is the SDBM hash of "big_volcano".
+    const volcano = tables.geysers.find((g) => g.type_id === -1592417549);
     assert.ok(volcano, "BigVolcano should be classified as a geyser");
     assert.equal(volcano.prefab_id, "BigVolcano");
     assert.equal(volcano.rate_roll, 0.7);

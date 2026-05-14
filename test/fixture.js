@@ -84,7 +84,8 @@ export const FAKE_SAVE = {
           behaviors: [
             { name: "KPrefabID", templateData: { InstanceID: 1 } },
             { name: "Geyser", templateData: { configuration: {
-              typeId: "steam", rateRoll: 0.5, iterationLengthRoll: 0.4,
+              // Real saves store typeId as { hash: N } — match that shape.
+              typeId: { hash: -899515856 }, rateRoll: 0.5, iterationLengthRoll: 0.4,
               iterationPercentRoll: 0.6, yearLengthRoll: 0.5, yearPercentRoll: 0.55,
             }}},
           ],
@@ -102,7 +103,7 @@ export const FAKE_SAVE = {
           behaviors: [
             { name: "KPrefabID", templateData: { InstanceID: 2 } },
             { name: "Geyser", templateData: { configuration: {
-              typeId: "big_volcano", rateRoll: 0.7, iterationLengthRoll: 0.3,
+              typeId: { hash: -1592417549 }, rateRoll: 0.7, iterationLengthRoll: 0.3,
               iterationPercentRoll: 0.4, yearLengthRoll: 0.6, yearPercentRoll: 0.5,
             }}},
           ],

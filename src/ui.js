@@ -6,6 +6,8 @@
 // we don't pull in chalk / picocolors. The CLI in cli/status.js decides
 // whether to enable color based on stdout.isTTY and NO_COLOR.
 
+import { elementName } from "./elements.js";
+
 const ANSI = {
   reset: "\x1b[0m",
   dim: "\x1b[2m",
@@ -104,6 +106,38 @@ export function renderHeadCounts(db, { color = false } = {}) {
   ].join(sep);
 }
 
+// Geyser type hash → human-readable name.
+// Hashes computed with the same SDBM algorithm as elements, over the
+// internal type string (e.g. "steam", "hot_water", "molten_iron").
+const GEYSER_NAMES = new Map([
+  [-899515856,   "Steam Vent"],
+  [-2022709954,  "Hot Steam Vent"],
+  [713477285,    "Hot Water Geyser"],
+  [630638510,    "Salt Water Geyser"],
+  [1280790313,   "Slush Geyser"],
+  [1483840464,   "Chlorine Vent"],
+  [-1046145888,  "Hydrogen Vent"],
+  [-841236436,   "Natural Gas Geyser"],
+  [-597658376,   "Leaky Oil Fissure"],
+  [1482090435,   "CO₂ Geyser"],
+  [-1765654948,  "Liquid Sulfur Geyser"],
+  [-471575302,   "Minor Volcano"],
+  [-1592417549,  "Volcano"],
+  [-695301211,   "Copper Volcano"],
+  [-1332060084,  "Gold Volcano"],
+  [254095636,    "Iron Volcano"],
+  [159381264,    "Tungsten Volcano"],
+  [1137916511,   "Cobalt Volcano"],
+  [-968505972,   "Aluminum Volcano"],
+  [976669543,    "Niobium Volcano"],
+]);
+
+function geyserName(typeId) {
+  if (typeId == null) return "(unknown)";
+  const key = Math.trunc(Number(typeId));
+  return GEYSER_NAMES.get(key) ?? `hash:${key}`;
+}
+
 /** Geyser types grouped by count. */
 export function renderGeysers(db, { color = false } = {}) {
   const rows = db
@@ -113,7 +147,7 @@ export function renderGeysers(db, { color = false } = {}) {
 
   const header = paint("Geysers", ANSI.bold + ANSI.magenta, color);
   const items = rows
-    .map((r) => `${pad(r.type_id ?? "(unknown)", 24)} ×${r.n}`)
+    .map((r) => `${pad(geyserName(r.type_id), 24)} ×${r.n}`)
     .join("  ");
   return `${header}\n  ${items}`;
 }
@@ -144,19 +178,23 @@ export function renderStockpile(db, { color = false, limit = 8 } = {}) {
 
   const header = paint("Stockpile (top elements by mass)", ANSI.bold + ANSI.green, color);
   const lines = rows.map((r) => {
+    const name = elementName(r.element_id);
     const mass = formatMass(r.total_units);
-    return `  ${pad(r.element_id, 16)} ${lpad(mass, 12)}   in ${r.items} place${r.items === 1 ? "" : "s"}`;
+    return `  ${pad(name, 20)} ${lpad(mass, 12)}   in ${r.items} place${r.items === 1 ? "" : "s"}`;
   });
   return [header, ...lines].join("\n");
 }
 
-/** Dupes with stress bars. */
+/** Dupes with stress bars and mastered skills. */
 export function renderDupes(db, { color = false, limit = 12 } = {}) {
   const rows = db
     .prepare(
-      `SELECT name, stress, current_role
-       FROM duplicants
-       ORDER BY stress IS NULL, stress DESC
+      `SELECT d.game_object_id, d.name, d.stress,
+              GROUP_CONCAT(ds.skill, ',') AS skills
+       FROM duplicants d
+       LEFT JOIN duplicant_skills ds ON ds.duplicant_id = d.game_object_id
+       GROUP BY d.game_object_id
+       ORDER BY d.stress IS NULL, d.stress DESC
        LIMIT ?`
     )
     .all(limit);
@@ -172,9 +210,62 @@ export function renderDupes(db, { color = false, limit = 12 } = {}) {
       ? `${c}${bar(stress / 100)}${reset}`
       : paint("──────────", ANSI.dim, color);
     const pct = hasStress ? `${lpad(stress.toFixed(1), 5)}%` : `   — `;
-    return `  ${fit(r.name ?? "(unnamed)", 12)} ${bar10} ${pct}   ${r.current_role ?? ""}`;
+    const skillsStr = formatSkills(r.skills);
+    const skillCol = skillsStr ? paint(skillsStr, ANSI.dim, color) : paint("no skills", ANSI.dim, color);
+    return `  ${fit(r.name ?? "(unnamed)", 24)} ${bar10} ${pct}   ${skillCol}`;
   });
   return [header, ...lines].join("\n");
+}
+
+// Skill branch labels (prefix → display name).
+const SKILL_LABELS = new Map([
+  ["mining",       "Miner"],
+  ["building",     "Builder"],
+  ["researching",  "Researcher"],
+  ["farming",      "Farmer"],
+  ["cooking",      "Cook"],
+  ["ranching",     "Rancher"],
+  ["arting",       "Artist"],
+  ["doctoring",    "Medic"],
+  ["hauling",      "Hauler"],
+  ["suit",         "Suit"],
+  ["power",        "Engineer"],
+  ["plumbing",     "Plumber"],
+  ["hvac",         "HVAC"],
+  ["rocketry",     "Rocketry"],
+  ["farming2",     "Botanist"],  // DLC branch
+  ["spaceanalysis","Space"],
+]);
+
+const ROMAN = ["", "I", "II", "III", "IV", "V"];
+
+/**
+ * Convert a comma-separated skills string from GROUP_CONCAT into a compact
+ * human-readable label. Groups skills by branch and keeps only the highest
+ * level per branch. E.g. "Building1,Building2,Mining1" → "Builder II, Miner I".
+ *
+ * @param {string|null} raw
+ * @returns {string}
+ */
+function formatSkills(raw) {
+  if (!raw) return "";
+  const bestLevel = new Map(); // branch key → highest level
+  for (const skill of raw.split(",")) {
+    const m = skill.match(/^([A-Za-z]+?)(\d+)?$/);
+    if (!m) continue;
+    const branch = m[1].toLowerCase();
+    const level = m[2] ? Number(m[2]) : 1;
+    if (!bestLevel.has(branch) || level > bestLevel.get(branch)) {
+      bestLevel.set(branch, level);
+    }
+  }
+  const parts = [];
+  for (const [branch, level] of bestLevel) {
+    const label = SKILL_LABELS.get(branch) ?? (branch.charAt(0).toUpperCase() + branch.slice(1));
+    const roman = ROMAN[level] ?? String(level);
+    parts.push(roman ? `${label} ${roman}` : label);
+  }
+  return parts.join(", ");
 }
 
 /** Top-of-mind alerts: parsed_at staleness, missing data, etc. */

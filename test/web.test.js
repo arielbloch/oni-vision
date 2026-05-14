@@ -79,7 +79,8 @@ describe("GET /api/status", () => {
     assert.ok(Array.isArray(body.top_dupes));
     assert.equal(body.top_dupes[0].name, "Meep");
     assert.ok(Array.isArray(body.geyser_types));
-    assert.ok(body.geyser_types.find((g) => g.type_id === "steam"));
+    // type_id is now a SimHash integer (-899515856 = "steam")
+    assert.ok(body.geyser_types.find((g) => g.type_id === -899515856));
     assert.ok(Array.isArray(body.top_resources));
   });
 

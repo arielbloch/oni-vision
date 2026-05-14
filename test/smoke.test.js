@@ -33,7 +33,8 @@ describe("smoke pipeline", () => {
     const dupes = queries.find((q) => q.query.startsWith("SELECT name, ROUND(stress"));
     assert.equal(dupes.rows[0].name, "Meep");
     const geyserCounts = queries.find((q) => q.query.includes("v_geysers_summary"));
-    const types = geyserCounts.rows.map((r) => r.type_id).sort();
-    assert.deepEqual(types, ["big_volcano", "steam"]);
+    // type_id is now a SimHash integer; sort numerically.
+    const types = geyserCounts.rows.map((r) => r.type_id).sort((a, b) => a - b);
+    assert.deepEqual(types, [-1592417549, -899515856]);
   });
 });

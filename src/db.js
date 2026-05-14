@@ -140,7 +140,7 @@ const SCHEMA = [
   `CREATE TABLE geysers (
      game_object_id INTEGER PRIMARY KEY,
      prefab_id TEXT NOT NULL,
-     type_id TEXT,
+     type_id INTEGER,
      rate_roll REAL,
      iteration_length_roll REAL,
      iteration_percent_roll REAL,

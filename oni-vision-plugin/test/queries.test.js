@@ -170,8 +170,10 @@ describe("geysers", () => {
   test("returns both steam and BigVolcano", () => {
     const db = buildDb();
     const rows = geysers(db);
-    const types = rows.map((r) => r.type_id).sort();
-    assert.deepEqual(types, ["big_volcano", "steam"]);
+    // type_id is stored as a SimHash integer extracted from { hash: N }.
+    // steam = -899515856, big_volcano = -1592417549.
+    const types = rows.map((r) => r.type_id).sort((a, b) => a - b);
+    assert.deepEqual(types, [-1592417549, -899515856]);
   });
 });
 

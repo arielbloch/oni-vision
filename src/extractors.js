@@ -240,7 +240,9 @@ function extractGeyser(go, goId, prefabId, tables) {
   tables.geysers.push({
     game_object_id: goId,
     prefab_id: prefabId,
-    type_id: cfg.typeId ?? null,
+    // typeId is a { hash: N } object in the raw save; store just the integer
+    // so the column is directly queryable rather than a JSON blob.
+    type_id: cfg.typeId?.hash ?? null,
     rate_roll: cfg.rateRoll ?? null,
     iteration_length_roll: cfg.iterationLengthRoll ?? null,
     iteration_percent_roll: cfg.iterationPercentRoll ?? null,
