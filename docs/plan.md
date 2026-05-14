@@ -308,6 +308,103 @@ Companion: `src/cli/uninstall.js` / `npm run uninstall` — removes the service 
 
 ---
 
+---
+
+## 6. DB as single source of truth for all lookup tables — 🔜 next
+
+### Problem
+
+Five name/label lookup tables currently live only in `.js` files:
+
+| Data | Where it lives now | Who can reach it |
+|---|---|---|
+| Element names (SimHash → name) | `src/elements.js` | Web server only |
+| Geyser type names (SimHash → name) | `src/ui.js` | Web server only |
+| Food metadata (prefab → name, kcal, morale) | hardcoded in `src/web/index.html` | Browser only |
+| Effect labels (effect string → display label, severity) | hardcoded in `src/web/index.html` | Browser only |
+| Skill labels (branch prefix → display name) | `src/ui.js` + hardcoded in HTML | Web server + browser (duplicate) |
+
+This creates two broken data flows:
+
+- **MCP plugin** is deliberately standalone (cannot `import` from the parent repo). `oni_geysers()` and `oni_resources()` return raw SimHash integers. Claude has to resolve them from CLAUDE.md or its own knowledge — which is error-prone and wastes context tokens.
+- **Browser** maintains its own hardcoded copy of every lookup table. These drift from the server-side sources and miss entries (e.g., Clay, Carbon, Oxylite, Fertilizer were all missing).
+
+The web server can partially paper over this (it can import `elements.js` and ship `element_names` in the API response), but that still leaves the MCP blind and requires per-table plumbing in `web.js` for every lookup.
+
+### Solution: write lookup tables into `current.sqlite` during `buildOutputs()`
+
+The DB is the one artifact both consumers share. If the lookup tables live in `current.sqlite`, every query — whether from `web.js` or `oni-vision-plugin/lib/queries.js` — can JOIN against them with no JS imports needed. The `.js` source files remain the canonical editable source; they just get written to the DB on each parse, exactly like the rest of the extracted data.
+
+```
+src/elements.js   ──┐
+src/ui.js         ──┤ buildOutputs() ──→ element_names, geyser_type_names,
+src/food.js (new) ──┤                    food_meta, effect_labels,
+src/effects.js    ──┘                    skill_labels  in current.sqlite
+(new)
+```
+
+After this change, both consumers become simple query composers:
+
+```sql
+-- Geysers with human names (MCP + web)
+SELECT g.prefab_id, gn.name AS type_name,
+       g.rate_roll, g.year_percent_roll
+FROM geysers g
+LEFT JOIN geyser_type_names gn ON gn.type_id = g.type_id;
+
+-- Food in storage with metadata (MCP + web)
+SELECT fm.name, fm.kcal_per_item, fm.morale, COUNT(*) AS qty
+FROM storage_contents sc
+JOIN food_meta fm ON fm.prefab_id = sc.item_prefab_id
+WHERE sc.item_prefab_id IS NOT NULL AND sc.element_id IS NULL
+GROUP BY sc.item_prefab_id
+ORDER BY SUM(fm.kcal_per_item) DESC;
+```
+
+### New DB tables
+
+| Table | Columns | Source |
+|---|---|---|
+| `element_names` | `element_id INTEGER PK, name TEXT` | `src/elements.js` |
+| `geyser_type_names` | `type_id INTEGER PK, name TEXT` | `src/ui.js` `GEYSER_NAMES` |
+| `food_meta` | `prefab_id TEXT PK, name TEXT, kcal_per_item INTEGER, morale INTEGER` | new `src/food.js` |
+| `effect_labels` | `effect TEXT PK, label TEXT, severity TEXT` | new `src/effects.js` |
+| `skill_labels` | `branch TEXT PK, label TEXT` | `src/ui.js` `SKILL_LABELS` |
+
+### Deliverables
+
+| File | Change |
+|---|---|
+| `src/db.js` | Add `CREATE TABLE` for all five lookup tables to the schema |
+| `src/food.js` | New — `FOOD_META` map (prefab → name/kcal/morale), extracted from `web/index.html` |
+| `src/effects.js` | New — `EFFECT_LABELS` map (effect string → label/severity), extracted from `web/index.html` |
+| `src/ui.js` | Export `GEYSER_NAMES` and `SKILL_LABELS` so `pipeline.js` can import them |
+| `src/elements.js` | Already exports `ELEMENT_NAMES` — no change needed |
+| `src/pipeline.js` | After extractors run, bulk-insert all five lookup tables from the JS maps |
+| `oni-vision-plugin/lib/queries.js` | Update `geysers()`, `resources()`, `status()` to LEFT JOIN against lookup tables; add `oni_food()` query function |
+| `oni-vision-plugin/mcp/server.js` | Register new `oni_food` tool |
+| `src/web.js` | Query `element_names`, `geyser_type_names`, `food_meta`, `effect_labels`, `skill_labels` from DB instead of importing JS files; remove `import { ELEMENT_NAMES }` |
+| `src/web/index.html` | Remove all hardcoded lookup tables (`ELEMENT_NAMES`, `GEYSER_NAMES`, `BAD_EFFECTS`, `FOOD`, `SKILL_LABELS`); render from API-provided data only |
+
+### MCP additions
+
+New typed tool `oni_food`: returns food items currently in storage with name, total kcal, quantity, and morale impact — joined against `food_meta`. Replaces ad-hoc `oni_query` calls for "what food do I have?"
+
+Updated tools `oni_geysers` and `oni_resources` include human-readable names in their output — no more raw SimHash integers for Claude to resolve.
+
+### What doesn't change
+
+- The `.js` source files (`elements.js`, `ui.js`, `food.js`, `effects.js`) remain the canonical editable source for each lookup. To add a new element or food item, edit the source file; the next `buildOutputs()` run re-populates the DB table.
+- The DB tables are written fresh on every parse (DROP + INSERT), so there's no migration concern — they're derived data, not user data.
+- `oni_query` still works for anything the typed tools don't cover.
+
+### Open questions
+
+- Should lookup tables be written even if the save parse fails partway through? Probably yes — they're static constants, independent of the save. Write them at the top of `buildOutputs()` before the extractor runs, so they're always present.
+- Should `element_names` and `geyser_type_names` include entries for IDs that don't appear in this save? Yes — a complete table is more useful for `oni_query` users composing their own JOINs, and the cost (a few hundred rows) is negligible.
+
+---
+
 ## Sequencing
 
 A reasonable order, roughly increasing scope:
@@ -316,4 +413,5 @@ A reasonable order, roughly increasing scope:
 2. **UX status command** — ✅ Wave 7
 3. **MCP plugin** — ✅ Wave 8
 4. **ONI architect skill** — ✅ Wave 9
-5. **Zero-config experience** — 🔜 next: web on by default (5a), browser auto-open (5b), login auto-start (5c)
+5. **Zero-config experience** — ✅ Waves 26–31
+6. **DB as single source of truth** — 🔜 next
