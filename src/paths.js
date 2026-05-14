@@ -51,10 +51,6 @@ function buildDefaults({ home, platform }) {
     includeAutoSaves: false,
     // Wait this long after the last write before parsing (avoids partial files).
     debounceMs: 1500,
-    // Web dashboard — on by default, localhost-only, no auth needed.
-    // Override with: { "web": { "enabled": false } } in config to turn off,
-    // or { "web": { "port": 9090 } } to change the port.
-    web: { enabled: true, port: 8080, host: "127.0.0.1" },
   };
 }
 
@@ -104,21 +100,15 @@ export async function resolveConfig({
   const defaults = buildDefaults({ home, platform });
   const user = loadUserConfig({ home });
 
-  // Deep-merge nested objects so a user setting only { "web": { "port": 9090 } }
-  // keeps the default enabled/host values rather than losing them.
-  const merged = { ...defaults, ...user };
-  if (user.web && typeof user.web === "object") {
-    merged.web = { ...defaults.web, ...user.web };
-  }
-
   // Explicit user saveDir wins; no discovery needed.
   if (typeof user.saveDir === "string") {
-    return { ...merged, _autoDetected: null };
+    return { ...defaults, ...user, _autoDetected: null };
   }
 
   const discovered = await discoverSaveDir({ home, platform });
   return {
-    ...merged,
+    ...defaults,
+    ...user,
     saveDir: discovered.saveDir ?? defaults.saveDir,
     _autoDetected: discovered,
   };

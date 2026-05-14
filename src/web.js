@@ -28,17 +28,11 @@ const WEB_ROOT = join(HERE, "web");
  * Start the HTTP server. Returns a Promise resolving to the server handle
  * once it's actually listening, so callers can wire shutdown logic.
  *
- * If the requested port is already in use, automatically tries the next
- * port up to PORT_FALLBACK_LIMIT times before giving up. This makes the
- * default-on web server resilient to another process sitting on 8080.
- *
  * @param {object} opts
- * @param {number} [opts.port=8080]        first port to try
+ * @param {number} [opts.port=8080]      port to bind
  * @param {string} [opts.host="127.0.0.1"] host/interface to bind
- * @param {string} opts.outputDir          directory containing current.sqlite
+ * @param {string} opts.outputDir        directory containing current.sqlite
  */
-const PORT_FALLBACK_LIMIT = 10;
-
 export function startWeb({ port = 8080, host = "127.0.0.1", outputDir }) {
   const server = http.createServer(async (req, res) => {
     try {
@@ -56,30 +50,8 @@ export function startWeb({ port = 8080, host = "127.0.0.1", outputDir }) {
     }
   });
 
-  return tryListen(server, host, port, 0);
-}
-
-/**
- * Attempt to bind on `port`; if EADDRINUSE, retry on port+1 up to
- * PORT_FALLBACK_LIMIT attempts. Resolves with the bound server.
- *
- * @param {http.Server} server
- * @param {string} host
- * @param {number} port       current candidate port
- * @param {number} attempt    how many ports we've already tried
- * @returns {Promise<http.Server>}
- */
-function tryListen(server, host, port, attempt) {
   return new Promise((resolve, reject) => {
-    server.once("error", (err) => {
-      if (err.code === "EADDRINUSE" && attempt < PORT_FALLBACK_LIMIT) {
-        server.removeAllListeners("error");
-        console.warn(`[web] port ${port} in use, trying ${port + 1}…`);
-        resolve(tryListen(server, host, port + 1, attempt + 1));
-      } else {
-        reject(err);
-      }
-    });
+    server.once("error", reject);
     server.listen(port, host, () => {
       const addr = server.address();
       const realPort = typeof addr === "object" && addr ? addr.port : port;

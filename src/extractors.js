@@ -240,9 +240,7 @@ function extractGeyser(go, goId, prefabId, tables) {
   tables.geysers.push({
     game_object_id: goId,
     prefab_id: prefabId,
-    // typeId is a { hash: N } object in the raw save; store just the integer
-    // so the column is directly queryable rather than a JSON blob.
-    type_id: cfg.typeId?.hash ?? null,
+    type_id: cfg.typeId ?? null,
     rate_roll: cfg.rateRoll ?? null,
     iteration_length_roll: cfg.iterationLengthRoll ?? null,
     iteration_percent_roll: cfg.iterationPercentRoll ?? null,
@@ -286,7 +284,7 @@ function extractBuilding(go, goId, prefabId, tables) {
     element_id: pe?.ElementID ?? null,
     units: pe?.Units ?? null,
     temperature: pe?._Temperature ?? null,
-    disease_id: pe?.diseaseID?.hash ?? null,
+    disease_id: pe?.diseaseID ?? null,
     disease_count: pe?.diseaseCount ?? null,
   });
 
@@ -309,7 +307,7 @@ function extractWorldObject(go, goId, prefabId, tables) {
     element_id: pe?.ElementID ?? null,
     units: pe?.Units ?? null,
     temperature: pe?._Temperature ?? null,
-    disease_id: pe?.diseaseID?.hash ?? null,
+    disease_id: pe?.diseaseID ?? null,
     disease_count: pe?.diseaseCount ?? null,
   });
 
@@ -325,7 +323,7 @@ function emitStorageContents(storage, ownerGoId, tables) {
       element_id: itemPE?.ElementID ?? null,
       units: itemPE?.Units ?? null,
       temperature: itemPE?._Temperature ?? null,
-      disease_id: itemPE?.diseaseID?.hash ?? null,
+      disease_id: itemPE?.diseaseID ?? null,
       disease_count: itemPE?.diseaseCount ?? null,
     });
   }

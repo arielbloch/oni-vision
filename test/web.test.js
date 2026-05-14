@@ -79,8 +79,7 @@ describe("GET /api/status", () => {
     assert.ok(Array.isArray(body.top_dupes));
     assert.equal(body.top_dupes[0].name, "Meep");
     assert.ok(Array.isArray(body.geyser_types));
-    // type_id is now a SimHash integer (-899515856 = "steam")
-    assert.ok(body.geyser_types.find((g) => g.type_id === -899515856));
+    assert.ok(body.geyser_types.find((g) => g.type_id === "steam"));
     assert.ok(Array.isArray(body.top_resources));
   });
 
@@ -97,26 +96,6 @@ describe("GET /api/status", () => {
       assert.match(body.db_path, /current\.sqlite$/);
     } finally {
       s.close();
-    }
-  });
-
-  test("port fallback: binds on next free port when requested port is busy", async () => {
-    // Occupy a port, then ask startWeb to use the same port — it should
-    // automatically step up and bind successfully.
-    const blocker = await startWeb({ port: 0, host: "127.0.0.1", outputDir });
-    const blockedPort = blocker.address().port;
-    const fallback = await startWeb({ port: blockedPort, host: "127.0.0.1", outputDir });
-    try {
-      assert.ok(
-        fallback.address().port > blockedPort,
-        `expected fallback port > ${blockedPort}, got ${fallback.address().port}`
-      );
-      // Fallback server should still serve the dashboard.
-      const res = await fetch(`http://127.0.0.1:${fallback.address().port}/`);
-      assert.equal(res.status, 200);
-    } finally {
-      blocker.close();
-      fallback.close();
     }
   });
 });

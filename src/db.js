@@ -100,7 +100,7 @@ const SCHEMA = [
      element_id TEXT,
      units REAL,
      temperature REAL,
-     disease_id INTEGER,
+     disease_id TEXT,
      disease_count INTEGER
    )`,
   `CREATE INDEX idx_b_prefab ON buildings(prefab_id)`,
@@ -117,7 +117,7 @@ const SCHEMA = [
      element_id TEXT,
      units REAL,
      temperature REAL,
-     disease_id INTEGER,
+     disease_id TEXT,
      disease_count INTEGER
    )`,
   `CREATE INDEX idx_wo_prefab ON world_objects(prefab_id)`,
@@ -132,7 +132,7 @@ const SCHEMA = [
      element_id TEXT,
      units REAL,
      temperature REAL,
-     disease_id INTEGER,
+     disease_id TEXT,
      disease_count INTEGER
    )`,
   `CREATE INDEX idx_sc_owner ON storage_contents(owner_id)`,
@@ -140,7 +140,7 @@ const SCHEMA = [
   `CREATE TABLE geysers (
      game_object_id INTEGER PRIMARY KEY,
      prefab_id TEXT NOT NULL,
-     type_id INTEGER,
+     type_id TEXT,
      rate_roll REAL,
      iteration_length_roll REAL,
      iteration_percent_roll REAL,

@@ -101,26 +101,4 @@ describe("resolveConfig", () => {
     const cfg = await resolveConfig({ home, platform: "win32" });
     assert.match(cfg.saveDir, /Documents.+Klei.+OxygenNotIncluded.+save_files$/);
   });
-
-  test("web dashboard is enabled by default with port 8080", async () => {
-    const home = tmpHome();
-    const cfg = await resolveConfig({ home, platform: "darwin" });
-    assert.deepEqual(cfg.web, { enabled: true, port: 8080, host: "127.0.0.1" });
-  });
-
-  test("user setting only web.port keeps enabled:true and host", async () => {
-    const home = tmpHome();
-    writeConfig(home, { web: { port: 9090 } });
-    const cfg = await resolveConfig({ home, platform: "darwin" });
-    assert.equal(cfg.web.enabled, true,  "enabled should stay true");
-    assert.equal(cfg.web.port,    9090,  "port should be overridden");
-    assert.equal(cfg.web.host, "127.0.0.1", "host should keep default");
-  });
-
-  test("user can disable the web dashboard", async () => {
-    const home = tmpHome();
-    writeConfig(home, { web: { enabled: false } });
-    const cfg = await resolveConfig({ home, platform: "darwin" });
-    assert.equal(cfg.web.enabled, false);
-  });
 });

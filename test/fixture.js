@@ -84,8 +84,7 @@ export const FAKE_SAVE = {
           behaviors: [
             { name: "KPrefabID", templateData: { InstanceID: 1 } },
             { name: "Geyser", templateData: { configuration: {
-              // Real saves store typeId as { hash: N } — match that shape.
-              typeId: { hash: -899515856 }, rateRoll: 0.5, iterationLengthRoll: 0.4,
+              typeId: "steam", rateRoll: 0.5, iterationLengthRoll: 0.4,
               iterationPercentRoll: 0.6, yearLengthRoll: 0.5, yearPercentRoll: 0.55,
             }}},
           ],
@@ -103,7 +102,7 @@ export const FAKE_SAVE = {
           behaviors: [
             { name: "KPrefabID", templateData: { InstanceID: 2 } },
             { name: "Geyser", templateData: { configuration: {
-              typeId: { hash: -1592417549 }, rateRoll: 0.7, iterationLengthRoll: 0.3,
+              typeId: "big_volcano", rateRoll: 0.7, iterationLengthRoll: 0.3,
               iterationPercentRoll: 0.4, yearLengthRoll: 0.6, yearPercentRoll: 0.5,
             }}},
           ],
@@ -121,7 +120,7 @@ export const FAKE_SAVE = {
             { name: "BuildingComplete", templateData: {} },
             { name: "PrimaryElement", templateData: {
               ElementID: "RefinedMetal", Units: 200, _Temperature: 295.15,
-              diseaseID: { hash: 0 }, diseaseCount: 0,
+              diseaseID: "", diseaseCount: 0,
             }},
           ],
         },
@@ -139,7 +138,7 @@ export const FAKE_SAVE = {
             { name: "KPrefabID", templateData: { InstanceID: 100 } },
             { name: "PrimaryElement", templateData: {
               ElementID: "Algae", Units: 750, _Temperature: 293,
-              diseaseID: { hash: 0 }, diseaseCount: 0,
+              diseaseID: "", diseaseCount: 0,
             }},
           ],
         },
@@ -156,7 +155,7 @@ export const FAKE_SAVE = {
             { name: "BuildingComplete", templateData: {} },
             { name: "PrimaryElement", templateData: {
               ElementID: "Iron", Units: 100, _Temperature: 295,
-              diseaseID: { hash: 0 }, diseaseCount: 0,
+              diseaseID: "", diseaseCount: 0,
             }},
             { name: "Storage", templateData: {
               onlyFetchMarkedItems: false, workTimeRemaining: 0, numberOfUses: 0,
@@ -168,7 +167,7 @@ export const FAKE_SAVE = {
                 behaviors: [
                   { name: "PrimaryElement", templateData: {
                     ElementID: "Algae", Units: 500, _Temperature: 295,
-                    diseaseID: { hash: 1918712348 }, diseaseCount: 10,
+                    diseaseID: "FoodPoisoning", diseaseCount: 10,
                   }},
                 ],
               },
@@ -179,7 +178,7 @@ export const FAKE_SAVE = {
                 behaviors: [
                   { name: "PrimaryElement", templateData: {
                     ElementID: "Water", Units: 250, _Temperature: 290,
-                    diseaseID: { hash: 0 }, diseaseCount: 0,
+                    diseaseID: "", diseaseCount: 0,
                   }},
                 ],
               },
@@ -198,7 +197,7 @@ export const FAKE_SAVE = {
             { name: "KPrefabID", templateData: { InstanceID: 9 } },
             { name: "PrimaryElement", templateData: {
               ElementID: "Creature", Units: 1, _Temperature: 295,
-              diseaseID: { hash: 0 }, diseaseCount: 0,
+              diseaseID: "", diseaseCount: 0,
             }},
             { name: "MinionModifiers", templateData: {}, extraData: {
               amounts: [
@@ -226,7 +225,7 @@ export const FAKE_SAVE = {
             { name: "KPrefabID", templateData: { InstanceID: 200 } },
             { name: "PrimaryElement", templateData: {
               ElementID: "Creature", Units: 1, _Temperature: 295,
-              diseaseID: { hash: 0 }, diseaseCount: 0,
+              diseaseID: "", diseaseCount: 0,
             }},
             { name: "MinionModifiers", templateData: {}, extraData: {
               amounts: [

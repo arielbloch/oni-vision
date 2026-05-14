@@ -45,16 +45,13 @@ describe("classification", () => {
   });
 
   test("GeyserGeneric_steam goes to geysers", () => {
-    // type_id is now stored as a SimHash integer extracted from { hash: N }.
-    // -899515856 is the SDBM hash of "steam".
-    const steam = tables.geysers.find((g) => g.type_id === -899515856);
+    const steam = tables.geysers.find((g) => g.type_id === "steam");
     assert.ok(steam, "steam geyser should be in geysers");
     assert.equal(steam.rate_roll, 0.5);
   });
 
   test("BigVolcano goes to geysers via behavior detection (prefab name doesn't start with 'Geyser')", () => {
-    // -1592417549 is the SDBM hash of "big_volcano".
-    const volcano = tables.geysers.find((g) => g.type_id === -1592417549);
+    const volcano = tables.geysers.find((g) => g.type_id === "big_volcano");
     assert.ok(volcano, "BigVolcano should be classified as a geyser");
     assert.equal(volcano.prefab_id, "BigVolcano");
     assert.equal(volcano.rate_roll, 0.7);
@@ -121,11 +118,8 @@ describe("storage extraction", () => {
     assert.equal(contents.length, 2);
     const byElement = Object.fromEntries(contents.map((c) => [c.element_id, c]));
     assert.equal(byElement.Algae.units, 500);
-    // disease_id is the SimHash integer extracted from { hash: N }.
-    // 1918712348 = SDBM hash of "FoodPoisoning".
-    assert.equal(byElement.Algae.disease_id, 1918712348);
+    assert.equal(byElement.Algae.disease_id, "FoodPoisoning");
     assert.equal(byElement.Water.units, 250);
-    assert.equal(byElement.Water.disease_id, 0); // hash 0 = no disease
   });
 });
 

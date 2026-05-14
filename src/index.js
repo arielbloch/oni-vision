@@ -10,11 +10,13 @@ import { existsSync } from "node:fs";
 import chokidar from "chokidar";
 
 import { resolveConfig } from "./paths.js";
+import { ensureConfig } from "./config-writer.js";
 import { findLatestSave } from "./find-latest.js";
 import { buildOutputs } from "./pipeline.js";
 import { startWeb } from "./web.js";
 
 const config = await resolveConfig();
+ensureConfig({ config });
 
 if (config._autoDetected?.saveDir) {
   console.log(`[vision] auto-detected save dir: ${config.saveDir}`);
