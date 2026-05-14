@@ -5,15 +5,10 @@
 // Linux:  stops + disables the systemd user service and deletes the unit file.
 // Windows: deletes the Task Scheduler entry.
 //
-// Also clears the "browser already opened" flag so the next manual `npm start`
-// will open the dashboard in the browser again.
-
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
-
-import { clearBrowserFlag } from "../browser.js";
 
 const HOME     = homedir();
 const PLATFORM = process.platform;
@@ -29,7 +24,6 @@ if (PLATFORM === "darwin") {
   process.exit(1);
 }
 
-clearBrowserFlag(HOME);
 console.log("[uninstall] ✓ done.");
 
 // ── macOS ─────────────────────────────────────────────────────────────────────
