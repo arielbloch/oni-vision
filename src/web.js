@@ -138,6 +138,9 @@ function serveEvents(res) {
 /**
  * Status endpoint. Wraps statusObject() and enriches the payload with:
  *   - per-dupe mastered skills (from duplicant_skills)
+ *   - per-dupe active effects/diseases (from duplicant_effects)
+ *   - individual geyser quality rolls (replaces the grouped geyser_types)
+ *   - food in storage by type (from storage_contents)
  */
 function serveStatus(res, outputDir) {
   const dbPath = join(outputDir, "current.sqlite");
@@ -155,19 +158,55 @@ function serveStatus(res, outputDir) {
     db = new DatabaseSync(dbPath, { readOnly: true });
     const payload = statusObject(db, { dupeLimit: 9999 });
 
-    // Enrich top_dupes with mastered skills. We re-query by name (names are
-    // unique within a colony — ONI enforces this at the game level).
-    const skillStmt = db.prepare(
-      `SELECT GROUP_CONCAT(ds.skill, ',') AS skills
+    // ── Dupe enrichment: skills + active effects ──────────────────────────────
+    // Two bulk queries keyed by dupe name (unique within a colony per ONI rules).
+
+    const skillsByName = new Map();
+    for (const row of db.prepare(
+      `SELECT d.name, GROUP_CONCAT(ds.skill, ',') AS skills
        FROM duplicants d
        LEFT JOIN duplicant_skills ds ON ds.duplicant_id = d.game_object_id
-       WHERE d.name = ?
        GROUP BY d.game_object_id`
-    );
-    for (const dupe of payload.top_dupes) {
-      const row = skillStmt.get(dupe.name);
-      dupe.skills = row?.skills ?? null;
+    ).all()) {
+      skillsByName.set(row.name, row.skills ?? null);
     }
+
+    const effectsByName = new Map();
+    for (const row of db.prepare(
+      `SELECT d.name, de.effect
+       FROM duplicant_effects de
+       JOIN duplicants d ON d.game_object_id = de.duplicant_id
+       WHERE de.time_remaining > 0 OR de.time_remaining IS NULL`
+    ).all()) {
+      if (!effectsByName.has(row.name)) effectsByName.set(row.name, []);
+      effectsByName.get(row.name).push(row.effect);
+    }
+
+    for (const dupe of payload.top_dupes) {
+      dupe.skills  = skillsByName.get(dupe.name)  ?? null;
+      dupe.effects = effectsByName.get(dupe.name) ?? [];
+    }
+
+    // ── Geysers: individual rows with quality rolls ───────────────────────────
+    // Replace the grouped geyser_types from statusObject with per-geyser data.
+    payload.geyser_types = db.prepare(
+      `SELECT type_id, rate_roll, year_percent_roll
+       FROM geysers
+       ORDER BY type_id, rate_roll DESC`
+    ).all();
+
+    // ── Food in storage ───────────────────────────────────────────────────────
+    // storage_contents rows with item_prefab_id set and no element_id are food
+    // items (and other manufactured items). Count stacks per type; the client
+    // maps known food IDs to calorie estimates.
+    payload.food = db.prepare(
+      `SELECT item_prefab_id, COUNT(*) AS qty
+       FROM storage_contents
+       WHERE item_prefab_id IS NOT NULL AND element_id IS NULL
+       GROUP BY item_prefab_id
+       ORDER BY qty DESC
+       LIMIT 30`
+    ).all();
 
     res.writeHead(200, {
       "Content-Type": "application/json",

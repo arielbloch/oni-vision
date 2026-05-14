@@ -80,10 +80,13 @@
     background: var(--bg-card); border: 1px solid var(--bad); color: var(--bad);
     padding: 12px; border-radius: 6px;
   }
-  .two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  @media (max-width: 520px) {
-    .counts { grid-template-columns: repeat(2, 1fr); }
-    .two-up { grid-template-columns: 1fr; }
+  .badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-left: 5px; vertical-align: middle; }
+  .badge.bad  { background: rgba(248,113,113,0.15); color: var(--bad);  border: 1px solid rgba(248,113,113,0.3); }
+  .badge.warn { background: rgba(250,204,21,0.15);  color: var(--warn); border: 1px solid rgba(250,204,21,0.3); }
+  .three-up { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  @media (max-width: 600px) {
+    .counts   { grid-template-columns: repeat(2, 1fr); }
+    .three-up { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -110,13 +113,17 @@
   <h2>Dupes</h2>
   <div class="card" id="dupes-card"><div class="empty">loading…</div></div>
 
-  <div class="two-up">
+  <div class="three-up">
     <div>
-      <h2>Geyser types</h2>
+      <h2>Geysers</h2>
       <div class="card" id="geysers-card"><div class="empty">loading…</div></div>
     </div>
     <div>
-      <h2>Stockpile (by mass)</h2>
+      <h2>Food stores</h2>
+      <div class="card" id="food-card"><div class="empty">loading…</div></div>
+    </div>
+    <div>
+      <h2>Stockpile</h2>
       <div class="card" id="resources-card"><div class="empty">loading…</div></div>
     </div>
   </div>
@@ -238,6 +245,56 @@
     "976669543":    "Niobium Volcano",
   };
 
+  // Disease / negative status effects to surface as badges on dupe rows.
+  // Only the effects in this map are shown; positive effects are ignored.
+  const BAD_EFFECTS = {
+    "FoodPoisoning":        { label: "Food Poisoned",  cls: "bad"  },
+    "SlimeLung":            { label: "Slimelung",       cls: "bad"  },
+    "ZombieSpores":         { label: "Zombie Spores",  cls: "bad"  },
+    "Scalding":             { label: "Scalding",        cls: "bad"  },
+    "SevereScalding":       { label: "Melting",         cls: "bad"  },
+    "Hypothermia":          { label: "Hypothermia",     cls: "warn" },
+    "SevereHypothermia":    { label: "Freezing",        cls: "bad"  },
+    "Sunburn":              { label: "Sunburned",       cls: "warn" },
+    "StressedOut":          { label: "Stressed Out",    cls: "warn" },
+    "Suffocation":          { label: "Suffocating",     cls: "bad"  },
+    "Suffocating":          { label: "Suffocating",     cls: "bad"  },
+    "MinorAilment":         { label: "Ill",             cls: "warn" },
+    "MajorAilment":         { label: "Sick",            cls: "bad"  },
+    "Pathogen_FoodPoisoning":{ label: "Food Poisoned",  cls: "bad"  },
+  };
+
+  // Food prefab ID → { name, kcal per item }.
+  // kcal values are the game's standard item calorie count.
+  const FOOD = {
+    "MushBar":          { name: "Mush Bar",         kcal: 1000 },
+    "Mushroom":         { name: "Raw Mushroom",      kcal: 1   },
+    "FriedMushroom":    { name: "Fried Mushroom",    kcal: 1600 },
+    "MushFry":          { name: "Mush Fry",          kcal: 1200 },
+    "CookedEgg":        { name: "Cooked Egg",        kcal: 2000 },
+    "RawEgg":           { name: "Raw Egg",           kcal: 700  },
+    "Burger":           { name: "Barbecue",          kcal: 4000 },
+    "Meat":             { name: "Raw Meat",          kcal: 1600 },
+    "CookedMeat":       { name: "Cooked Meat",       kcal: 2400 },
+    "SpiceBread":       { name: "Spice Bread",       kcal: 2400 },
+    "SurfAndTurf":      { name: "Surf 'n' Turf",     kcal: 6000 },
+    "PepperbreadMeal":  { name: "Pepper Bread",      kcal: 3200 },
+    "SpicyTofu":        { name: "Spicy Tofu",        kcal: 3200 },
+    "MeatPlanks":       { name: "Jerky",             kcal: 4800 },
+    "PlantMeat":        { name: "Plant Meat",        kcal: 1600 },
+    "BasicForagePlant": { name: "Mealwood Shoot",    kcal: 600  },
+    "Tofu":             { name: "Tofu",              kcal: 1600 },
+    "WormBasicFood":    { name: "Stuffed Berry",     kcal: 4000 },
+    "MushroomWrap":     { name: "Mushroom Wrap",     kcal: 4000 },
+    "FruitCake":        { name: "Frost Burger",      kcal: 6000 },
+    "ColdWheatBread":   { name: "Cold Wheat Bread",  kcal: 1600 },
+    "PrickleFig":       { name: "Prickle Muffin",    kcal: 1200 },
+    "Lettuce":          { name: "Lettuce",           kcal: 1   },
+    "SpiceNut":         { name: "Spice Nut",         kcal: 1   },
+    "BeanPlantSeed":    { name: "Nosh Bean",         kcal: 600  },
+    "SwampLily":        { name: "Swamp Lily",        kcal: 1   },
+  };
+
   // Skill branch prefix → display label (mirrors SKILL_LABELS in src/ui.js).
   const SKILL_LABELS = {
     mining:       "Miner",
@@ -317,6 +374,14 @@
     return `${Math.floor(s/86400)}d ago`;
   }
 
+  function fmtKcal(kcal) {
+    if (kcal == null || !Number.isFinite(Number(kcal))) return "?";
+    const k = Number(kcal);
+    if (k >= 1_000_000) return `${(k / 1_000_000).toFixed(1)} Mkcal`;
+    if (k >= 1_000)     return `${(k / 1_000).toFixed(0)} kkcal`;
+    return `${k.toFixed(0)} kcal`;
+  }
+
   function fmtMass(units) {
     if (units == null) return "?";
     const u = Number(units);
@@ -368,8 +433,13 @@
         ? `<div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--bg-elev)"></div></div>`
         : bar(r.stress);
       const skillsLabel = formatSkills(r.skills);
+      const badges = (r.effects ?? [])
+        .map(e => BAD_EFFECTS[e])
+        .filter(Boolean)
+        .map(e => `<span class="badge ${e.cls}">${escapeHtml(e.label)}</span>`)
+        .join("");
       return `<tr>
-        <td class="name">${escapeHtml(r.name ?? "(unnamed)")}</td>
+        <td class="name">${escapeHtml(r.name ?? "(unnamed)")}${badges}</td>
         <td class="bar">${barCell}</td>
         <td class="pct">${pct}</td>
         <td class="skills">${escapeHtml(skillsLabel)}</td>
@@ -383,10 +453,48 @@
       setHTML("geysers-card", `<div class="empty">no geysers detected</div>`);
       return;
     }
-    const html = rows.map(r =>
-      `<tr><td>${escapeHtml(geyserName(r.type_id))}</td><td class="count">×${r.count}</td></tr>`
-    ).join("");
+    const html = rows.map(r => {
+      const quality = Math.round(((Number(r.rate_roll) + Number(r.year_percent_roll)) / 2) * 100);
+      const cls = quality >= 70 ? "" : quality >= 40 ? "med" : "high"; // reuse stress bar colours inverted
+      return `<tr>
+        <td style="font-size:12px">${escapeHtml(geyserName(r.type_id))}</td>
+        <td class="bar" style="width:50%">
+          <div class="bar-track">
+            <div class="bar-fill ${cls}" style="width:${quality}%"></div>
+          </div>
+        </td>
+        <td class="pct">${quality}%</td>
+      </tr>`;
+    }).join("");
     setHTML("geysers-card", `<table><tbody>${html}</tbody></table>`);
+  }
+
+  function renderFood(rows, dupeCount) {
+    const known = (rows ?? [])
+      .map(r => ({ info: FOOD[r.item_prefab_id], qty: r.qty }))
+      .filter(r => r.info && r.info.kcal > 10)  // skip raw plants with kcal≈1
+      .sort((a, b) => (b.qty * b.info.kcal) - (a.qty * a.info.kcal));
+
+    if (known.length === 0) {
+      setHTML("food-card", `<div class="empty">no food in storage</div>`);
+      return;
+    }
+    const totalKcal = known.reduce((s, r) => s + r.qty * r.info.kcal, 0);
+    const cycles = dupeCount > 0 ? Math.floor(totalKcal / (1000 * dupeCount)) : "?";
+
+    const html = known.map(r => {
+      const rowKcal = r.qty * r.info.kcal;
+      return `<tr>
+        <td style="font-size:12px">${escapeHtml(r.info.name)}</td>
+        <td class="count">×${r.qty}</td>
+        <td class="metric">${fmtKcal(rowKcal)}</td>
+      </tr>`;
+    }).join("");
+    const footer = `<tr style="border-top:1px solid var(--border);margin-top:4px">
+      <td colspan="2" style="color:var(--fg-dim);font-size:11px;padding-top:6px">~${cycles} cycles</td>
+      <td class="metric" style="padding-top:6px">${fmtKcal(totalKcal)}</td>
+    </tr>`;
+    setHTML("food-card", `<table><tbody>${html}${footer}</tbody></table>`);
   }
 
   function renderResources(rows) {
@@ -396,9 +504,8 @@
     }
     const html = rows.map(r =>
       `<tr>
-        <td>${escapeHtml(elementName(r.element_id))}</td>
+        <td style="font-size:12px">${escapeHtml(elementName(r.element_id))}</td>
         <td class="metric">${fmtMass(r.total_units)}</td>
-        <td class="count">${r.items} place${r.items === 1 ? "" : "s"}</td>
       </tr>`
     ).join("");
     setHTML("resources-card", `<table><tbody>${html}</tbody></table>`);
@@ -454,6 +561,7 @@
       renderCounts(data.counts || {});
       renderDupes(data.top_dupes || []);
       renderGeysers(data.geyser_types || []);
+      renderFood(data.food || [], data.counts?.duplicants ?? 0);
       renderResources(data.top_resources || []);
     } catch (err) {
       showError(`fetch failed: ${err.message}`);
