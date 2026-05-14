@@ -1,27 +1,8 @@
 # oni-vision — feature plan
 
-This document is the design north star for oni-vision. Each section is a self-contained mini-design: what we want, the rough shape of the solution, what ships, and what we still need to decide.
+This document is the design north star for the next round of features after Wave 5 (config-file-only). Each section is a self-contained mini-design: what we want, the rough shape of the solution, what ships, and what we still need to decide. Pick them up in any order; #1 is the natural next step because it pays off for every other feature.
 
-> **Status (post Wave 23):** Features 1–4 are implemented and committed. Feature 5 (zero-config experience) is the active design goal. This doc is kept as living design rationale; the §"Open questions" notes capture calls made during implementation.
-
----
-
-## Design principle: zero-config
-
-**A user should be able to clone the repo, run `npm start`, and have a live browser dashboard of their colony — with no config file, no flag, no copy-paste.**
-
-This is the north star for every new feature. Concretely it means:
-
-- **Save-file discovery is automatic.** (✅ done, Wave 6.) The daemon probes known platform paths and picks the most-recently-written save.
-- **The web dashboard is on by default.** No `web.enabled: true` required. Port 8080, localhost-only, starts with the daemon.
-- **The browser opens automatically** on first start (or when the dashboard isn't already open). One fewer step the user has to remember.
-- **The daemon auto-starts on login.** After a one-time `npm run setup`, it runs silently in the background. The user never has to remember `npm start` again.
-
-Config file (`~/.oni-vision/config.json`) is still supported for overrides — a different port, a different save dir, disabling the web UI — but it is never *required*.
-
-The test for this principle: hand the repo to someone who plays ONI and has Node ≥ 22, and count the steps to a working dashboard. The target is two: `npm install` → `npm run setup`. Everything else is automatic.
-
----
+> **Status (post Wave 11):** all four features are implemented and committed. This doc is kept as the design rationale; the §"Open questions" notes capture the calls actually made during implementation.
 
 ## 1. Zero-config save-dir discovery — ✅ implemented (Wave 6)
 
@@ -201,119 +182,11 @@ A non-exhaustive list of subject areas, sourced from the official Klei wiki and 
 
 ---
 
-## 5. Zero-config experience — 🔜 next
-
-### Goal
-
-`npm install && npm run setup` is the complete installation. After that, every time the user launches ONI the dashboard is already waiting at `http://localhost:8080`. No terminal, no config file, no `npm start`.
-
-### The three gaps
-
-#### 5a. Web on by default
-
-Right now the web server only starts when `config.web.enabled === true`. Flip the default: the server starts unless the user explicitly sets `"web": { "enabled": false }`.
-
-- **`src/paths.js` `buildDefaults()`**: add `web: { enabled: true, port: 8080 }`.
-- **Port conflict**: if 8080 is busy, try 8081, 8082, … up to 8090. Log the actual URL so the user knows where to look.
-- No new dependency — already using `node:http`.
-
-Open question: should we print a one-time "Dashboard running at http://localhost:8080 — add `web.enabled: false` to config to turn this off" notice? Probably yes, on first run only (detect by absence of config file).
-
-#### 5b. Auto-open browser on first start
-
-After `startWeb()` resolves and the current.sqlite is fresh (parsed within the last 60 s), open the dashboard in the default browser. Do this only if:
-
-1. No browser is already polling `/api/status` (detect via a simple flag file `~/.oni-vision/browser-opened`).
-2. A TTY is attached (non-interactive use, e.g. cron/launchctl, should stay silent).
-
-Platform open commands:
-- macOS: `open http://localhost:<port>`
-- Windows: `start http://localhost:<port>`
-- Linux: `xdg-open http://localhost:<port>`
-
-All via `child_process.spawn` with `{ detached: true, stdio: 'ignore' }` — fire and forget, don't wait.
-
-Deliverable: `src/browser.js` — `openBrowser(url)` export. Called from `src/index.js` after the first successful `buildOutputs` while the web server is up.
-
-#### 5c. Auto-start on login: `npm run setup`
-
-A one-shot command that installs a platform-appropriate background service so the daemon starts on login and stays running silently.
-
-**macOS — LaunchAgent** (preferred, standard, no root required):
-
-```xml
-<!-- ~/Library/LaunchAgents/com.oni-vision.daemon.plist -->
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" …>
-<plist version="1.0">
-<dict>
-  <key>Label</key>           <string>com.oni-vision.daemon</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/usr/local/bin/node</string>
-    <string>/path/to/oni-vision/src/index.js</string>
-  </array>
-  <key>RunAtLoad</key>       <true/>
-  <key>KeepAlive</key>       <true/>
-  <key>StandardOutPath</key> <string>~/.oni-vision/daemon.log</string>
-  <key>StandardErrorPath</key><string>~/.oni-vision/daemon.log</string>
-</dict>
-</plist>
-```
-
-After writing the plist: `launchctl load ~/Library/LaunchAgents/com.oni-vision.daemon.plist`.
-
-**Linux — systemd user service**:
-
-```ini
-# ~/.config/systemd/user/oni-vision.service
-[Unit]
-Description=oni-vision save watcher
-
-[Service]
-ExecStart=node /path/to/oni-vision/src/index.js
-Restart=on-failure
-StandardOutput=append:%h/.oni-vision/daemon.log
-StandardError=append:%h/.oni-vision/daemon.log
-
-[Install]
-WantedBy=default.target
-```
-
-After writing: `systemctl --user enable --now oni-vision`.
-
-**Windows — Task Scheduler** (via `schtasks /create`): lower priority, implement after macOS/Linux.
-
-Deliverable: `src/cli/setup.js` — detects platform, writes the appropriate service file, registers it, prints a confirmation. Wired to `"setup": "node src/cli/setup.js"` in `package.json`.
-
-Companion: `src/cli/uninstall.js` / `npm run uninstall` — removes the service file and unregisters it cleanly.
-
-### What doesn't change
-
-- Config file still works as before. Any key present in `~/.oni-vision/config.json` overrides the default.
-- The daemon is still stoppable with `Ctrl-C` (or `launchctl unload` / `systemctl --user stop`).
-- The web server still binds to `127.0.0.1` only — no exposure to the network.
-
-### Deliverables summary
-
-| File | What it does |
-|---|---|
-| `src/paths.js` | `web.enabled` defaults to `true`; port-fallback logic |
-| `src/browser.js` | `openBrowser(url)` — cross-platform, fire-and-forget |
-| `src/index.js` | call `openBrowser` after first parse while web is up |
-| `src/cli/setup.js` | write + register platform service; `npm run setup` |
-| `src/cli/uninstall.js` | remove + unregister; `npm run uninstall` |
-| `package.json` | add `setup` and `uninstall` scripts |
-| `README.md` | replace "Configuration" section with two-step install |
-
----
-
 ## Sequencing
 
 A reasonable order, roughly increasing scope:
 
-1. **Zero-config discovery** — ✅ Wave 6
-2. **UX status command** — ✅ Wave 7
-3. **MCP plugin** — ✅ Wave 8
-4. **ONI architect skill** — ✅ Wave 9
-5. **Zero-config experience** — 🔜 next: web on by default (5a), browser auto-open (5b), login auto-start (5c)
+1. **Zero-config discovery** — small, contained, makes the daemon usable for new users out of the box. Unblocks every other feature because the MCP plugin and CLI status assume a working `current.sqlite`.
+2. **UX status command** — gives us something to show users beyond log lines. Same rendering powers Feature 3's `oni_status` MCP tool, so the work is reused.
+3. **MCP plugin** — wraps the data we already have for Claude clients. Depends on Feature 2's renderer.
+4. **ONI architect skill** — biggest content task; sit it on top of the plumbing once the plumbing is solid.
