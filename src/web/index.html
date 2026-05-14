@@ -119,11 +119,15 @@
       <div class="card" id="geysers-card"><div class="empty">loading…</div></div>
     </div>
     <div>
-      <h2>Food stores</h2>
+      <h2>Calories</h2>
       <div class="card" id="food-card"><div class="empty">loading…</div></div>
     </div>
     <div>
-      <h2>Stockpile</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px">
+        <h2 style="margin:0">Stockpile</h2>
+        <button id="stockpile-cfg-btn" onclick="togglePicker()" style="font-size:11px;padding:2px 8px;cursor:pointer;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--fg-dim)">configure</button>
+      </div>
+      <div id="stockpile-picker" style="display:none;background:var(--bg-elev);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;font-size:12px;max-height:180px;overflow-y:auto"></div>
       <div class="card" id="resources-card"><div class="empty">loading…</div></div>
     </div>
   </div>
@@ -262,37 +266,6 @@
     "MinorAilment":         { label: "Ill",             cls: "warn" },
     "MajorAilment":         { label: "Sick",            cls: "bad"  },
     "Pathogen_FoodPoisoning":{ label: "Food Poisoned",  cls: "bad"  },
-  };
-
-  // Food prefab ID → { name, kcal per item }.
-  // kcal values are the game's standard item calorie count.
-  const FOOD = {
-    "MushBar":          { name: "Mush Bar",         kcal: 1000 },
-    "Mushroom":         { name: "Raw Mushroom",      kcal: 1   },
-    "FriedMushroom":    { name: "Fried Mushroom",    kcal: 1600 },
-    "MushFry":          { name: "Mush Fry",          kcal: 1200 },
-    "CookedEgg":        { name: "Cooked Egg",        kcal: 2000 },
-    "RawEgg":           { name: "Raw Egg",           kcal: 700  },
-    "Burger":           { name: "Barbecue",          kcal: 4000 },
-    "Meat":             { name: "Raw Meat",          kcal: 1600 },
-    "CookedMeat":       { name: "Cooked Meat",       kcal: 2400 },
-    "SpiceBread":       { name: "Spice Bread",       kcal: 2400 },
-    "SurfAndTurf":      { name: "Surf 'n' Turf",     kcal: 6000 },
-    "PepperbreadMeal":  { name: "Pepper Bread",      kcal: 3200 },
-    "SpicyTofu":        { name: "Spicy Tofu",        kcal: 3200 },
-    "MeatPlanks":       { name: "Jerky",             kcal: 4800 },
-    "PlantMeat":        { name: "Plant Meat",        kcal: 1600 },
-    "BasicForagePlant": { name: "Mealwood Shoot",    kcal: 600  },
-    "Tofu":             { name: "Tofu",              kcal: 1600 },
-    "WormBasicFood":    { name: "Stuffed Berry",     kcal: 4000 },
-    "MushroomWrap":     { name: "Mushroom Wrap",     kcal: 4000 },
-    "FruitCake":        { name: "Frost Burger",      kcal: 6000 },
-    "ColdWheatBread":   { name: "Cold Wheat Bread",  kcal: 1600 },
-    "PrickleFig":       { name: "Prickle Muffin",    kcal: 1200 },
-    "Lettuce":          { name: "Lettuce",           kcal: 1   },
-    "SpiceNut":         { name: "Spice Nut",         kcal: 1   },
-    "BeanPlantSeed":    { name: "Nosh Bean",         kcal: 600  },
-    "SwampLily":        { name: "Swamp Lily",        kcal: 1   },
   };
 
   // Skill branch prefix → display label (mirrors SKILL_LABELS in src/ui.js).
@@ -469,40 +442,102 @@
     setHTML("geysers-card", `<table><tbody>${html}</tbody></table>`);
   }
 
-  function renderFood(rows, dupeCount) {
-    const known = (rows ?? [])
-      .map(r => ({ info: FOOD[r.item_prefab_id], qty: r.qty }))
-      .filter(r => r.info && r.info.kcal > 10)  // skip raw plants with kcal≈1
-      .sort((a, b) => (b.qty * b.info.kcal) - (a.qty * a.info.kcal));
+  // ── Stockpile picker state ────────────────────────────────────────────────────
 
-    if (known.length === 0) {
-      setHTML("food-card", `<div class="empty">no food in storage</div>`);
+  // Persist selected element IDs across reloads in localStorage.
+  // null means "show top 8 by mass" (default before user configures anything).
+  const LS_KEY = "oni-stockpile-v1";
+  let stockpileSelection = null; // Set<string> | null
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) stockpileSelection = new Set(JSON.parse(raw));
+  } catch { /**/ }
+
+  let allElements = []; // populated from latest API response
+
+  function togglePicker() {
+    const el = $("stockpile-picker");
+    if (!el) return;
+    el.style.display = el.style.display === "none" ? "block" : "none";
+    if (el.style.display === "block") renderPicker();
+  }
+
+  function renderPicker() {
+    const el = $("stockpile-picker");
+    if (!el || allElements.length === 0) return;
+    el.innerHTML = allElements.map(r => {
+      const id = String(Math.trunc(Number(r.element_id)));
+      const checked = stockpileSelection === null || stockpileSelection.has(id) ? "checked" : "";
+      const name = escapeHtml(elementName(r.element_id));
+      const mass = escapeHtml(fmtMass(r.total_units));
+      return `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer">
+        <input type="checkbox" data-id="${escapeHtml(id)}" ${checked} onchange="onPickerChange()">
+        <span style="flex:1">${name}</span>
+        <span style="color:var(--fg-muted)">${mass}</span>
+      </label>`;
+    }).join("");
+  }
+
+  function onPickerChange() {
+    const checkboxes = ($("stockpile-picker") ?? {}).querySelectorAll?.("input[type=checkbox]") ?? [];
+    if ([...checkboxes].every(cb => cb.checked)) {
+      // All checked → treat as "no filter" (same as default)
+      stockpileSelection = null;
+      localStorage.removeItem(LS_KEY);
+    } else {
+      stockpileSelection = new Set([...checkboxes].filter(cb => cb.checked).map(cb => cb.dataset.id));
+      try { localStorage.setItem(LS_KEY, JSON.stringify([...stockpileSelection])); } catch { /**/ }
+    }
+    renderResources(allElements);
+  }
+
+  // ── Renderers ─────────────────────────────────────────────────────────────────
+
+  /** Show per-dupe calorie levels (hungriest first). */
+  function renderFood(rows) {
+    if (!rows || rows.length === 0) {
+      setHTML("food-card", `<div class="empty">no calorie data</div>`);
       return;
     }
-    const totalKcal = known.reduce((s, r) => s + r.qty * r.info.kcal, 0);
-    const cycles = dupeCount > 0 ? Math.floor(totalKcal / (1000 * dupeCount)) : "?";
-
-    const html = known.map(r => {
-      const rowKcal = r.qty * r.info.kcal;
+    // Dupe stomach capacity in ONI is 4000 kcal.
+    const MAX_KCAL = 4000;
+    const html = rows.map(r => {
+      const kcal = Number(r.calories ?? 0);
+      const pct  = Math.max(0, Math.min(100, (kcal / MAX_KCAL) * 100));
+      // Invert stress-bar colours: low calories = bad (red), high = good (green).
+      const cls  = pct < 25 ? "high" : pct < 55 ? "med" : "";
       return `<tr>
-        <td style="font-size:12px">${escapeHtml(r.info.name)}</td>
-        <td class="count">×${r.qty}</td>
-        <td class="metric">${fmtKcal(rowKcal)}</td>
+        <td class="name">${escapeHtml(r.name ?? "(unnamed)")}</td>
+        <td class="bar">
+          <div class="bar-track">
+            <div class="bar-fill ${cls}" style="width:${pct.toFixed(1)}%"></div>
+          </div>
+        </td>
+        <td class="pct">${fmtKcal(kcal)}</td>
       </tr>`;
     }).join("");
-    const footer = `<tr style="border-top:1px solid var(--border);margin-top:4px">
-      <td colspan="2" style="color:var(--fg-dim);font-size:11px;padding-top:6px">~${cycles} cycles</td>
-      <td class="metric" style="padding-top:6px">${fmtKcal(totalKcal)}</td>
-    </tr>`;
-    setHTML("food-card", `<table><tbody>${html}${footer}</tbody></table>`);
+    setHTML("food-card", `<table><tbody>${html}</tbody></table>`);
   }
 
   function renderResources(rows) {
-    if (!rows || rows.length === 0) {
+    allElements = rows ?? [];
+
+    // Apply user selection; fall back to top 8 by mass if nothing selected.
+    let display = allElements;
+    if (stockpileSelection !== null && stockpileSelection.size > 0) {
+      display = allElements.filter(r => {
+        const id = String(Math.trunc(Number(r.element_id)));
+        return stockpileSelection.has(id);
+      });
+    } else {
+      display = allElements.slice(0, 8);
+    }
+
+    if (display.length === 0) {
       setHTML("resources-card", `<div class="empty">stockpile empty</div>`);
       return;
     }
-    const html = rows.map(r =>
+    const html = display.map(r =>
       `<tr>
         <td style="font-size:12px">${escapeHtml(elementName(r.element_id))}</td>
         <td class="metric">${fmtMass(r.total_units)}</td>
@@ -561,8 +596,8 @@
       renderCounts(data.counts || {});
       renderDupes(data.top_dupes || []);
       renderGeysers(data.geyser_types || []);
-      renderFood(data.food || [], data.counts?.duplicants ?? 0);
-      renderResources(data.top_resources || []);
+      renderFood(data.food || []);
+      renderResources(data.all_resources || []);
     } catch (err) {
       showError(`fetch failed: ${err.message}`);
     }

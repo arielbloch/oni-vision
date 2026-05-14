@@ -195,17 +195,29 @@ function serveStatus(res, outputDir) {
        ORDER BY type_id, rate_roll DESC`
     ).all();
 
-    // ── Food in storage ───────────────────────────────────────────────────────
-    // storage_contents rows with item_prefab_id set and no element_id are food
-    // items (and other manufactured items). Count stacks per type; the client
-    // maps known food IDs to calorie estimates.
+    // ── Per-dupe calorie levels ───────────────────────────────────────────────
+    // From duplicant_amounts (the live amount values tracked per dupe).
+    // Sorted hungriest-first so critical dupes surface at the top.
     payload.food = db.prepare(
-      `SELECT item_prefab_id, COUNT(*) AS qty
-       FROM storage_contents
-       WHERE item_prefab_id IS NOT NULL AND element_id IS NULL
-       GROUP BY item_prefab_id
-       ORDER BY qty DESC
-       LIMIT 30`
+      `SELECT d.name, da.value AS calories
+       FROM duplicant_amounts da
+       JOIN duplicants d ON d.game_object_id = da.duplicant_id
+       WHERE da.amount_name = 'Calories'
+       ORDER BY da.value ASC`
+    ).all();
+
+    // ── All stored elements (for the user-configurable stockpile picker) ──────
+    // Returns every element found in containers or loose in the world, sorted
+    // by total mass. The client filters this down to the user's selection.
+    payload.all_resources = db.prepare(
+      `SELECT element_id, SUM(units) AS total_units
+       FROM (
+         SELECT element_id, units FROM storage_contents WHERE element_id IS NOT NULL
+         UNION ALL
+         SELECT element_id, units FROM world_objects   WHERE element_id IS NOT NULL
+       )
+       GROUP BY element_id
+       ORDER BY total_units DESC`
     ).all();
 
     res.writeHead(200, {
