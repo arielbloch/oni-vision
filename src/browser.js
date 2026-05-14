@@ -55,6 +55,11 @@ export function openBrowser(url, {
       detached: true,
       stdio: "ignore",
     });
+    // Suppress ENOENT / EACCES if the open command doesn't exist on this
+    // platform. Without this listener Node.js emits an unhandled 'error'
+    // event and crashes the process — most visible in tests that pass
+    // platform:"linux" on macOS where xdg-open isn't installed.
+    child.on("error", () => { /* detached — ignore launch errors */ });
     child.unref();
 
     sessionOpened = true;

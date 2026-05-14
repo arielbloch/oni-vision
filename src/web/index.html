@@ -39,7 +39,7 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 14px; line-height: 1.5;
   }
-  body { padding: 16px; max-width: 720px; margin: 0 auto; }
+  body { padding: 16px; max-width: 1000px; margin: 0 auto; }
   h1 { font-size: 22px; margin: 0; font-weight: 600; }
   h2 { font-size: 13px; margin: 18px 0 8px; color: var(--fg-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
   .mono { font-family: var(--mono); }
@@ -88,25 +88,32 @@
     .counts   { grid-template-columns: repeat(2, 1fr); }
     .three-up { grid-template-columns: 1fr; }
   }
+  :root { --logo: #fb923c; }
+  @media (prefers-color-scheme: light) { :root { --logo: #854F0B; } }
   .app-header {
     display: flex; align-items: center; gap: 9px;
     padding-bottom: 10px; margin-bottom: 10px;
     border-bottom: 1px solid var(--border);
   }
   .app-name {
-    font-size: 17px; font-weight: 700; letter-spacing: 0.02em;
-    color: var(--accent);
+    font-size: 17px; font-weight: 800; letter-spacing: 0.01em;
+    color: var(--logo);
   }
 </style>
 </head>
 <body>
 
 <div class="app-header">
-  <!-- Logo: oxygen bubble (outer circle) + vision (eye path + pupil) -->
+  <!-- Logo: hexagon lattice (colony grid) + central node (the colony) -->
   <svg viewBox="0 0 24 24" width="28" height="28" fill="none" aria-hidden="true">
-    <circle cx="12" cy="12" r="10" stroke="var(--accent)" stroke-width="1.5"/>
-    <path d="M5.5 12 Q12 5.5 18.5 12 Q12 18.5 5.5 12" stroke="var(--accent)" stroke-width="1.5"/>
-    <circle cx="12" cy="12" r="2.8" fill="var(--accent)"/>
+    <polygon points="12,2 22,7 22,17 12,22 2,17 2,7" stroke="var(--logo)" stroke-width="1.5"/>
+    <circle cx="12" cy="12" r="3" fill="var(--logo)"/>
+    <line x1="12" y1="2"    x2="12"  y2="9"    stroke="var(--logo)" stroke-width="1"/>
+    <line x1="12" y1="15"   x2="12"  y2="22"   stroke="var(--logo)" stroke-width="1"/>
+    <line x1="2"  y1="7"    x2="8.2" y2="10.5" stroke="var(--logo)" stroke-width="1"/>
+    <line x1="15.8" y1="13.5" x2="22" y2="17"  stroke="var(--logo)" stroke-width="1"/>
+    <line x1="2"  y1="17"   x2="8.2" y2="13.5" stroke="var(--logo)" stroke-width="1"/>
+    <line x1="15.8" y1="10.5" x2="22" y2="7"   stroke="var(--logo)" stroke-width="1"/>
   </svg>
   <span class="app-name">ONI-vision</span>
 </div>
