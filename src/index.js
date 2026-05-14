@@ -13,7 +13,7 @@ import { resolveConfig } from "./paths.js";
 import { ensureConfig } from "./config-writer.js";
 import { findLatestSave } from "./find-latest.js";
 import { buildOutputs } from "./pipeline.js";
-import { startWeb } from "./web.js";
+import { startWeb, notifyClients } from "./web.js";
 import { openBrowser } from "./browser.js";
 
 const config = await resolveConfig();
@@ -68,6 +68,8 @@ async function runOnce(reason) {
       `[vision] (${reason}) latest save: ${latest.path} (${(latest.size / 1024 / 1024).toFixed(2)} MB)`
     );
     await buildOutputs({ savePath: latest.path, outputDir: config.outputDir });
+    // Push a "parse" event to any open browser tabs so they refresh instantly.
+    notifyClients();
     // Open the dashboard on the first successful parse, if we haven't yet.
     if (webServer) {
       const addr = webServer.address();

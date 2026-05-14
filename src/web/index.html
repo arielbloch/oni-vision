@@ -51,19 +51,19 @@
   .dot.cold { background: var(--bad); }
   .source { font-family: var(--mono); color: var(--fg-muted); font-size: 11px; word-break: break-all; }
   .counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 6px; }
-  .count {
+  .count-card {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
     padding: 10px; text-align: center;
   }
-  .count .n { font-family: var(--mono); font-size: 20px; font-weight: 600; }
-  .count .label { font-size: 11px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .count-card .n { font-family: var(--mono); font-size: 20px; font-weight: 600; }
+  .count-card .label { font-size: 11px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.05em; }
   .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-top: 10px; }
   table { width: 100%; border-collapse: collapse; font-family: var(--mono); }
   td { padding: 4px 6px; vertical-align: middle; }
-  td.name { width: 30%; }
-  td.bar { width: 40%; padding-right: 12px; }
-  td.pct { width: 12%; text-align: right; color: var(--fg-dim); }
-  td.role { color: var(--fg-dim); font-size: 12px; }
+  td.name { width: 22%; white-space: nowrap; }
+  td.bar { width: 32%; padding-right: 12px; }
+  td.pct { width: 10%; text-align: right; color: var(--fg-dim); }
+  td.skills { color: var(--fg-dim); font-size: 12px; }
   td.metric { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   .bar-track {
@@ -121,8 +121,186 @@
 </main>
 
 <script>
-  const POLL_MS = 5000;
-  const STALE_AFTER_S = 600; // 10 minutes — UI flips dot to "stale"
+  // ── Name lookup tables ───────────────────────────────────────────────────────
+  // SimHash integers → human-readable names. Same data as src/elements.js and
+  // the GEYSER_NAMES map in src/ui.js. Keys stored as strings because JS Maps
+  // compare object keys by identity, not value — using a plain Object is safe
+  // here since all keys are integers (no collision with inherited properties).
+
+  const ELEMENT_NAMES = {
+    // Gases
+    "758759285":   "Vacuum",
+    "-1046145888": "Hydrogen",
+    "-1528777920": "Oxygen",
+    "721531317":   "Polluted O₂",
+    "1960575215":  "Carbon Dioxide",
+    "-841236436":  "Methane",
+    "-1324664829": "Chlorine",
+    "-927923200":  "Sour Gas",
+    "-1858722091": "Propane",
+    "-899515856":  "Steam",
+    // Liquids
+    "1836671383":  "Water",
+    "1832607973":  "Dirty Water",
+    "1911997537":  "Salt Water",
+    "-324547888":  "Brine",
+    "-1412059381": "Crude Oil",
+    "-486269331":  "Petroleum",
+    "-87974045":   "Ethanol",
+    "1157157570":  "Naphtha",
+    "1323821489":  "Liq. Phosphorus",
+    "-1108652427": "Liq. Sulfur",
+    "-1075911705": "Magma",
+    // Ores & raw minerals
+    "-1736594426": "Cuprite",
+    "-1870043872": "Algae",
+    "-1153056158": "Slime Mold",
+    "707722079":   "Slime",
+    "1624244999":  "Dirt",
+    "381796644":   "Sand",
+    "493438017":   "Sandstone",
+    "-105943486":  "Granite",
+    "-2057963720": "Igneous Rock",
+    "-474151749":  "Obsidian",
+    "1362238252":  "Regolith",
+    "1282846257":  "Mafic Rock",
+    "869554203":   "Toxic Sand",
+    "-355957251":  "Igneous Rock",
+    "183408504":   "Sedimentary Rock",
+    "1608833498":  "Iron Ore",
+    "-758990593":  "Phosphorite",
+    "-839728230":  "Bleach Stone",
+    "381665462":   "Salt",
+    "118518245":   "Carbon Fibre",
+    "-1683093854": "Visco-Gel",
+    "-2008682336": "Isoresin",
+    "245514112":   "Fullerene",
+    "1757792140":  "Fossil",
+    "-527922989":  "Fulgurite",
+    // Refined metals
+    "1306370440":  "Iron",
+    "-899253461":  "Steel",
+    "-1725038055": "Copper",
+    "361868060":   "Gold Amalgam",
+    "-279785280":  "Gold",
+    "2108244480":  "Aluminum",
+    "-755153220":  "Lead",
+    "108179667":   "Cobalt",
+    "-1779895821": "Niobium",
+    "-1058835580": "Tungsten",
+    "733064268":   "Platinum",
+    "1838482828":  "Unobtanium",
+    "-1208854194": "Wolframite",
+    "-400237395":  "Oxidized Copper",
+    // Carbon & glass
+    "892111639":   "Coal",
+    "-902240476":  "Refined Carbon",
+    "-2079931820": "Diamond",
+    "623986332":   "Glass",
+    "-1467370314": "Ceramic",
+    "-1139150657": "Mineral Wool",
+    // Special / manufactured
+    "-123825053":  "Super Coolant",
+    "-1713958528": "Super Insulator",
+    "1071649902":  "Katairite",
+    // Elemental solids
+    "-220394187":  "Phosphorus",
+    "-729385479":  "Sulfur",
+    // Ice / frozen
+    "873952427":   "Ice",
+    "-1561279013": "Brine Ice",
+    "1664334585":  "Dirty Ice",
+    "489261827":   "Snow",
+  };
+
+  const GEYSER_NAMES = {
+    "-899515856":   "Steam Vent",
+    "-2022709954":  "Hot Steam Vent",
+    "713477285":    "Hot Water Geyser",
+    "630638510":    "Salt Water Geyser",
+    "1280790313":   "Slush Geyser",
+    "1483840464":   "Chlorine Vent",
+    "-1046145888":  "Hydrogen Vent",
+    "-841236436":   "Natural Gas Geyser",
+    "-597658376":   "Leaky Oil Fissure",
+    "1482090435":   "CO₂ Geyser",
+    "-1765654948":  "Liquid Sulfur Geyser",
+    "-471575302":   "Minor Volcano",
+    "-1592417549":  "Volcano",
+    "-695301211":   "Copper Volcano",
+    "-1332060084":  "Gold Volcano",
+    "254095636":    "Iron Volcano",
+    "159381264":    "Tungsten Volcano",
+    "1137916511":   "Cobalt Volcano",
+    "-968505972":   "Aluminum Volcano",
+    "976669543":    "Niobium Volcano",
+  };
+
+  // Skill branch prefix → display label (mirrors SKILL_LABELS in src/ui.js).
+  const SKILL_LABELS = {
+    mining:       "Miner",
+    building:     "Builder",
+    researching:  "Researcher",
+    farming:      "Farmer",
+    cooking:      "Cook",
+    ranching:     "Rancher",
+    arting:       "Artist",
+    doctoring:    "Medic",
+    hauling:      "Hauler",
+    suit:         "Suit",
+    power:        "Engineer",
+    plumbing:     "Plumber",
+    hvac:         "HVAC",
+    rocketry:     "Rocketry",
+    farming2:     "Botanist",
+    spaceanalysis:"Space",
+  };
+  const ROMAN = ["", "I", "II", "III", "IV", "V"];
+
+  /** Resolve a numeric element_id to a display name. */
+  function elementName(id) {
+    if (id == null) return "?";
+    const key = String(Math.trunc(Number(id)));
+    return ELEMENT_NAMES[key] ?? String(id);
+  }
+
+  /** Resolve a numeric geyser type_id to a display name. */
+  function geyserName(id) {
+    if (id == null) return "(unknown)";
+    const key = String(Math.trunc(Number(id)));
+    return GEYSER_NAMES[key] ?? `hash:${key}`;
+  }
+
+  /**
+   * Convert a comma-separated skills string (GROUP_CONCAT output) into a
+   * compact human-readable label, e.g. "Mining1,Mining2,Building1" → "Miner II, Builder I".
+   * Groups by branch prefix, keeps highest level per branch.
+   */
+  function formatSkills(raw) {
+    if (!raw) return "";
+    const bestLevel = {};
+    for (const skill of raw.split(",")) {
+      const m = skill.match(/^([A-Za-z]+?)(\d+)?$/);
+      if (!m) continue;
+      const branch = m[1].toLowerCase();
+      const level = m[2] ? Number(m[2]) : 1;
+      if (!(branch in bestLevel) || level > bestLevel[branch]) {
+        bestLevel[branch] = level;
+      }
+    }
+    const parts = [];
+    for (const [branch, level] of Object.entries(bestLevel)) {
+      const label = SKILL_LABELS[branch] ?? (branch.charAt(0).toUpperCase() + branch.slice(1));
+      const roman = ROMAN[level] ?? String(level);
+      parts.push(roman ? `${label} ${roman}` : label);
+    }
+    return parts.join(", ");
+  }
+
+  // ── DOM helpers ──────────────────────────────────────────────────────────────
+
+  const POLL_MS = 10000;        // polling fallback (SSE is the primary push path)
+  const STALE_AFTER_S = 600;   // 10 minutes — UI flips dot to "stale"
 
   function $(id) { return document.getElementById(id); }
   function setText(id, t) { const el = $(id); if (el) el.textContent = t; }
@@ -131,8 +309,8 @@
   function fmtAge(seconds) {
     if (seconds == null) return "unknown";
     const s = Math.max(0, Math.floor(seconds));
-    if (s < 90)   return `${s}s ago`;
-    if (s < 5400) return `${Math.floor(s/60)}m ago`;
+    if (s < 90)    return `${s}s ago`;
+    if (s < 5400)  return `${Math.floor(s/60)}m ago`;
     if (s < 86400) return `${Math.floor(s/3600)}h ago`;
     return `${Math.floor(s/86400)}d ago`;
   }
@@ -157,15 +335,23 @@
     return String(path).split(/[\\/]/).pop();
   }
 
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+
+  // ── Renderers ────────────────────────────────────────────────────────────────
+
   function renderCounts(c) {
     const items = [
       ["duplicants", c.duplicants],
-      ["critters", c.critters],
-      ["geysers", c.geysers],
-      ["buildings", c.buildings],
+      ["critters",   c.critters],
+      ["geysers",    c.geysers],
+      ["buildings",  c.buildings],
     ];
     setHTML("counts", items.map(([label, n]) =>
-      `<div class="count"><div class="n">${n ?? "—"}</div><div class="label">${label}</div></div>`
+      `<div class="count-card"><div class="n">${n ?? "—"}</div><div class="label">${label}</div></div>`
     ).join(""));
   }
 
@@ -175,16 +361,16 @@
       return;
     }
     const html = rows.map(r => {
-      const stress = r.stress;
-      const pct = stress == null ? "—" : `${Number(stress).toFixed(1)}%`;
-      const barCell = stress == null
-        ? `<div class="bar-track"><div class="bar-fill" style="width: 0%; background: var(--bg-elev)"></div></div>`
-        : bar(stress);
+      const pct = r.stress == null ? "—" : `${Number(r.stress).toFixed(1)}%`;
+      const barCell = r.stress == null
+        ? `<div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--bg-elev)"></div></div>`
+        : bar(r.stress);
+      const skillsLabel = formatSkills(r.skills);
       return `<tr>
         <td class="name">${escapeHtml(r.name ?? "(unnamed)")}</td>
         <td class="bar">${barCell}</td>
         <td class="pct">${pct}</td>
-        <td class="role">${escapeHtml(r.current_role ?? "")}</td>
+        <td class="skills">${escapeHtml(skillsLabel)}</td>
       </tr>`;
     }).join("");
     setHTML("dupes-card", `<table><tbody>${html}</tbody></table>`);
@@ -195,9 +381,9 @@
       setHTML("geysers-card", `<div class="empty">no geysers detected</div>`);
       return;
     }
-    const html = rows.map(r => `
-      <tr><td>${escapeHtml(r.type_id ?? "(unknown)")}</td><td class="count">×${r.count}</td></tr>
-    `).join("");
+    const html = rows.map(r =>
+      `<tr><td>${escapeHtml(geyserName(r.type_id))}</td><td class="count">×${r.count}</td></tr>`
+    ).join("");
     setHTML("geysers-card", `<table><tbody>${html}</tbody></table>`);
   }
 
@@ -206,21 +392,17 @@
       setHTML("resources-card", `<div class="empty">stockpile empty</div>`);
       return;
     }
-    const html = rows.map(r => `
-      <tr>
-        <td>${escapeHtml(r.element_id ?? "(unknown)")}</td>
+    const html = rows.map(r =>
+      `<tr>
+        <td>${escapeHtml(elementName(r.element_id))}</td>
         <td class="metric">${fmtMass(r.total_units)}</td>
         <td class="count">${r.items} place${r.items === 1 ? "" : "s"}</td>
-      </tr>
-    `).join("");
+      </tr>`
+    ).join("");
     setHTML("resources-card", `<table><tbody>${html}</tbody></table>`);
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-    }[c]));
-  }
+  // ── Liveness ─────────────────────────────────────────────────────────────────
 
   function setLiveness(state, label) {
     $("liveness-dot").className = "dot " + state;
@@ -240,6 +422,8 @@
     if (el) el.hidden = true;
   }
 
+  // ── Fetch & render ───────────────────────────────────────────────────────────
+
   async function refresh() {
     try {
       const res = await fetch("/api/status", { cache: "no-store" });
@@ -248,10 +432,7 @@
         showError(body.message || body.error || "oni-vision hasn't produced data yet");
         return;
       }
-      if (!res.ok) {
-        showError(`HTTP ${res.status}`);
-        return;
-      }
+      if (!res.ok) { showError(`HTTP ${res.status}`); return; }
       const data = await res.json();
       clearError();
 
@@ -277,7 +458,22 @@
     }
   }
 
+  // ── SSE — instant push when a new save lands ─────────────────────────────────
+
+  function connectSSE() {
+    const es = new EventSource("/api/events");
+    es.addEventListener("parse", () => refresh());
+    es.onerror = () => {
+      // EventSource auto-reconnects; nothing extra needed.
+    };
+  }
+
+  // ── Boot ─────────────────────────────────────────────────────────────────────
+
   refresh();
+  connectSSE();
+  // Polling as a safety net: covers cases where the SSE connection drops and
+  // the browser is slow to reconnect, or a save lands during the reconnect window.
   setInterval(refresh, POLL_MS);
 </script>
 
