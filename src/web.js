@@ -153,7 +153,7 @@ function serveStatus(res, outputDir) {
   let db;
   try {
     db = new DatabaseSync(dbPath, { readOnly: true });
-    const payload = statusObject(db);
+    const payload = statusObject(db, { dupeLimit: 9999 });
 
     // Enrich top_dupes with mastered skills. We re-query by name (names are
     // unique within a colony — ONI enforces this at the game level).
