@@ -25,35 +25,37 @@ Multiply by 600 for kg/cycle.
 
 ## Type table (vanilla + Spaced Out, base game)
 
-`type_id` values come from `oni_geysers().type_id`. Output element is what comes out; output temperature is roughly fixed per type with small jitter. Base output ranges (kg/s during eruption) and dormancy params:
+`type_id` in the SQLite `geysers` table is a numeric **SimHash** integer (ONI's SDBM hash of the internal type name). Both the name and its hash are listed below so you can match live query results to this reference.
 
-| type_id                     | Output             | Rate range (kg/s)   | Out temp (°C) |
-|-----------------------------|--------------------|---------------------|---------------|
-| `steam`                     | Cool Steam Vent water | 1.0 – 2.0       | 110           |
-| `hot_steam`                 | Steam Vent steam   | 0.5 – 2.0           | 500           |
-| `hot_water`                 | Water Geyser       | 1.0 – 3.0           | 95            |
-| `slush_water`               | Cool Slush Geyser  | 1.0 – 2.0           | -10 (PW)      |
-| `filthy_water`              | Polluted Water Vent | 2.0 – 6.0          | 30 (PW)       |
-| `slush_salt_water`          | Cool Salt Slush    | 1.0 – 2.0           | -10 (salt water) |
-| `salt_water`                | Salt Water Geyser  | 1.0 – 4.0           | 95            |
-| `oil_drip`                  | Leaky Oil Fissure  | 1.0 – 3.0           | 325           |
-| `small_volcano`             | Minor Volcano      | 8.0 – 20.0 (magma)  | 1726 (magma) |
-| `big_volcano`               | Volcano            | 18.0 – 40.0 (magma) | 1726          |
-| `liquid_co2`                | Carbon Dioxide Geyser | 0.2 – 0.4 (LCO2) | -55           |
-| `hot_co2`                   | Carbon Dioxide Vent | 0.07 – 0.14 (CO2) | 500          |
-| `chlorine_gas`              | Chlorine Gas Vent  | 0.04 – 0.14         | 60            |
-| `hot_hydrogen`              | Hydrogen Vent      | 0.07 – 0.14         | 500           |
-| `hot_po2`                   | Hot Polluted Oxygen Vent | 0.07 – 0.14   | 500           |
-| `slimy_po2`                 | Infectious Polluted Oxygen | 0.05 – 0.14 | 60            |
-| `methane`                   | Natural Gas Geyser | 0.07 – 0.14         | 150           |
-| `liquid_sulfur`             | Liquid Sulfur Geyser (Frosty Planet) | 0.5 – 1.5 | 138 |
-| `iron`                      | Iron Volcano       | 8 – 24 (iron magma) | 2526          |
-| `copper`                    | Copper Volcano     | 8 – 24 (copper magma) | 2226        |
-| `aluminum`                  | Aluminum Volcano   | 8 – 24 (aluminum magma) | 2226      |
-| `gold`                      | Gold Volcano       | 8 – 24 (gold magma) | 2326          |
-| `cobalt`                    | Cobalt Volcano     | 8 – 24 (cobalt magma) | 2226        |
-| `tungsten`                  | Tungsten Volcano   | 8 – 24 (tungsten magma) | 4426      |
-| `niobium`                   | Niobium Volcano    | 8 – 24 (niobium magma) | 4126       |
+Output element is what comes out; output temperature is roughly fixed per type with small jitter. Base output ranges (kg/s during eruption) and dormancy params:
+
+| type_id (name)        | SimHash integer | Output             | Rate range (kg/s)   | Out temp (°C) |
+|-----------------------|-----------------|--------------------|---------------------|---------------|
+| `steam`               | -899515856      | Cool Steam Vent water | 1.0 – 2.0       | 110           |
+| `hot_steam`           | -2022709954     | Steam Vent steam   | 0.5 – 2.0           | 500           |
+| `hot_water`           | 713477285       | Water Geyser       | 1.0 – 3.0           | 95            |
+| `slush_water`         | 1280790313      | Cool Slush Geyser  | 1.0 – 2.0           | -10 (PW)      |
+| `filthy_water`        | -413583980      | Polluted Water Vent | 2.0 – 6.0          | 30 (PW)       |
+| `slush_salt_water`    | 1984991388      | Cool Salt Slush    | 1.0 – 2.0           | -10 (salt water) |
+| `salt_water`          | 630638510       | Salt Water Geyser  | 1.0 – 4.0           | 95            |
+| `oil_drip`            | -2131904254     | Leaky Oil Fissure  | 1.0 – 3.0           | 325           |
+| `small_volcano`       | -471575302      | Minor Volcano      | 8.0 – 20.0 (magma)  | 1726 (magma)  |
+| `big_volcano`         | -1592417549     | Volcano            | 18.0 – 40.0 (magma) | 1726          |
+| `liquid_co2`          | 1482090435      | Carbon Dioxide Geyser | 0.2 – 0.4 (LCO2) | -55           |
+| `hot_co2`             | -620712844      | Carbon Dioxide Vent | 0.07 – 0.14 (CO2) | 500           |
+| `chlorine_gas`        | 1483840464      | Chlorine Gas Vent  | 0.04 – 0.14         | 60            |
+| `hot_hydrogen`        | 1123505170      | Hydrogen Vent      | 0.07 – 0.14         | 500           |
+| `hot_po2`             | -513313279      | Hot Polluted Oxygen Vent | 0.07 – 0.14  | 500           |
+| `slimy_po2`           | 2128532496      | Infectious Polluted Oxygen | 0.05 – 0.14 | 60           |
+| `methane`             | -841236436      | Natural Gas Geyser | 0.07 – 0.14         | 150           |
+| `liquid_sulfur`       | -1765654948     | Liquid Sulfur Geyser (Frosty Planet) | 0.5 – 1.5 | 138 |
+| `iron`                | 1306370440      | Iron Volcano       | 8 – 24 (iron magma) | 2526          |
+| `copper`              | -1725038055     | Copper Volcano     | 8 – 24 (copper magma) | 2226        |
+| `aluminum`            | 2108244480      | Aluminum Volcano   | 8 – 24 (aluminum magma) | 2226      |
+| `gold`                | -279785280      | Gold Volcano       | 8 – 24 (gold magma) | 2326          |
+| `cobalt`              | 108179667       | Cobalt Volcano     | 8 – 24 (cobalt magma) | 2226        |
+| `tungsten`            | -1058835580     | Tungsten Volcano   | 8 – 24 (tungsten magma) | 4426      |
+| `niobium`             | -1779895821     | Niobium Volcano    | 8 – 24 (niobium magma) | 4126       |
 
 (Numbers are author's best recall as of the Frosty Planet patch; verify against [oxygennotincluded.fandom.com/wiki/Geyser](https://oxygennotincluded.fandom.com/wiki/Geyser) when in doubt. Klei occasionally rebalances.)
 

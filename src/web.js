@@ -61,7 +61,8 @@ const PORT_FALLBACK_LIMIT = 10;
 export function startWeb({ port = 8080, host = "127.0.0.1", outputDir }) {
   const server = http.createServer(async (req, res) => {
     try {
-      const url = req.url ?? "/";
+      // Strip query string so /api/status?t=1 routes correctly.
+      const url = (req.url ?? "/").split("?")[0];
       if (url === "/api/events")  return serveEvents(res);
       if (url === "/api/status")  return serveStatus(res, outputDir);
       if (url === "/" || url === "/index.html") return serveStatic(res, "index.html");
@@ -72,7 +73,8 @@ export function startWeb({ port = 8080, host = "127.0.0.1", outputDir }) {
       if (!res.headersSent) {
         res.writeHead(500, { "Content-Type": "text/plain" });
       }
-      res.end(`internal error: ${err.message}`);
+      // Avoid leaking internal paths in the response body.
+      res.end("internal server error");
     }
   });
 
@@ -248,6 +250,12 @@ function serveStatus(res, outputDir) {
       "Cache-Control": "no-cache",
     });
     res.end(JSON.stringify(payload));
+  } catch (err) {
+    console.error(`[web] serveStatus: ${err.stack || err.message}`);
+    if (!res.headersSent) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+    }
+    res.end(JSON.stringify({ error: "internal server error" }));
   } finally {
     if (db) {
       try { db.close(); } catch { /* ignore */ }

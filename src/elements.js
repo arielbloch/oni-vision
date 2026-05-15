@@ -42,16 +42,16 @@ export const ELEMENT_NAMES = new Map([
   [381796644,   "Sand"],
   [493438017,   "Sandstone"],
   [-105943486,  "Granite"],
-  [-2057963720, "Igneous Rock"],
+  [-2057963720, "Igneous Rock"],    // canonical SimHash of "IgneousRock"
   [-474151749,  "Obsidian"],
   [1362238252,  "Regolith"],
   [1282846257,  "Mafic Rock"],
   [869554203,   "Toxic Sand"],
-  [-355957251,  "Igneous Rock"],   // IgneousRock variant
+  [-355957251,  "Igneous Rock"],   // alternate tag hash (IgneousRock tag vs element)
   [183408504,   "Sedimentary Rock"],
   [1608833498,  "Iron Ore"],
-  [-758990593,  "Phosphorite"],
-  [-877427037,  "Phosphorite"],    // alternate SimHash (Phosphorite tag)
+  [-758990593,  "Phosphorite"],     // canonical SimHash of "Phosphorite"
+  [-877427037,  "Phosphorite"],    // alternate tag hash (PhosphoriteFossilLayer tag)
   [-839728230,  "Bleach Stone"],
   [381665462,   "Salt"],
   [118518245,   "Carbon Fibre"],

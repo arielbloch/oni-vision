@@ -468,8 +468,12 @@ export function schema(db) {
     )
     .all();
 
+  // Validate name before interpolating into PRAGMA — sqlite_master names
+  // come from our own schema, but we guard anyway in case of corruption.
+  const SAFE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
   const lines = [];
   for (const obj of objects) {
+    if (!SAFE_NAME.test(obj.name)) continue; // skip any malformed name
     const cols = db
       .prepare(`PRAGMA table_info("${obj.name}")`)
       .all()

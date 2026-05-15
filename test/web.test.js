@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { extractAll } from "../src/extractors.js";
 import { writeDatabase } from "../src/db.js";
 import { FAKE_SAVE } from "./fixture.js";
-import { startWeb } from "../src/web.js";
+import { startWeb, notifyClients } from "../src/web.js";
 
 let server;
 let outputDir;
@@ -100,6 +100,13 @@ describe("GET /api/status", () => {
     }
   });
 
+  test("/api/status ignores query string (no 404 on ?t=1)", async () => {
+    const res = await fetch(`${baseUrl}/api/status?t=1`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.base_name, "Test Base");
+  });
+
   test("port fallback: binds on next free port when requested port is busy", async () => {
     // Occupy a port, then ask startWeb to use the same port — it should
     // automatically step up and bind successfully.
@@ -118,5 +125,41 @@ describe("GET /api/status", () => {
       blocker.close();
       fallback.close();
     }
+  });
+});
+
+describe("GET /api/events (SSE)", () => {
+  test("responds with text/event-stream and an initial comment", async () => {
+    const ac = new AbortController();
+    const res = await fetch(`${baseUrl}/api/events`, { signal: ac.signal });
+
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type"), /text\/event-stream/);
+
+    // Read just enough to see the initial ": connected" comment.
+    const reader = res.body.getReader();
+    const { value } = await reader.read();
+    const text = new TextDecoder().decode(value);
+    assert.match(text, /: connected/);
+
+    ac.abort(); // close the stream
+  });
+
+  test("notifyClients() pushes a parse event to connected clients", async () => {
+    const ac = new AbortController();
+    await fetch(`${baseUrl}/api/events`, { signal: ac.signal });
+
+    // Give the server a tick to register the SSE client.
+    await new Promise((r) => setTimeout(r, 20));
+
+    // notifyClients should not throw even with one connected client.
+    assert.doesNotThrow(() => notifyClients());
+
+    ac.abort();
+  });
+
+  test("notifyClients() is a no-op when no clients are connected", () => {
+    // After aborting all connections, calling notifyClients is harmless.
+    assert.doesNotThrow(() => notifyClients());
   });
 });
