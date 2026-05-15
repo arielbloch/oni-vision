@@ -24,6 +24,11 @@ import { extractAll } from "../src/extractors.js";
 import { writeDatabase } from "../src/db.js";
 import { render } from "../src/ui.js";
 import { elementName } from "../src/elements.js";
+import { ELEMENT_NAMES } from "../src/elements.js";
+import { GEYSER_TYPE_NAMES } from "../src/geyser_types.js";
+import { FOOD_META } from "../src/food.js";
+import { EFFECT_LABELS } from "../src/effects.js";
+import { SKILL_LABELS } from "../src/ui.js";
 import { statusObject } from "../oni-vision-plugin/lib/queries.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -55,6 +60,12 @@ describe("real ONI save end-to-end", { skip: skipReason }, () => {
     // Inject required daemon-written keys so UI / queries don't blow up.
     tables.save_meta.push({ key: "parsed_at", value: new Date().toISOString() });
     tables.save_meta.push({ key: "source_file", value: savePath });
+    // Populate lookup tables (Feature 6) so JOIN-based queries resolve correctly.
+    tables.element_names = [...ELEMENT_NAMES.entries()].map(([element_id, name]) => ({ element_id, name }));
+    tables.geyser_type_names = GEYSER_TYPE_NAMES;
+    tables.food_meta = FOOD_META;
+    tables.effect_labels = EFFECT_LABELS;
+    tables.skill_labels = [...SKILL_LABELS.entries()].map(([branch, label]) => ({ branch, label }));
     writeDatabase(dbPath, tables);
     db = new DatabaseSync(dbPath, { readOnly: true });
   });
@@ -485,5 +496,53 @@ describe("real ONI save end-to-end", { skip: skipReason }, () => {
           `geyser type_id not a number: ${JSON.stringify(g.type_id)}`);
       }
     }
+  });
+
+  // ── 16. Lookup tables (Feature 6) ───────────────────────────────────────────
+
+  test("lookup tables are populated and queryable", () => {
+    const en = db.prepare("SELECT COUNT(*) AS n FROM element_names").get().n;
+    assert.ok(en > 0, "element_names should have rows");
+
+    const gtn = db.prepare("SELECT COUNT(*) AS n FROM geyser_type_names").get().n;
+    assert.ok(gtn > 0, "geyser_type_names should have rows");
+
+    const fm = db.prepare("SELECT COUNT(*) AS n FROM food_meta").get().n;
+    assert.ok(fm > 0, "food_meta should have rows");
+
+    const el = db.prepare("SELECT COUNT(*) AS n FROM effect_labels").get().n;
+    assert.ok(el > 0, "effect_labels should have rows");
+
+    const sl = db.prepare("SELECT COUNT(*) AS n FROM skill_labels").get().n;
+    assert.ok(sl > 0, "skill_labels should have rows");
+  });
+
+  test("geyser JOIN resolves type_name for known geysers", () => {
+    const rows = db.prepare(
+      `SELECT g.type_id, COALESCE(gtn.name, 'hash:' || g.type_id) AS type_name
+       FROM geysers g
+       LEFT JOIN geyser_type_names gtn ON gtn.type_id = g.type_id
+       LIMIT 1`
+    ).all();
+    if (rows.length === 0) return; // no geysers in this save
+    assert.ok(
+      typeof rows[0].type_name === "string" && rows[0].type_name.length > 0,
+      "geyser JOIN should produce a type_name string"
+    );
+  });
+
+  test("element JOIN resolves name for known elements", () => {
+    const rows = db.prepare(
+      `SELECT wo.element_id, COALESCE(en.name, 'id:' || wo.element_id) AS name
+       FROM world_objects wo
+       LEFT JOIN element_names en ON en.element_id = wo.element_id
+       WHERE wo.element_id IS NOT NULL
+       LIMIT 1`
+    ).all();
+    if (rows.length === 0) return; // no world objects with elements
+    assert.ok(
+      typeof rows[0].name === "string" && rows[0].name.length > 0,
+      "element JOIN should produce a name string"
+    );
   });
 });

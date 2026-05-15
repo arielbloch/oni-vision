@@ -9,9 +9,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { extractAll } from "../../src/extractors.js";
 import { writeDatabase } from "../../src/db.js";
-import { FAKE_SAVE } from "../../test/fixture.js";
+import { buildFakeTables } from "../../test/helpers.js";
 import {
   saveMeta,
   freshness,
@@ -19,6 +18,7 @@ import {
   dupeDetail,
   geysers,
   resources,
+  food,
   query,
   status,
   statusObject,
@@ -26,11 +26,8 @@ import {
   toTsv,
 } from "../lib/queries.js";
 
-function buildDb() {
-  const tables = extractAll(FAKE_SAVE);
-  tables.save_meta.push({ key: "parsed_at", value: new Date().toISOString() });
-  tables.save_meta.push({ key: "source_file", value: "/tmp/fake.sav" });
-
+function buildDb(opts) {
+  const tables = buildFakeTables(opts);
   const dir = mkdtempSync(join(tmpdir(), "oni-mcp-test-"));
   const dbPath = join(dir, "test.sqlite");
   writeDatabase(dbPath, tables);
@@ -60,12 +57,7 @@ describe("freshness", () => {
   test("returns null fields when parsed_at is missing (older oni-vision version)", () => {
     // Build a DB whose save_meta has no parsed_at row, simulating
     // a SQLite produced by a pre-Wave-1 oni-vision.
-    const tables = extractAll(FAKE_SAVE);
-    // Note: deliberately NOT pushing { key: "parsed_at", ... }.
-    const dir = mkdtempSync(join(tmpdir(), "oni-mcp-test-noparsed-"));
-    const dbPath = join(dir, "test.sqlite");
-    writeDatabase(dbPath, tables);
-    const db = new DatabaseSync(dbPath);
+    const db = buildDb({ includeParsedAt: false });
     const f = freshness(db);
     assert.equal(f.parsed_at, null);
     assert.equal(f.age_seconds, null);
@@ -175,6 +167,23 @@ describe("geysers", () => {
     const types = rows.map((r) => r.type_id).sort((a, b) => a - b);
     assert.deepEqual(types, [-1592417549, -899515856]);
   });
+
+  test("resolves type_name via geyser_type_names lookup table", () => {
+    const db = buildDb();
+    const rows = geysers(db);
+    const steam = rows.find((r) => r.type_id === -899515856);
+    assert.ok(steam, "steam geyser should be present");
+    assert.equal(steam.type_name, "Steam Vent", "type_name should resolve via JOIN");
+  });
+
+  test("falls back to hash:<id> for unknown geyser types", () => {
+    // Build a DB without lookup tables so the JOIN misses.
+    const db = buildDb({ includeLookupTables: false });
+    const rows = geysers(db);
+    const steam = rows.find((r) => r.type_id === -899515856);
+    assert.ok(steam);
+    assert.equal(steam.type_name, "hash:-899515856", "unknown type should fallback to hash: prefix");
+  });
 });
 
 describe("resources", () => {
@@ -200,6 +209,42 @@ describe("resources", () => {
     const rows = resources(db, { location: "both" });
     const algae = rows.find((r) => r.element_id === "Algae");
     assert.equal(algae.total_units, 1250); // 500 (storage) + 750 (world)
+  });
+
+  test("resolves element_name via element_names lookup table", () => {
+    // The FAKE_SAVE fixture uses string element_ids ("Algae", "Water").
+    // Real saves use SimHash integers. Build a DB with a numeric element_id
+    // that matches a known entry in element_names so the JOIN fires.
+    const tables = buildFakeTables();
+    tables.world_objects.push({
+      game_object_id: 9999,
+      prefab_id: "TestOre",
+      position_x: 0,
+      position_y: 0,
+      element_id: -1870043872, // SimHash for "Algae" from elements.js
+      units: 100,
+      temperature: 300,
+      disease_id: null,
+      disease_count: 0,
+    });
+    const dir = mkdtempSync(join(tmpdir(), "oni-mcp-elements-"));
+    const dbPath = join(dir, "test.sqlite");
+    writeDatabase(dbPath, tables);
+    const db = new DatabaseSync(dbPath);
+
+    const rows = resources(db, { location: "world" });
+    // element_id column affinity is TEXT, so SimHash may come back as string.
+    const algae = rows.find((r) => r.element_id == -1870043872);
+    assert.ok(algae, "Algae (by SimHash) should be present");
+    assert.equal(algae.element_name, "Algae", "element_name should resolve via JOIN");
+  });
+
+  test("falls back to id:<hash> for unknown elements", () => {
+    const db = buildDb({ includeLookupTables: false });
+    const rows = resources(db, { location: "world" });
+    const algae = rows.find((r) => r.element_id === "Algae");
+    assert.ok(algae);
+    assert.equal(algae.element_name, "id:Algae", "unknown element should fallback to id: prefix");
   });
 });
 
@@ -359,7 +404,7 @@ describe("status", () => {
     // Build a DB whose baseName contains a newline (defensive coverage —
     // ONI doesn't allow this in practice, but if it ever did, the
     // status block must not get split into bogus extra lines).
-    const tables = extractAll(FAKE_SAVE);
+    const tables = buildFakeTables({ includeParsedAt: false });
     const idx = tables.save_meta.findIndex((r) => r.key === "baseName");
     tables.save_meta[idx] = { key: "baseName", value: "Line1\nLine2" };
     tables.save_meta.push({ key: "parsed_at", value: new Date().toISOString() });
@@ -419,6 +464,68 @@ describe("statusObject", () => {
   });
 });
 
+describe("food", () => {
+  test("returns known food items with name, kcal, morale, and qty", () => {
+    const db = buildDb();
+    const rows = food(db);
+    // FAKE_SAVE has no real food in storage (only Algae and Water in the locker).
+    // food() filters for item_prefab_id NOT NULL AND element_id IS NULL,
+    // so the fixture's StorageLocker contents (Algae, Water) are excluded
+    // because they have element_id set.
+    assert.equal(rows.length, 0, "fixture has no food items without element_id");
+  });
+
+  test("returns food when food prefabs are present", () => {
+    // Build a DB manually with a food item in storage.
+    const tables = buildFakeTables();
+    tables.storage_contents.push({
+      owner_id: 999,
+      item_prefab_id: "CookedMeat",
+      element_id: null,
+      units: 2,
+      temperature: 300,
+      disease_id: null,
+      disease_count: 0,
+    });
+    const dir = mkdtempSync(join(tmpdir(), "oni-mcp-food-"));
+    const dbPath = join(dir, "test.sqlite");
+    writeDatabase(dbPath, tables);
+    const db = new DatabaseSync(dbPath);
+
+    const rows = food(db);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].prefab_id, "CookedMeat");
+    assert.equal(rows[0].name, "Cooked Meat");
+    assert.equal(rows[0].kcal, 2400);
+    assert.equal(rows[0].morale, 2);
+    assert.equal(rows[0].qty, 1); // one stack
+  });
+
+  test("unknown food items appear with null metadata", () => {
+    const tables = buildFakeTables();
+    tables.storage_contents.push({
+      owner_id: 999,
+      item_prefab_id: "MysteryFood DLC_X",
+      element_id: null,
+      units: 1,
+      temperature: 300,
+      disease_id: null,
+      disease_count: 0,
+    });
+    const dir = mkdtempSync(join(tmpdir(), "oni-mcp-food-unknown-"));
+    const dbPath = join(dir, "test.sqlite");
+    writeDatabase(dbPath, tables);
+    const db = new DatabaseSync(dbPath);
+
+    const rows = food(db);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].prefab_id, "MysteryFood DLC_X");
+    assert.equal(rows[0].name, null);
+    assert.equal(rows[0].kcal, null);
+    assert.equal(rows[0].morale, null);
+  });
+});
+
 describe("schema", () => {
   test("lists tables and views with their columns", () => {
     const db = buildDb();
@@ -433,6 +540,9 @@ describe("schema", () => {
     assert.match(out, /storage_contents: owner_id/);
     // Views show up too.
     assert.match(out, /view v_buildings_by_prefab:/);
+    // Lookup tables (Feature 6).
+    assert.match(out, /table element_names:/);
+    assert.match(out, /table food_meta:/);
   });
 
   test("skips internal sqlite_* objects", () => {

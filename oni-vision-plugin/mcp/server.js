@@ -133,7 +133,7 @@ const TOOLS = [
   },
   {
     name: "oni_query",
-    description: "Run an arbitrary SELECT (or WITH … SELECT) against the SQLite DB. Multiple statements and any non-SELECT statement are rejected. Use the typed tools above when they cover the question — they're cheaper to compose and they pre-round numeric noise.",
+    description: "Run an arbitrary SELECT (or WITH … SELECT) against the SQLite DB. Multiple statements and any non-SELECT statement are rejected. Note: semicolons anywhere in the SQL (even inside string literals) are rejected — avoid `WHERE name = ';'`. Use the typed tools above when they cover the question — they're cheaper to compose and they pre-round numeric noise.",
     inputSchema: {
       type: "object",
       properties: {

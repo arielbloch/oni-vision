@@ -67,8 +67,11 @@ Element totals across containers, the floor, or both:
 
 Totals ≥100 kg are reported as integers (rounding noise stripped). Default limit is 10.
 
+### `oni_food({ limit?, format? })`
+Food items currently in colony storage, with display name, kcal per item, morale bonus, and stack count. Joins the `food_meta` lookup table so results are human-readable. Unknown food items (new DLC) appear with null name/kcal/morale. Default limit is 20.
+
 ### `oni_query({ sql, params?, format? })`
-SELECT-only escape hatch over the whole DB schema. Reject any non-SELECT statement; multiple statements aren't allowed either. Use `format: "tsv"` for large tabular returns.
+SELECT-only escape hatch over the whole DB schema. Reject any non-SELECT statement; multiple statements aren't allowed either. **Caveat:** semicolons anywhere in the SQL string are rejected, even inside string literals (`WHERE name = ';'` will fail — use a different quote or omit the semicolon). Use `format: "tsv"` for large tabular returns.
 
 ### Schema crib for `oni_query`
 
@@ -103,6 +106,10 @@ Convenience views: `v_resources_in_storage`, `v_world_objects_by_element`, `v_ge
 **"How much algae do I have?"**
 1. `oni_resources({ location: "both", limit: 50 })`, look for `Algae`.
 2. Mention the storage-vs-floor split if relevant.
+
+**"What food do I have?"**
+1. `oni_food()` — returns stored food with names, total kcal, and morale bonuses.
+2. If the user wants a specific item: filter the results or ask follow-up.
 
 **"What's my cycle?"**
 1. `oni_save_meta()` — return cycle and base_name; that's a one-shot answer.

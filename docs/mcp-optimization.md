@@ -156,6 +156,7 @@ For "tell me everything about Meep" — currently the model has to call `oni_dup
 | `oni_geysers`    | ✓            | ✓            | —            | (unchanged)       | —     |
 | `oni_resources`  | ✓            | ✓            | —            | 25 → 10           | int totals when ≥100 kg |
 | `oni_query`      | ✓            | ✓            | —            | (unchanged)       | —     |
+| `oni_food`       | (new)        | ✓            | —            | 20                | joins food_meta lookup table |
 | `oni_status`     | (new)        | (TSV-text)   | —            | —                 | one-call aggregate |
 | `oni_schema`     | (new)        | (TSV-text)   | —            | —                 | replaces SKILL crib |
 | `oni_dupe`       | (new)        | ✓            | —            | —                 | one-dupe deep dive |

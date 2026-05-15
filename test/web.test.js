@@ -9,14 +9,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { extractAll } from "../src/extractors.js";
 import { writeDatabase } from "../src/db.js";
-import { ELEMENT_NAMES } from "../src/elements.js";
-import { GEYSER_TYPE_NAMES } from "../src/geyser_types.js";
-import { FOOD_META } from "../src/food.js";
-import { EFFECT_LABELS } from "../src/effects.js";
-import { SKILL_LABELS } from "../src/ui.js";
-import { FAKE_SAVE } from "./fixture.js";
+import { buildFakeTables } from "./helpers.js";
 import { startWeb, notifyClients } from "../src/web.js";
 
 let server;
@@ -25,16 +19,7 @@ let baseUrl;
 
 before(async () => {
   outputDir = mkdtempSync(join(tmpdir(), "oni-web-test-"));
-  const tables = extractAll(FAKE_SAVE);
-  tables.save_meta.push({ key: "parsed_at", value: new Date().toISOString() });
-  tables.save_meta.push({ key: "source_file", value: "/tmp/fake.sav" });
-  // Populate lookup tables the same way pipeline.js does so /api/status
-  // returns the full enriched payload in tests.
-  tables.element_names    = [...ELEMENT_NAMES.entries()].map(([element_id, name]) => ({ element_id, name }));
-  tables.geyser_type_names = GEYSER_TYPE_NAMES;
-  tables.food_meta        = FOOD_META;
-  tables.effect_labels    = EFFECT_LABELS;
-  tables.skill_labels     = [...SKILL_LABELS.entries()].map(([branch, label]) => ({ branch, label }));
+  const tables = buildFakeTables();
   writeDatabase(join(outputDir, "current.sqlite"), tables);
 
   // Port 0 → OS picks a free one.

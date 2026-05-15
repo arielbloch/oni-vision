@@ -310,7 +310,7 @@ Companion: `src/cli/uninstall.js` / `npm run uninstall` — removes the service 
 
 ---
 
-## 6. DB as single source of truth for all lookup tables — 🔜 next
+## 6. DB as single source of truth for all lookup tables — ✅ implemented (Wave 32+)
 
 ### Problem
 

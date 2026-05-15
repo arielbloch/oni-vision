@@ -155,7 +155,7 @@ function serveStatus(res, outputDir) {
     res.end(JSON.stringify({
       error: "no parse yet",
       message: "oni-vision hasn't produced a current.sqlite. Has the daemon parsed a save?",
-      db_path: dbPath,
+      db_path: "current.sqlite",
     }));
     return;
   }

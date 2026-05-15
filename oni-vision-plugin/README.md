@@ -32,7 +32,7 @@ oni-vision-plugin/
 - **`oni-vision`** — teaches the model when and how to use the MCP tools below to answer questions about the user's *current* colony.
 - **`oni-architect`** — a curated knowledge base for ONI strategy, debugging, and design advice. Loads `references/*.md` on demand (progressive disclosure). When `oni-vision` data is available the architect grounds advice in actual numbers; otherwise it falls back to general design patterns.
 
-**Nine MCP tools:**
+**Ten MCP tools:**
 
 | Tool             | What                                                              |
 |------------------|-------------------------------------------------------------------|
