@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "oni-vision": {
+      "command": "node",
+      "args": ["--no-warnings=ExperimentalWarning", "${CLAUDE_PLUGIN_ROOT}/mcp/server.js"]
+    }
+  }
+}
