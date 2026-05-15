@@ -18,6 +18,7 @@ import { ELEMENT_NAMES } from "./elements.js";
 import { GEYSER_TYPE_NAMES } from "./geyser_types.js";
 import { FOOD_META } from "./food.js";
 import { EFFECT_LABELS } from "./effects.js";
+import { CHORE_GROUP_NAMES } from "./chore_groups.js";
 
 /**
  * Best-effort removal of a stale tmp file. Swallows errors because the
@@ -79,6 +80,7 @@ export async function buildOutputs({ savePath, outputDir }) {
   tables.food_meta = FOOD_META;
   tables.effect_labels = EFFECT_LABELS;
   tables.skill_labels = [...SKILL_LABELS.entries()].map(([branch, label]) => ({ branch, label }));
+  tables.chore_group_names = CHORE_GROUP_NAMES;
   const tExtracted = Date.now();
   console.log(
     `[pipeline]   extracted ${countRows(tables)} rows across ${Object.keys(tables).length} tables in ${tExtracted - tParsed} ms`

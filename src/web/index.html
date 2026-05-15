@@ -62,10 +62,20 @@
   .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-top: 10px; }
   table { width: 100%; border-collapse: collapse; font-family: var(--mono); }
   td { padding: 4px 6px; vertical-align: middle; }
-  td.name { width: 22%; white-space: nowrap; }
-  td.bar { width: 32%; padding-right: 12px; }
-  td.pct { width: 10%; text-align: right; color: var(--fg-dim); }
-  td.skills { color: var(--fg-dim); font-size: 12px; }
+  td.name { width: 20%; white-space: nowrap; }
+  td.bar { width: 26%; padding-right: 12px; }
+  td.pct { width: 8%; text-align: right; color: var(--fg-dim); }
+  td.skills { color: var(--fg-dim); font-size: 12px; width: 20%; }
+  td.focus { font-size: 11px; width: 26%; }
+  .focus-tag {
+    display: inline-block; padding: 1px 5px; border-radius: 3px; margin: 1px 2px 1px 0;
+    background: rgba(127,119,221,0.15); color: var(--accent);
+    border: 1px solid rgba(127,119,221,0.3);
+  }
+  .focus-tag.p5 {
+    background: rgba(74,222,128,0.15); color: var(--good);
+    border-color: rgba(74,222,128,0.35);
+  }
   td.metric { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   .bar-track {
@@ -295,11 +305,18 @@
         .filter(Boolean)
         .map(e => `<span class="badge ${e.cls}">${escapeHtml(e.label)}</span>`)
         .join("");
+      const focusTags = (r.focus ?? [])
+        .map(f => {
+          const cls = f.priority >= 5 ? "focus-tag p5" : "focus-tag";
+          return `<span class="${cls}">${escapeHtml(f.label)}</span>`;
+        })
+        .join("");
       return `<tr>
         <td class="name">${escapeHtml(r.name ?? "(unnamed)")}${badges}</td>
         <td class="bar">${barCell}</td>
         <td class="pct">${pct}</td>
         <td class="skills">${escapeHtml(skillsLabel)}</td>
+        <td class="focus">${focusTags || '<span style="color:var(--fg-muted)">—</span>'}</td>
       </tr>`;
     }).join("");
     setHTML("dupes-card", `<table><tbody>${html}</tbody></table>`);

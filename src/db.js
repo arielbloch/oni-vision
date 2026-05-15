@@ -191,6 +191,17 @@ const SCHEMA = [
      branch TEXT PRIMARY KEY,
      label  TEXT NOT NULL
    )`,
+  `CREATE TABLE chore_group_names (
+     hash  INTEGER PRIMARY KEY,
+     name  TEXT NOT NULL,
+     label TEXT NOT NULL
+   )`,
+  `CREATE TABLE duplicant_priorities (
+     duplicant_id INTEGER NOT NULL,
+     chore_group  TEXT NOT NULL,
+     priority     INTEGER NOT NULL
+   )`,
+  `CREATE INDEX idx_dp_dupe ON duplicant_priorities(duplicant_id)`,
 
   // Convenience views.
   `CREATE VIEW v_resources_in_storage AS
@@ -265,6 +276,8 @@ export const TABLE_COLUMNS = {
   food_meta:        ["prefab_id", "name", "kcal", "morale"],
   effect_labels:    ["effect", "label", "severity"],
   skill_labels:     ["branch", "label"],
+  chore_group_names:     ["hash", "name", "label"],
+  duplicant_priorities:  ["duplicant_id", "chore_group", "priority"],
 };
 
 function buildInsertSql(tableName, cols) {

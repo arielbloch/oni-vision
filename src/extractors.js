@@ -36,6 +36,7 @@ import {
 } from "oni-save-parser";
 
 import { safeStringify } from "./utils.js";
+import { CHORE_GROUP_BY_HASH } from "./chore_groups.js";
 
 const PREFAB_DUPLICANT = "Minion";
 
@@ -72,6 +73,7 @@ export function extractAll(save) {
     duplicant_attributes: [],
     duplicant_effects: [],
     duplicant_amounts: [],
+    duplicant_priorities: [],
     buildings: [],
     world_objects: [],
     storage_contents: [],
@@ -227,6 +229,22 @@ function extractDuplicant(go, goId, instanceId, tables) {
       duplicant_id: goId,
       amount_name: a.name,
       value: a?.value?.value ?? null,
+    });
+  }
+
+  // Chore group priorities (from ChoreConsumer behavior).
+  // choreGroupPriorities is an array of [{hash: N}, {priority: N}] pairs.
+  // An empty array means the dupe is fully at defaults (all groups = 3).
+  const choreConsumer = findBehavior(go, "ChoreConsumer")?.templateData;
+  for (const pair of choreConsumer?.choreGroupPriorities ?? []) {
+    const hash = pair[0]?.hash;
+    const priority = pair[1]?.priority;
+    if (hash == null || priority == null) continue;
+    const group = CHORE_GROUP_BY_HASH.get(hash);
+    tables.duplicant_priorities.push({
+      duplicant_id: goId,
+      chore_group: group?.name ?? `hash:${hash}`,
+      priority,
     });
   }
 }

@@ -188,9 +188,24 @@ function serveStatus(res, outputDir) {
       effectsByName.get(row.name).push(row.effect);
     }
 
+    // Per-dupe boosted priorities (chore_group priority > 3 only).
+    const focusByName = new Map();
+    for (const row of db.prepare(
+      `SELECT d.name, dp.chore_group, COALESCE(cgn.label, dp.chore_group) AS label, dp.priority
+       FROM duplicant_priorities dp
+       JOIN duplicants d ON d.game_object_id = dp.duplicant_id
+       LEFT JOIN chore_group_names cgn ON cgn.name = dp.chore_group
+       WHERE dp.priority > 3
+       ORDER BY dp.priority DESC, dp.chore_group`
+    ).all()) {
+      if (!focusByName.has(row.name)) focusByName.set(row.name, []);
+      focusByName.get(row.name).push({ group: row.chore_group, label: row.label, priority: row.priority });
+    }
+
     for (const dupe of payload.top_dupes) {
       dupe.skills  = skillsByName.get(dupe.name)  ?? null;
       dupe.effects = effectsByName.get(dupe.name) ?? [];
+      dupe.focus   = focusByName.get(dupe.name)   ?? [];
     }
 
     // ── Geysers: individual rows with quality rolls ───────────────────────────

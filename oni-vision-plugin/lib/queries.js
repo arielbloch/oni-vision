@@ -241,7 +241,44 @@ export function dupeDetail(db, name) {
     .all(id)
     .map((r) => ({ ...r }));
 
-  return { ...dupe, traits, skills, attributes, effects };
+  const priorities = db
+    .prepare(
+      `SELECT dp.chore_group, cgn.label, dp.priority
+       FROM duplicant_priorities dp
+       LEFT JOIN chore_group_names cgn ON cgn.name = dp.chore_group
+       WHERE dp.duplicant_id = ?
+       ORDER BY dp.priority DESC, dp.chore_group`
+    )
+    .all(id)
+    .map((r) => ({ ...r }));
+
+  return { ...dupe, traits, skills, attributes, effects, priorities };
+}
+
+// ---------------------------------------------------------------------------
+// Priorities for all dupes
+// ---------------------------------------------------------------------------
+
+/**
+ * Chore group priorities for every dupe. Returns one row per (dupe, group)
+ * pair where priority != 3 (i.e., non-default). Default priority (3) is
+ * omitted to keep the response compact; callers should treat a missing group
+ * as priority 3.
+ */
+export function priorities(db) {
+  return db
+    .prepare(
+      `SELECT d.name AS dupe_name,
+              dp.chore_group, cgn.label,
+              dp.priority
+       FROM duplicant_priorities dp
+       JOIN duplicants d ON d.game_object_id = dp.duplicant_id
+       LEFT JOIN chore_group_names cgn ON cgn.name = dp.chore_group
+       WHERE dp.priority != 3
+       ORDER BY d.name, dp.priority DESC, dp.chore_group`
+    )
+    .all()
+    .map((r) => ({ ...r }));
 }
 
 // ---------------------------------------------------------------------------

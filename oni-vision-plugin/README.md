@@ -23,7 +23,27 @@ Claude Code / Cowork plugin that lets Claude query your live **Oxygen Not Includ
 
 This registers the MCP server and loads both skills (`oni-vision` and `oni-architect`) automatically.
 
-### Option B — Register only the MCP server (no plugin system)
+### Option B — Claude desktop app (Cowork)
+
+Add the MCP server to `~/Library/Application Support/Claude/claude_desktop_config.json` (create the file if it doesn't exist):
+
+```json
+{
+  "mcpServers": {
+    "oni-vision": {
+      "command": "node",
+      "args": [
+        "--no-warnings=ExperimentalWarning",
+        "/Users/ariel/code/oni-vision/oni-vision-plugin/mcp/server.js"
+      ]
+    }
+  }
+}
+```
+
+Restart the Claude desktop app after saving. The MCP tools will be available in any Cowork session.
+
+### Option C — Register only the MCP server (Claude Code, no plugin system)
 
 ```bash
 claude mcp add oni-vision -- node --no-warnings=ExperimentalWarning /path/to/oni-vision/oni-vision-plugin/mcp/server.js

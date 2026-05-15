@@ -36,6 +36,7 @@ import {
   query,
   status,
   schema,
+  priorities,
 } from "../lib/queries.js";
 
 const TOOLS = [
@@ -128,6 +129,16 @@ const TOOLS = [
       properties: {
         limit: { type: "integer", description: "Max food types to return. Default: 20." },
         format: { type: "string", enum: ["json", "tsv"], description: "Output format. Default: json." },
+      },
+    },
+  },
+  {
+    name: "oni_priorities",
+    description: "Chore group priorities for every dupe — only non-default entries (priority ≠ 3). Returns dupe_name, chore_group, label (UI name), and priority. Use this to understand each dupe's specialisation at a glance.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        format: { type: "string", enum: ["json", "tsv"], description: "Output format. Default: json. Use tsv for large results." },
       },
     },
   },
@@ -231,6 +242,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         break;
       case "oni_food":
         payload = withDb((db) => food(db, args));
+        break;
+      case "oni_priorities":
+        payload = withDb((db) => priorities(db));
         break;
       case "oni_query":
         payload = withDb((db) => query(db, args.sql, args.params ?? []));
