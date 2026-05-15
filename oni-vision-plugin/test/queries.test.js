@@ -34,24 +34,35 @@ function buildDb(opts) {
   return new DatabaseSync(dbPath);
 }
 
+function withDb(fn, opts) {
+  const db = buildDb(opts);
+  try {
+    return fn(db);
+  } finally {
+    db.close();
+  }
+}
+
 describe("saveMeta", () => {
-  test("returns headline facts with normalized keys", () => {
-    const db = buildDb();
-    const meta = saveMeta(db);
-    assert.equal(meta.base_name, "Test Base");
-    assert.equal(meta.cycle, 312);
-    assert.equal(meta.duplicant_count, 3);
-    assert.equal(meta.save_version, "7.26");
-    assert.match(meta.parsed_at, /^\d{4}-\d{2}-\d{2}T/);
+    test("returns headline facts with normalized keys", () => {
+      withDb((db) => {
+      const meta = saveMeta(db);
+      assert.equal(meta.base_name, "Test Base");
+      assert.equal(meta.cycle, 312);
+      assert.equal(meta.duplicant_count, 3);
+      assert.equal(meta.save_version, "7.26");
+      assert.match(meta.parsed_at, /^\d{4}-\d{2}-\d{2}T/);
+      });
   });
 });
 
 describe("freshness", () => {
-  test("computes age_seconds from parsed_at", () => {
-    const db = buildDb();
-    const f = freshness(db);
-    assert.ok(f.parsed_at);
-    assert.ok(f.age_seconds >= 0 && f.age_seconds < 60);
+    test("computes age_seconds from parsed_at", () => {
+      withDb((db) => {
+      const f = freshness(db);
+      assert.ok(f.parsed_at);
+      assert.ok(f.age_seconds >= 0 && f.age_seconds < 60);
+      });
   });
 
   test("returns null fields when parsed_at is missing (older oni-vision version)", () => {
@@ -65,42 +76,47 @@ describe("freshness", () => {
 });
 
 describe("dupes", () => {
-  test("returns duplicants sorted by stress desc by default", () => {
-    const db = buildDb();
-    const rows = dupes(db);
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].name, "Meep");
-    assert.equal(rows[0].current_role, "Digger");
-    assert.equal(rows[0].stress, 12.5);
+    test("returns duplicants sorted by stress desc by default", () => {
+      withDb((db) => {
+      const rows = dupes(db);
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].name, "Meep");
+      assert.equal(rows[0].current_role, "Digger");
+      assert.equal(rows[0].stress, 12.5);
+      });
   });
 
-  test("ignores invalid sort key (falls back to stress)", () => {
-    const db = buildDb();
-    const rows = dupes(db, { sort: "DROP TABLE; --" });
-    assert.equal(rows.length, 1); // didn't blow up
-    assert.equal(rows[0].name, "Meep");
+    test("ignores invalid sort key (falls back to stress)", () => {
+      withDb((db) => {
+      const rows = dupes(db, { sort: "DROP TABLE; --" });
+      assert.equal(rows.length, 1); // didn't blow up
+      assert.equal(rows[0].name, "Meep");
+      });
   });
 
-  test("fields projection limits columns to the requested set", () => {
-    const db = buildDb();
-    const rows = dupes(db, { fields: ["name", "stress"] });
-    assert.equal(rows.length, 1);
-    assert.deepEqual(Object.keys(rows[0]).sort(), ["name", "stress"]);
-    assert.equal(rows[0].name, "Meep");
-    assert.equal(rows[0].stress, 12.5);
+    test("fields projection limits columns to the requested set", () => {
+      withDb((db) => {
+      const rows = dupes(db, { fields: ["name", "stress"] });
+      assert.equal(rows.length, 1);
+      assert.deepEqual(Object.keys(rows[0]).sort(), ["name", "stress"]);
+      assert.equal(rows[0].name, "Meep");
+      assert.equal(rows[0].stress, 12.5);
+      });
   });
 
-  test("fields projection silently drops unknown column names", () => {
-    const db = buildDb();
-    const rows = dupes(db, { fields: ["name", "DROP TABLE", "stress"] });
-    assert.deepEqual(Object.keys(rows[0]).sort(), ["name", "stress"]);
+    test("fields projection silently drops unknown column names", () => {
+      withDb((db) => {
+      const rows = dupes(db, { fields: ["name", "DROP TABLE", "stress"] });
+      assert.deepEqual(Object.keys(rows[0]).sort(), ["name", "stress"]);
+      });
   });
 
-  test("empty/invalid fields list falls back to all columns", () => {
-    const db = buildDb();
-    const rows = dupes(db, { fields: [] });
-    // All-columns projection has way more than 2 keys.
-    assert.ok(Object.keys(rows[0]).length > 2);
+    test("empty/invalid fields list falls back to all columns", () => {
+      withDb((db) => {
+      const rows = dupes(db, { fields: [] });
+      // All-columns projection has way more than 2 keys.
+      assert.ok(Object.keys(rows[0]).length > 2);
+      });
   });
 
   test("default limit is 12 (was 50 pre-optimization)", () => {
@@ -112,68 +128,74 @@ describe("dupes", () => {
     assert.equal(rows.length, 1);
   });
 
-  test("sort column doesn't need to be in fields (SQLite allows ORDER BY on unprojected columns)", () => {
-    const db = buildDb();
-    const rows = dupes(db, { sort: "stress", fields: ["name"] });
-    assert.equal(rows.length, 1);
-    assert.deepEqual(Object.keys(rows[0]), ["name"]);
-    assert.equal(rows[0].name, "Meep");
+    test("sort column doesn't need to be in fields (SQLite allows ORDER BY on unprojected columns)", () => {
+      withDb((db) => {
+      const rows = dupes(db, { sort: "stress", fields: ["name"] });
+      assert.equal(rows.length, 1);
+      assert.deepEqual(Object.keys(rows[0]), ["name"]);
+      assert.equal(rows[0].name, "Meep");
+      });
   });
 
-  test("explicit fields covering every DUPE_COLUMN matches the default projection", () => {
-    const db = buildDb();
-    const explicit = dupes(db, {
-      fields: [
-        "name", "gender", "current_role", "target_role",
-        "stress", "calories", "stamina", "bladder", "breath",
-        "hp", "decor", "immune", "body_temperature",
-      ],
+    test("explicit fields covering every DUPE_COLUMN matches the default projection", () => {
+      withDb((db) => {
+        const explicit = dupes(db, {
+          fields: [
+            "name", "gender", "current_role", "target_role",
+            "stress", "calories", "stamina", "bladder", "breath",
+            "hp", "decor", "immune", "body_temperature",
+          ],
+        });
+        const def = dupes(db);
+        assert.deepEqual(Object.keys(explicit[0]).sort(), Object.keys(def[0]).sort());
+      });
     });
-    const def = dupes(db);
-    assert.deepEqual(Object.keys(explicit[0]).sort(), Object.keys(def[0]).sort());
-  });
 });
 
 describe("dupeDetail", () => {
-  test("returns vitals + traits + skills + attributes + effects for a known dupe", () => {
-    const db = buildDb();
-    const detail = dupeDetail(db, "Meep");
-    assert.equal(detail.name, "Meep");
-    assert.equal(detail.current_role, "Digger");
-    assert.equal(detail.stress, 12.5);
-    // Fixture: Meep has Trait_Sociable and Trait_Loud.
-    assert.deepEqual(detail.traits.sort(), ["Trait_Loud", "Trait_Sociable"]);
-    // Fixture: only Mining1 mastered.
-    assert.deepEqual(detail.skills, ["Mining1"]);
-    // Fixture: Digging and Strength attributes.
-    const attrIds = detail.attributes.map((a) => a.attribute).sort();
-    assert.deepEqual(attrIds, ["Digging", "Strength"]);
-    // Fixture: FullBladder effect.
-    assert.ok(detail.effects.find((e) => e.effect === "FullBladder"));
+    test("returns vitals + traits + skills + attributes + effects for a known dupe", () => {
+      withDb((db) => {
+      const detail = dupeDetail(db, "Meep");
+      assert.equal(detail.name, "Meep");
+      assert.equal(detail.current_role, "Digger");
+      assert.equal(detail.stress, 12.5);
+      // Fixture: Meep has Trait_Sociable and Trait_Loud.
+      assert.deepEqual(detail.traits.sort(), ["Trait_Loud", "Trait_Sociable"]);
+      // Fixture: only Mining1 mastered.
+      assert.deepEqual(detail.skills, ["Mining1"]);
+      // Fixture: Digging and Strength attributes.
+      const attrIds = detail.attributes.map((a) => a.attribute).sort();
+      assert.deepEqual(attrIds, ["Digging", "Strength"]);
+      // Fixture: FullBladder effect.
+      assert.ok(detail.effects.find((e) => e.effect === "FullBladder"));
+      });
   });
 
-  test("returns null for an unknown name", () => {
-    const db = buildDb();
-    assert.equal(dupeDetail(db, "Nobody"), null);
+    test("returns null for an unknown name", () => {
+      withDb((db) => {
+      assert.equal(dupeDetail(db, "Nobody"), null);
+      });
   });
 });
 
 describe("geysers", () => {
-  test("returns both steam and BigVolcano", () => {
-    const db = buildDb();
-    const rows = geysers(db);
-    // type_id is stored as a SimHash integer extracted from { hash: N }.
-    // steam = -899515856, big_volcano = -1592417549.
-    const types = rows.map((r) => r.type_id).sort((a, b) => a - b);
-    assert.deepEqual(types, [-1592417549, -899515856]);
+    test("returns both steam and BigVolcano", () => {
+      withDb((db) => {
+      const rows = geysers(db);
+      // type_id is stored as a SimHash integer extracted from { hash: N }.
+      // steam = -899515856, big_volcano = -1592417549.
+      const types = rows.map((r) => r.type_id).sort((a, b) => a - b);
+      assert.deepEqual(types, [-1592417549, -899515856]);
+      });
   });
 
-  test("resolves type_name via geyser_type_names lookup table", () => {
-    const db = buildDb();
-    const rows = geysers(db);
-    const steam = rows.find((r) => r.type_id === -899515856);
-    assert.ok(steam, "steam geyser should be present");
-    assert.equal(steam.type_name, "Steam Vent", "type_name should resolve via JOIN");
+    test("resolves type_name via geyser_type_names lookup table", () => {
+      withDb((db) => {
+      const rows = geysers(db);
+      const steam = rows.find((r) => r.type_id === -899515856);
+      assert.ok(steam, "steam geyser should be present");
+      assert.equal(steam.type_name, "Steam Vent", "type_name should resolve via JOIN");
+      });
   });
 
   test("falls back to hash:<id> for unknown geyser types", () => {
@@ -187,28 +209,31 @@ describe("geysers", () => {
 });
 
 describe("resources", () => {
-  test("location='storage' returns only storage_contents totals", () => {
-    const db = buildDb();
-    const rows = resources(db, { location: "storage" });
-    const elements = rows.map((r) => r.element_id).sort();
-    assert.deepEqual(elements, ["Algae", "Water"]);
-    const algae = rows.find((r) => r.element_id === "Algae");
-    assert.equal(algae.total_units, 500);
+    test("location='storage' returns only storage_contents totals", () => {
+      withDb((db) => {
+      const rows = resources(db, { location: "storage" });
+      const elements = rows.map((r) => r.element_id).sort();
+      assert.deepEqual(elements, ["Algae", "Water"]);
+      const algae = rows.find((r) => r.element_id === "Algae");
+      assert.equal(algae.total_units, 500);
+      });
   });
 
-  test("location='world' returns only world_objects totals", () => {
-    const db = buildDb();
-    const rows = resources(db, { location: "world" });
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].element_id, "Algae");
-    assert.equal(rows[0].total_units, 750);
+    test("location='world' returns only world_objects totals", () => {
+      withDb((db) => {
+      const rows = resources(db, { location: "world" });
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].element_id, "Algae");
+      assert.equal(rows[0].total_units, 750);
+      });
   });
 
-  test("location='both' sums across storage_contents and world_objects", () => {
-    const db = buildDb();
-    const rows = resources(db, { location: "both" });
-    const algae = rows.find((r) => r.element_id === "Algae");
-    assert.equal(algae.total_units, 1250); // 500 (storage) + 750 (world)
+    test("location='both' sums across storage_contents and world_objects", () => {
+      withDb((db) => {
+      const rows = resources(db, { location: "both" });
+      const algae = rows.find((r) => r.element_id === "Algae");
+      assert.equal(algae.total_units, 1250); // 500 (storage) + 750 (world)
+      });
   });
 
   test("resolves element_name via element_names lookup table", () => {
@@ -231,99 +256,114 @@ describe("resources", () => {
     const dbPath = join(dir, "test.sqlite");
     writeDatabase(dbPath, tables);
     const db = new DatabaseSync(dbPath);
-
-    const rows = resources(db, { location: "world" });
-    // element_id column affinity is TEXT, so SimHash may come back as string.
-    const algae = rows.find((r) => r.element_id == -1870043872);
-    assert.ok(algae, "Algae (by SimHash) should be present");
-    assert.equal(algae.element_name, "Algae", "element_name should resolve via JOIN");
+    try {
+  
+      const rows = resources(db, { location: "world" });
+      // element_id column affinity is TEXT, so SimHash may come back as string.
+      const algae = rows.find((r) => r.element_id == -1870043872);
+      assert.ok(algae, "Algae (by SimHash) should be present");
+      assert.equal(algae.element_name, "Algae", "element_name should resolve via JOIN");
+    } finally {
+      db.close();
+    }
   });
 
-  test("falls back to id:<hash> for unknown elements", () => {
-    const db = buildDb({ includeLookupTables: false });
-    const rows = resources(db, { location: "world" });
-    const algae = rows.find((r) => r.element_id === "Algae");
-    assert.ok(algae);
-    assert.equal(algae.element_name, "id:Algae", "unknown element should fallback to id: prefix");
+    test("falls back to id:<hash> for unknown elements", () => {
+      withDb((db) => {
+      const rows = resources(db, { location: "world" });
+      const algae = rows.find((r) => r.element_id === "Algae");
+      assert.ok(algae);
+      assert.equal(algae.element_name, "id:Algae", "unknown element should fallback to id: prefix");
+      });
   });
 });
 
 describe("query (SELECT-only)", () => {
-  test("accepts a normal SELECT", () => {
-    const db = buildDb();
-    const rows = query(db, "SELECT name, stress FROM duplicants");
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].name, "Meep");
+    test("accepts a normal SELECT", () => {
+      withDb((db) => {
+      const rows = query(db, "SELECT name, stress FROM duplicants");
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].name, "Meep");
+      });
   });
 
-  test("accepts a WITH … SELECT", () => {
-    const db = buildDb();
-    const rows = query(
-      db,
-      "WITH stressed AS (SELECT name FROM duplicants WHERE stress > 10) SELECT * FROM stressed"
-    );
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].name, "Meep");
+    test("accepts a WITH … SELECT", () => {
+      withDb((db) => {
+      const rows = query(
+        db,
+        "WITH stressed AS (SELECT name FROM duplicants WHERE stress > 10) SELECT * FROM stressed"
+      );
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].name, "Meep");
+      });
   });
 
-  test("binds positional params correctly (regression: array was being passed as a single value)", () => {
-    const db = buildDb();
-    const rows = query(db, "SELECT name FROM duplicants WHERE name = ?", ["Meep"]);
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].name, "Meep");
+    test("binds positional params correctly (regression: array was being passed as a single value)", () => {
+      withDb((db) => {
+      const rows = query(db, "SELECT name FROM duplicants WHERE name = ?", ["Meep"]);
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].name, "Meep");
+      });
   });
 
-  test("supports multiple positional params", () => {
-    const db = buildDb();
-    const rows = query(
-      db,
-      "SELECT name FROM duplicants WHERE stress > ? AND stress < ?",
-      [10, 100]
-    );
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].name, "Meep");
+    test("supports multiple positional params", () => {
+      withDb((db) => {
+      const rows = query(
+        db,
+        "SELECT name FROM duplicants WHERE stress > ? AND stress < ?",
+        [10, 100]
+      );
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].name, "Meep");
+      });
   });
 
-  test("treats null/undefined params as no params", () => {
-    const db = buildDb();
-    const a = query(db, "SELECT name FROM duplicants", null);
-    const b = query(db, "SELECT name FROM duplicants", undefined);
-    assert.equal(a.length, 1);
-    assert.equal(b.length, 1);
+    test("treats null/undefined params as no params", () => {
+      withDb((db) => {
+      const a = query(db, "SELECT name FROM duplicants", null);
+      const b = query(db, "SELECT name FROM duplicants", undefined);
+      assert.equal(a.length, 1);
+      assert.equal(b.length, 1);
+      });
   });
 
-  test("supports named params via an object", () => {
-    const db = buildDb();
-    const rows = query(
-      db,
-      "SELECT name FROM duplicants WHERE name = $name",
-      { $name: "Meep" }
-    );
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].name, "Meep");
+    test("supports named params via an object", () => {
+      withDb((db) => {
+      const rows = query(
+        db,
+        "SELECT name FROM duplicants WHERE name = $name",
+        { $name: "Meep" }
+      );
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].name, "Meep");
+      });
   });
 
-  test("rejects DROP", () => {
-    const db = buildDb();
-    assert.throws(() => query(db, "DROP TABLE duplicants"), /Only SELECT/);
+    test("rejects DROP", () => {
+      withDb((db) => {
+      assert.throws(() => query(db, "DROP TABLE duplicants"), /Only SELECT/);
+      });
   });
 
-  test("rejects INSERT", () => {
-    const db = buildDb();
-    assert.throws(() => query(db, "INSERT INTO duplicants(name) VALUES ('x')"), /Only SELECT/);
+    test("rejects INSERT", () => {
+      withDb((db) => {
+      assert.throws(() => query(db, "INSERT INTO duplicants(name) VALUES ('x')"), /Only SELECT/);
+      });
   });
 
-  test("rejects PRAGMA", () => {
-    const db = buildDb();
-    assert.throws(() => query(db, "PRAGMA writable_schema=ON"), /Only SELECT/);
+    test("rejects PRAGMA", () => {
+      withDb((db) => {
+      assert.throws(() => query(db, "PRAGMA writable_schema=ON"), /Only SELECT/);
+      });
   });
 
-  test("rejects multiple statements", () => {
-    const db = buildDb();
-    assert.throws(
-      () => query(db, "SELECT 1; SELECT 2"),
-      /single SELECT/
-    );
+    test("rejects multiple statements", () => {
+      withDb((db) => {
+      assert.throws(
+        () => query(db, "SELECT 1; SELECT 2"),
+        /single SELECT/
+      );
+      });
   });
 });
 
@@ -378,26 +418,28 @@ describe("toTsv", () => {
 });
 
 describe("status", () => {
-  test("returns a TSV-block snapshot with the headline facts", () => {
-    const db = buildDb();
-    const out = status(db);
-    assert.match(out, /base_name=Test Base/);
-    assert.match(out, /cycle=312/);
-    assert.match(out, /duplicants=1/);
-    assert.match(out, /geysers=2/);
-    // Section headers and TSV bodies present.
-    assert.match(out, /# top dupes by stress/);
-    assert.match(out, /Meep\t12.5\tDigger/);
-    assert.match(out, /# geyser types/);
-    assert.match(out, /# top elements by mass/);
+    test("returns a TSV-block snapshot with the headline facts", () => {
+      withDb((db) => {
+      const out = status(db);
+      assert.match(out, /base_name=Test Base/);
+      assert.match(out, /cycle=312/);
+      assert.match(out, /duplicants=1/);
+      assert.match(out, /geysers=2/);
+      // Section headers and TSV bodies present.
+      assert.match(out, /# top dupes by stress/);
+      assert.match(out, /Meep\t12.5\tDigger/);
+      assert.match(out, /# geyser types/);
+      assert.match(out, /# top elements by mass/);
+      });
   });
 
-  test("limits are honored", () => {
-    const db = buildDb();
-    const out = status(db, { dupeLimit: 1, geyserLimit: 1, resourceLimit: 1 });
-    // Section headers still present; just fewer rows.
-    assert.match(out, /# top dupes/);
-    assert.match(out, /# geyser types/);
+    test("limits are honored", () => {
+      withDb((db) => {
+      const out = status(db, { dupeLimit: 1, geyserLimit: 1, resourceLimit: 1 });
+      // Section headers still present; just fewer rows.
+      assert.match(out, /# top dupes/);
+      assert.match(out, /# geyser types/);
+      });
   });
 
   test("collapses newlines in header values so the format stays line-oriented", () => {
@@ -412,67 +454,75 @@ describe("status", () => {
     const dbPath = join(dir, "test.sqlite");
     writeDatabase(dbPath, tables);
     const db = new DatabaseSync(dbPath);
-    const out = status(db);
-    // The base_name line must be a single line and must contain both
-    // parts joined by a space (newline collapsed). And there must NOT
-    // be a separate line containing only "Line2" — that would mean we
-    // failed to collapse and the format leaked.
-    const lines = out.split("\n");
-    const baseLine = lines.find((l) => l.startsWith("base_name="));
-    assert.equal(baseLine, "base_name=Line1 Line2");
-    // No standalone "Line2" line.
-    assert.ok(!lines.includes("Line2"));
+    try {
+      const out = status(db);
+      // The base_name line must be a single line and must contain both
+      // parts joined by a space (newline collapsed). And there must NOT
+      // be a separate line containing only "Line2" — that would mean we
+      // failed to collapse and the format leaked.
+      const lines = out.split("\n");
+      const baseLine = lines.find((l) => l.startsWith("base_name="));
+      assert.equal(baseLine, "base_name=Line1 Line2");
+      // No standalone "Line2" line.
+      assert.ok(!lines.includes("Line2"));
+    } finally {
+      db.close();
+    }
   });
 });
 
 describe("statusObject", () => {
-  test("returns the structured shape consumed by the web UI", () => {
-    const db = buildDb();
-    const o = statusObject(db);
-
-    // Top-level keys exist and have the right types.
-    assert.equal(o.base_name, "Test Base");
-    assert.equal(o.cycle, 312);
-    assert.equal(typeof o.save_version, "string");
-    assert.ok(o.parsed_at);
-    assert.equal(typeof o.age_seconds, "number");
-    assert.ok(o.counts);
-    assert.equal(o.counts.duplicants, 1);
-    assert.equal(o.counts.geysers, 2);
-    // Arrays of the right shape.
-    assert.ok(Array.isArray(o.top_dupes));
-    assert.equal(o.top_dupes[0].name, "Meep");
-    assert.ok(Array.isArray(o.geyser_types));
-    assert.ok(Array.isArray(o.top_resources));
+    test("returns the structured shape consumed by the web UI", () => {
+      withDb((db) => {
+      const o = statusObject(db);
+  
+      // Top-level keys exist and have the right types.
+      assert.equal(o.base_name, "Test Base");
+      assert.equal(o.cycle, 312);
+      assert.equal(typeof o.save_version, "string");
+      assert.ok(o.parsed_at);
+      assert.equal(typeof o.age_seconds, "number");
+      assert.ok(o.counts);
+      assert.equal(o.counts.duplicants, 1);
+      assert.equal(o.counts.geysers, 2);
+      // Arrays of the right shape.
+      assert.ok(Array.isArray(o.top_dupes));
+      assert.equal(o.top_dupes[0].name, "Meep");
+      assert.ok(Array.isArray(o.geyser_types));
+      assert.ok(Array.isArray(o.top_resources));
+      });
   });
 
-  test("limits flow through to the sub-queries", () => {
-    const db = buildDb();
-    const o = statusObject(db, { dupeLimit: 1, geyserLimit: 1, resourceLimit: 1 });
-    assert.ok(o.top_dupes.length <= 1);
-    assert.ok(o.geyser_types.length <= 1);
-    assert.ok(o.top_resources.length <= 1);
+    test("limits flow through to the sub-queries", () => {
+      withDb((db) => {
+      const o = statusObject(db, { dupeLimit: 1, geyserLimit: 1, resourceLimit: 1 });
+      assert.ok(o.top_dupes.length <= 1);
+      assert.ok(o.geyser_types.length <= 1);
+      assert.ok(o.top_resources.length <= 1);
+      });
   });
 
-  test("status(db) is just the TSV-block formatting of statusObject(db) (same data)", () => {
-    const db = buildDb();
-    const o = statusObject(db);
-    const block = status(db);
-    // The TSV block must reflect statusObject's counts and top dupes.
-    assert.match(block, new RegExp(`duplicants=${o.counts.duplicants}`));
-    if (o.top_dupes[0]) assert.match(block, new RegExp(o.top_dupes[0].name));
+    test("status(db) is just the TSV-block formatting of statusObject(db) (same data)", () => {
+      withDb((db) => {
+      const o = statusObject(db);
+      const block = status(db);
+      // The TSV block must reflect statusObject's counts and top dupes.
+      assert.match(block, new RegExp(`duplicants=${o.counts.duplicants}`));
+      if (o.top_dupes[0]) assert.match(block, new RegExp(o.top_dupes[0].name));
+      });
   });
 });
 
 describe("food", () => {
-  test("returns known food items with name, kcal, morale, and qty", () => {
-    const db = buildDb();
-    const rows = food(db);
-    // FAKE_SAVE has no real food in storage (only Algae and Water in the locker).
-    // food() filters for item_prefab_id NOT NULL AND element_id IS NULL,
-    // so the fixture's StorageLocker contents (Algae, Water) are excluded
-    // because they have element_id set.
-    assert.equal(rows.length, 0, "fixture has no food items without element_id");
+    test("returns known food items with name, kcal, morale, and qty", () => {
+      withDb((db) => {
+      const rows = food(db);
+      // FAKE_SAVE has no real food in storage (only Algae and Water in the locker).
+      // food() filters for item_prefab_id NOT NULL AND element_id IS NULL,
+      // so the fixture's StorageLocker contents (Algae, Water) are excluded
+      // because they have element_id set.
+      assert.equal(rows.length, 0, "fixture has no food items without element_id");
+      });
   });
 
   test("returns food when food prefabs are present", () => {
@@ -491,14 +541,18 @@ describe("food", () => {
     const dbPath = join(dir, "test.sqlite");
     writeDatabase(dbPath, tables);
     const db = new DatabaseSync(dbPath);
-
-    const rows = food(db);
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].prefab_id, "CookedMeat");
-    assert.equal(rows[0].name, "Cooked Meat");
-    assert.equal(rows[0].kcal, 2400);
-    assert.equal(rows[0].morale, 2);
-    assert.equal(rows[0].qty, 1); // one stack
+    try {
+  
+      const rows = food(db);
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].prefab_id, "CookedMeat");
+      assert.equal(rows[0].name, "Cooked Meat");
+      assert.equal(rows[0].kcal, 2400);
+      assert.equal(rows[0].morale, 2);
+      assert.equal(rows[0].qty, 1); // one stack
+    } finally {
+      db.close();
+    }
   });
 
   test("unknown food items appear with null metadata", () => {
@@ -516,38 +570,44 @@ describe("food", () => {
     const dbPath = join(dir, "test.sqlite");
     writeDatabase(dbPath, tables);
     const db = new DatabaseSync(dbPath);
-
-    const rows = food(db);
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].prefab_id, "MysteryFood DLC_X");
-    assert.equal(rows[0].name, null);
-    assert.equal(rows[0].kcal, null);
-    assert.equal(rows[0].morale, null);
+    try {
+  
+      const rows = food(db);
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].prefab_id, "MysteryFood DLC_X");
+      assert.equal(rows[0].name, null);
+      assert.equal(rows[0].kcal, null);
+      assert.equal(rows[0].morale, null);
+    } finally {
+      db.close();
+    }
   });
 });
 
 describe("schema", () => {
-  test("lists tables and views with their columns", () => {
-    const db = buildDb();
-    const out = schema(db);
-    // Should mention every typed table.
-    assert.match(out, /table duplicants:/);
-    assert.match(out, /table buildings:/);
-    assert.match(out, /table world_objects:/);
-    assert.match(out, /table geysers:/);
-    assert.match(out, /table critters:/);
-    // Storage owner column is owner_id (post-Wave-4 rename).
-    assert.match(out, /storage_contents: owner_id/);
-    // Views show up too.
-    assert.match(out, /view v_buildings_by_prefab:/);
-    // Lookup tables (Feature 6).
-    assert.match(out, /table element_names:/);
-    assert.match(out, /table food_meta:/);
+    test("lists tables and views with their columns", () => {
+      withDb((db) => {
+      const out = schema(db);
+      // Should mention every typed table.
+      assert.match(out, /table duplicants:/);
+      assert.match(out, /table buildings:/);
+      assert.match(out, /table world_objects:/);
+      assert.match(out, /table geysers:/);
+      assert.match(out, /table critters:/);
+      // Storage owner column is owner_id (post-Wave-4 rename).
+      assert.match(out, /storage_contents: owner_id/);
+      // Views show up too.
+      assert.match(out, /view v_buildings_by_prefab:/);
+      // Lookup tables (Feature 6).
+      assert.match(out, /table element_names:/);
+      assert.match(out, /table food_meta:/);
+      });
   });
 
-  test("skips internal sqlite_* objects", () => {
-    const db = buildDb();
-    const out = schema(db);
-    assert.doesNotMatch(out, /sqlite_/);
+    test("skips internal sqlite_* objects", () => {
+      withDb((db) => {
+      const out = schema(db);
+      assert.doesNotMatch(out, /sqlite_/);
+      });
   });
 });

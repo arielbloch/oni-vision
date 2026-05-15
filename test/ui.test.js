@@ -33,83 +33,100 @@ function buildDb() {
   return new DatabaseSync(dbPath);
 }
 
+function withDb(fn) {
+  const db = buildDb();
+  try {
+    return fn(db);
+  } finally {
+    db.close();
+  }
+}
+
 describe("readMeta", () => {
   test("returns headline facts as numbers / strings, not raw save_meta", () => {
-    const db = buildDb();
-    const meta = readMeta(db);
-    assert.equal(meta.baseName, "Test Base");
-    assert.equal(meta.cycle, 312);
-    assert.equal(meta.dupeCount, 3);
-    assert.equal(meta.saveVersion, "7.26");
-    assert.match(meta.parsedAt, /^\d{4}-\d{2}-\d{2}T/);
+    withDb((db) => {
+      const meta = readMeta(db);
+      assert.equal(meta.baseName, "Test Base");
+      assert.equal(meta.cycle, 312);
+      assert.equal(meta.dupeCount, 3);
+      assert.equal(meta.saveVersion, "7.26");
+      assert.match(meta.parsedAt, /^\d{4}-\d{2}-\d{2}T/);
+    });
   });
 });
 
 describe("renderBanner", () => {
   test("includes the base name and cycle", () => {
-    const db = buildDb();
-    const out = renderBanner(db, { color: false, width: 80 });
-    assert.match(out, /Test Base/);
-    assert.match(out, /cycle 312/);
+    withDb((db) => {
+      const out = renderBanner(db, { color: false, width: 80 });
+      assert.match(out, /Test Base/);
+      assert.match(out, /cycle 312/);
+    });
   });
 
   test("color=false produces no ANSI escapes", () => {
-    const db = buildDb();
-    const out = renderBanner(db, { color: false, width: 80 });
-    assert.doesNotMatch(out, /\x1b\[/);
+    withDb((db) => {
+      const out = renderBanner(db, { color: false, width: 80 });
+      assert.doesNotMatch(out, /\x1b\[/);
+    });
   });
 
   test("color=true produces some ANSI escapes", () => {
-    const db = buildDb();
-    const out = renderBanner(db, { color: true, width: 80 });
-    assert.match(out, /\x1b\[/);
+    withDb((db) => {
+      const out = renderBanner(db, { color: true, width: 80 });
+      assert.match(out, /\x1b\[/);
+    });
   });
 });
 
 describe("renderHeadCounts", () => {
   test("counts dupes / critters / geysers / buildings", () => {
-    const db = buildDb();
-    const out = renderHeadCounts(db);
-    // FAKE_SAVE: 1 dupe, 2 critters (Hatch + Pip), 2 geysers (steam + BigVolcano),
-    // 2 buildings (BatterySmart + StorageLocker). Algae pile is a world_object.
-    assert.match(out, /1 duplicants/);
-    assert.match(out, /2 critters/);
-    assert.match(out, /2 geysers/);
-    assert.match(out, /2 buildings/);
+    withDb((db) => {
+      const out = renderHeadCounts(db);
+      // FAKE_SAVE: 1 dupe, 2 critters (Hatch + Pip), 2 geysers (steam + BigVolcano),
+      // 2 buildings (BatterySmart + StorageLocker). Algae pile is a world_object.
+      assert.match(out, /1 duplicants/);
+      assert.match(out, /2 critters/);
+      assert.match(out, /2 geysers/);
+      assert.match(out, /2 buildings/);
+    });
   });
 });
 
 describe("renderGeysers", () => {
   test("lists each geyser type with a count", () => {
-    const db = buildDb();
-    const out = renderGeysers(db);
-    // type_id hashes are now resolved to display names.
-    assert.match(out, /Steam Vent/);
-    assert.match(out, /Volcano/);
-    assert.match(out, /×1/);
+    withDb((db) => {
+      const out = renderGeysers(db);
+      // type_id hashes are now resolved to display names.
+      assert.match(out, /Steam Vent/);
+      assert.match(out, /Volcano/);
+      assert.match(out, /×1/);
+    });
   });
 });
 
 describe("renderStockpile", () => {
   test("aggregates across world_objects and storage_contents", () => {
-    const db = buildDb();
-    const out = renderStockpile(db);
-    // FAKE_SAVE has Algae in two places: 750 loose + 500 in locker = 1250.
-    // Water 250 in locker.
-    assert.match(out, /Algae/);
-    assert.match(out, /Water/);
+    withDb((db) => {
+      const out = renderStockpile(db);
+      // FAKE_SAVE has Algae in two places: 750 loose + 500 in locker = 1250.
+      // Water 250 in locker.
+      assert.match(out, /Algae/);
+      assert.match(out, /Water/);
+    });
   });
 });
 
 describe("renderDupes", () => {
   test("includes Meep with stress percentage", () => {
-    const db = buildDb();
-    const out = renderDupes(db);
-    assert.match(out, /Meep/);
-    // Meep's stress is 12.5 in the fixture; should appear with 1 decimal.
-    assert.match(out, /12\.5/);
-    // Meep has Mining1 mastered in the fixture → rendered as "Miner I"
-    assert.match(out, /Miner I/);
+    withDb((db) => {
+      const out = renderDupes(db);
+      assert.match(out, /Meep/);
+      // Meep's stress is 12.5 in the fixture; should appear with 1 decimal.
+      assert.match(out, /12\.5/);
+      // Meep has Mining1 mastered in the fixture → rendered as "Miner I"
+      assert.match(out, /Miner I/);
+    });
   });
 
   test("dupes with null stress render an em-dash, not a bogus 0% bar", () => {
@@ -152,27 +169,32 @@ describe("renderDupes", () => {
     };
     writeDatabase(dbPath, tables);
     const db = new DatabaseSync(dbPath);
-    const out = renderDupes(db);
+    try {
+      const out = renderDupes(db);
     // Bar should be a dashed line, not block elements.
     assert.match(out, /Stoic/);
     assert.match(out, /─/);
-    assert.doesNotMatch(out, /0\.0%/); // never quote a fake 0% for missing data
+      assert.doesNotMatch(out, /0\.0%/); // never quote a fake 0% for missing data
+    } finally {
+      db.close();
+    }
   });
 });
 
 describe("render", () => {
   test("composes all sections without throwing", () => {
-    const db = buildDb();
-    const out = render(db, { color: false, width: 80 });
-    // Banner
-    assert.match(out, /Test Base/);
-    // Headcounts
-    assert.match(out, /duplicants/);
-    // Geysers
-    assert.match(out, /Geysers/);
-    // Stockpile
-    assert.match(out, /Stockpile/);
-    // Dupes section
-    assert.match(out, /Dupes/);
+    withDb((db) => {
+      const out = render(db, { color: false, width: 80 });
+      // Banner
+      assert.match(out, /Test Base/);
+      // Headcounts
+      assert.match(out, /duplicants/);
+      // Geysers
+      assert.match(out, /Geysers/);
+      // Stockpile
+      assert.match(out, /Stockpile/);
+      // Dupes section
+      assert.match(out, /Dupes/);
+    });
   });
 });

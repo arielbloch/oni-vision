@@ -1,6 +1,6 @@
 // browser.js — open the web dashboard in the user's default browser.
 //
-// Called once after the first successful parse while the web server is up.
+// Called once at daemon startup after the web server is up.
 // Guards:
 //   • Only when a TTY is attached — background services (launchctl, systemd)
 //     must not pop a browser window on every boot.

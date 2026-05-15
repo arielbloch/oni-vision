@@ -25,6 +25,15 @@ function buildDb() {
   return { db: new DatabaseSync(dbPath), tables };
 }
 
+function withDb(fn) {
+  const { db, tables } = buildDb();
+  try {
+    return fn(db, tables);
+  } finally {
+    db.close();
+  }
+}
+
 describe("normalize / writeDatabase value coercion", () => {
   // Build a minimal in-memory tables object that lets us exercise normalize()
   // indirectly by writing weird values and reading them back.
@@ -41,7 +50,11 @@ describe("normalize / writeDatabase value coercion", () => {
     };
     writeDatabase(dbPath, tables);
     const db = new DatabaseSync(dbPath);
-    return db.prepare("SELECT key, value FROM save_meta").all();
+    try {
+      return db.prepare("SELECT key, value FROM save_meta").all();
+    } finally {
+      db.close();
+    }
   }
 
   test("undefined and null both store as SQL NULL", () => {
@@ -128,77 +141,84 @@ describe("schema shape", () => {
 
 describe("round-trip queries", () => {
   test("save_meta carries parsed_at and base name", () => {
-    const { db } = buildDb();
-    const rows = db
-      .prepare("SELECT key, value FROM save_meta WHERE key IN ('baseName','parsed_at')")
-      .all();
-    const byKey = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-    assert.equal(byKey.baseName, "Test Base");
-    assert.match(byKey.parsed_at, /^\d{4}-\d{2}-\d{2}T/);
+    withDb((db) => {
+      const rows = db
+        .prepare("SELECT key, value FROM save_meta WHERE key IN ('baseName','parsed_at')")
+        .all();
+      const byKey = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+      assert.equal(byKey.baseName, "Test Base");
+      assert.match(byKey.parsed_at, /^\d{4}-\d{2}-\d{2}T/);
+    });
   });
 
   test("duplicants table is queryable with named columns", () => {
-    const { db } = buildDb();
-    const dupes = db.prepare("SELECT name, stress, current_role FROM duplicants").all();
-    assert.equal(dupes.length, 1);
-    assert.equal(dupes[0].name, "Meep");
-    assert.equal(dupes[0].stress, 12.5);
+    withDb((db) => {
+      const dupes = db.prepare("SELECT name, stress, current_role FROM duplicants").all();
+      assert.equal(dupes.length, 1);
+      assert.equal(dupes[0].name, "Meep");
+      assert.equal(dupes[0].stress, 12.5);
+    });
   });
 
   test("buildings table excludes loose elemental piles", () => {
-    const { db } = buildDb();
-    const prefabs = db
-      .prepare("SELECT prefab_id FROM buildings ORDER BY prefab_id")
-      .all()
-      .map((r) => r.prefab_id);
-    assert.deepEqual(prefabs, ["BatterySmart", "StorageLocker"]);
+    withDb((db) => {
+      const prefabs = db
+        .prepare("SELECT prefab_id FROM buildings ORDER BY prefab_id")
+        .all()
+        .map((r) => r.prefab_id);
+      assert.deepEqual(prefabs, ["BatterySmart", "StorageLocker"]);
+    });
   });
 
   test("world_objects table contains the loose Algae pile", () => {
-    const { db } = buildDb();
-    const piles = db
-      .prepare("SELECT prefab_id, units FROM world_objects")
-      .all();
-    assert.equal(piles.length, 1);
-    assert.equal(piles[0].prefab_id, "Algae");
-    assert.equal(piles[0].units, 750);
+    withDb((db) => {
+      const piles = db
+        .prepare("SELECT prefab_id, units FROM world_objects")
+        .all();
+      assert.equal(piles.length, 1);
+      assert.equal(piles[0].prefab_id, "Algae");
+      assert.equal(piles[0].units, 750);
+    });
   });
 
   test("storage_contents joins via owner_id (against either buildings or world_objects)", () => {
-    const { db } = buildDb();
-    const rows = db
-      .prepare(
-        `SELECT b.prefab_id AS owner, sc.element_id, sc.units
-         FROM buildings b
-         JOIN storage_contents sc ON sc.owner_id = b.game_object_id`
-      )
-      .all();
-    assert.equal(rows.length, 2);
-    assert.ok(rows.every((r) => r.owner === "StorageLocker"));
+    withDb((db) => {
+      const rows = db
+        .prepare(
+          `SELECT b.prefab_id AS owner, sc.element_id, sc.units
+           FROM buildings b
+           JOIN storage_contents sc ON sc.owner_id = b.game_object_id`
+        )
+        .all();
+      assert.equal(rows.length, 2);
+      assert.ok(rows.every((r) => r.owner === "StorageLocker"));
+    });
   });
 
   test("convenience views aggregate as expected", () => {
-    const { db } = buildDb();
-    // node:sqlite returns null-prototype rows; spread to plain objects so
-    // deepEqual against object literals succeeds.
-    const inStorage = db
-      .prepare("SELECT element_id, total_units FROM v_resources_in_storage ORDER BY element_id")
-      .all()
-      .map((r) => ({ ...r }));
-    assert.deepEqual(inStorage, [
-      { element_id: "Algae", total_units: 500 },
-      { element_id: "Water", total_units: 250 },
-    ]);
-    const looseByElement = db
-      .prepare("SELECT element_id, total_units FROM v_world_objects_by_element")
-      .all()
-      .map((r) => ({ ...r }));
-    assert.deepEqual(looseByElement, [{ element_id: "Algae", total_units: 750 }]);
+    withDb((db) => {
+      // node:sqlite returns null-prototype rows; spread to plain objects so
+      // deepEqual against object literals succeeds.
+      const inStorage = db
+        .prepare("SELECT element_id, total_units FROM v_resources_in_storage ORDER BY element_id")
+        .all()
+        .map((r) => ({ ...r }));
+      assert.deepEqual(inStorage, [
+        { element_id: "Algae", total_units: 500 },
+        { element_id: "Water", total_units: 250 },
+      ]);
+      const looseByElement = db
+        .prepare("SELECT element_id, total_units FROM v_world_objects_by_element")
+        .all()
+        .map((r) => ({ ...r }));
+      assert.deepEqual(looseByElement, [{ element_id: "Algae", total_units: 750 }]);
+    });
   });
 
   test("critters include species not in any hardcoded list (Pip)", () => {
-    const { db } = buildDb();
-    const species = db.prepare("SELECT prefab_id FROM critters ORDER BY prefab_id").all().map((r) => r.prefab_id);
-    assert.deepEqual(species, ["Hatch", "Pip"]);
+    withDb((db) => {
+      const species = db.prepare("SELECT prefab_id FROM critters ORDER BY prefab_id").all().map((r) => r.prefab_id);
+      assert.deepEqual(species, ["Hatch", "Pip"]);
+    });
   });
 });
