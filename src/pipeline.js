@@ -11,7 +11,13 @@ import { parseSaveFile } from "./parser.js";
 import { extractAll } from "./extractors.js";
 import { writeDatabase } from "./db.js";
 import { makeReplacer } from "./utils.js";
-import { render } from "./ui.js";
+import { render, SKILL_LABELS } from "./ui.js";
+// Static lookup tables written into current.sqlite so both web and MCP
+// consumers can resolve human-readable names via SQL JOINs.
+import { ELEMENT_NAMES } from "./elements.js";
+import { GEYSER_TYPE_NAMES } from "./geyser_types.js";
+import { FOOD_META } from "./food.js";
+import { EFFECT_LABELS } from "./effects.js";
 
 /**
  * Best-effort removal of a stale tmp file. Swallows errors because the
@@ -65,6 +71,14 @@ export async function buildOutputs({ savePath, outputDir }) {
   // Stamp parsing metadata so Claude can detect stale data via SQL.
   tables.save_meta.push({ key: "parsed_at", value: new Date().toISOString() });
   tables.save_meta.push({ key: "source_file", value: savePath });
+
+  // Populate static lookup tables so both web and MCP consumers can JOIN
+  // against human-readable names without any hardcoded JS on their side.
+  tables.element_names = [...ELEMENT_NAMES.entries()].map(([element_id, name]) => ({ element_id, name }));
+  tables.geyser_type_names = GEYSER_TYPE_NAMES;
+  tables.food_meta = FOOD_META;
+  tables.effect_labels = EFFECT_LABELS;
+  tables.skill_labels = [...SKILL_LABELS.entries()].map(([branch, label]) => ({ branch, label }));
   const tExtracted = Date.now();
   console.log(
     `[pipeline]   extracted ${countRows(tables)} rows across ${Object.keys(tables).length} tables in ${tExtracted - tParsed} ms`

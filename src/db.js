@@ -162,6 +162,36 @@ const SCHEMA = [
      temperature REAL
    )`,
   `CREATE INDEX idx_c_prefab ON critters(prefab_id)`,
+
+  // ── Static lookup tables ─────────────────────────────────────────────────
+  // Populated once per build from the source-of-truth JS files in src/.
+  // Written here so both the web frontend and MCP plugin can JOIN against them
+  // without maintaining separate hardcoded copies.
+
+  `CREATE TABLE element_names (
+     element_id INTEGER PRIMARY KEY,
+     name       TEXT NOT NULL
+   )`,
+  `CREATE TABLE geyser_type_names (
+     type_id INTEGER PRIMARY KEY,
+     name    TEXT NOT NULL
+   )`,
+  `CREATE TABLE food_meta (
+     prefab_id TEXT PRIMARY KEY,
+     name      TEXT NOT NULL,
+     kcal      REAL NOT NULL,
+     morale    INTEGER NOT NULL
+   )`,
+  `CREATE TABLE effect_labels (
+     effect   TEXT PRIMARY KEY,
+     label    TEXT NOT NULL,
+     severity TEXT NOT NULL
+   )`,
+  `CREATE TABLE skill_labels (
+     branch TEXT PRIMARY KEY,
+     label  TEXT NOT NULL
+   )`,
+
   // Convenience views.
   `CREATE VIEW v_resources_in_storage AS
      SELECT element_id, COUNT(*) AS items, SUM(units) AS total_units
@@ -229,6 +259,12 @@ export const TABLE_COLUMNS = {
     "game_object_id", "prefab_id", "position_x", "position_y",
     "age", "calories", "hp", "happiness", "temperature",
   ],
+  // Lookup tables (static, populated from JS source files during build).
+  element_names:    ["element_id", "name"],
+  geyser_type_names: ["type_id", "name"],
+  food_meta:        ["prefab_id", "name", "kcal", "morale"],
+  effect_labels:    ["effect", "label", "severity"],
+  skill_labels:     ["branch", "label"],
 };
 
 function buildInsertSql(tableName, cols) {

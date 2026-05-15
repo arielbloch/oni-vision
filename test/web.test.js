@@ -11,6 +11,11 @@ import { join } from "node:path";
 
 import { extractAll } from "../src/extractors.js";
 import { writeDatabase } from "../src/db.js";
+import { ELEMENT_NAMES } from "../src/elements.js";
+import { GEYSER_TYPE_NAMES } from "../src/geyser_types.js";
+import { FOOD_META } from "../src/food.js";
+import { EFFECT_LABELS } from "../src/effects.js";
+import { SKILL_LABELS } from "../src/ui.js";
 import { FAKE_SAVE } from "./fixture.js";
 import { startWeb, notifyClients } from "../src/web.js";
 
@@ -23,6 +28,13 @@ before(async () => {
   const tables = extractAll(FAKE_SAVE);
   tables.save_meta.push({ key: "parsed_at", value: new Date().toISOString() });
   tables.save_meta.push({ key: "source_file", value: "/tmp/fake.sav" });
+  // Populate lookup tables the same way pipeline.js does so /api/status
+  // returns the full enriched payload in tests.
+  tables.element_names    = [...ELEMENT_NAMES.entries()].map(([element_id, name]) => ({ element_id, name }));
+  tables.geyser_type_names = GEYSER_TYPE_NAMES;
+  tables.food_meta        = FOOD_META;
+  tables.effect_labels    = EFFECT_LABELS;
+  tables.skill_labels     = [...SKILL_LABELS.entries()].map(([branch, label]) => ({ branch, label }));
   writeDatabase(join(outputDir, "current.sqlite"), tables);
 
   // Port 0 → OS picks a free one.
@@ -82,6 +94,32 @@ describe("GET /api/status", () => {
     // type_id is now a SimHash integer (-899515856 = "steam")
     assert.ok(body.geyser_types.find((g) => g.type_id === -899515856));
     assert.ok(Array.isArray(body.top_resources));
+
+    // Feature 6: lookup tables served from DB.
+    assert.ok(body.element_names && typeof body.element_names === "object",
+      "element_names should be a non-null object");
+    assert.equal(body.element_names[String(1836671383)], "Water",
+      "element_names should resolve Water's SimHash");
+    assert.ok(body.geyser_type_names && typeof body.geyser_type_names === "object",
+      "geyser_type_names should be a non-null object");
+    assert.equal(body.geyser_type_names[String(-899515856)], "Steam Vent",
+      "geyser_type_names should resolve the steam vent hash");
+    assert.ok(body.food_meta && typeof body.food_meta === "object",
+      "food_meta should be a non-null object");
+    assert.ok(body.food_meta["SurfAndTurf"],
+      "food_meta should include SurfAndTurf");
+    assert.equal(body.food_meta["SurfAndTurf"].morale, 8,
+      "SurfAndTurf should have morale +8");
+    assert.ok(body.effect_labels && typeof body.effect_labels === "object",
+      "effect_labels should be a non-null object");
+    assert.ok(body.effect_labels["SlimeLung"],
+      "effect_labels should include SlimeLung");
+    assert.equal(body.effect_labels["SlimeLung"].cls, "bad",
+      "SlimeLung severity should map to cls='bad'");
+    assert.ok(body.skill_labels && typeof body.skill_labels === "object",
+      "skill_labels should be a non-null object");
+    assert.equal(body.skill_labels["mining"], "Miner",
+      "skill_labels should resolve mining branch");
   });
 
   test("returns 503 with a structured error when current.sqlite is missing", async () => {

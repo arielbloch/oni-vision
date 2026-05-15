@@ -250,14 +250,18 @@ export function dupeDetail(db, name) {
 
 /** Geyser list. */
 export function geysers(db) {
+  // LEFT JOIN geyser_type_names (written by pipeline from src/geyser_types.js)
+  // so each row carries a human-readable type name alongside the numeric hash.
   const rows = db
     .prepare(
-      `SELECT prefab_id, type_id,
-              position_x, position_y,
-              ROUND(rate_roll, 3) AS rate_roll,
-              ROUND(year_percent_roll, 3) AS year_percent_roll
-       FROM geysers
-       ORDER BY type_id, prefab_id`
+      `SELECT g.prefab_id, g.type_id,
+              COALESCE(gtn.name, 'hash:' || g.type_id) AS type_name,
+              g.position_x, g.position_y,
+              ROUND(g.rate_roll, 3) AS rate_roll,
+              ROUND(g.year_percent_roll, 3) AS year_percent_roll
+       FROM geysers g
+       LEFT JOIN geyser_type_names gtn ON gtn.type_id = g.type_id
+       ORDER BY g.type_id, g.prefab_id`
     )
     .all();
   return rows.map((r) => ({ ...r }));
@@ -275,41 +279,83 @@ export function geysers(db) {
  * integers — the 2-decimal precision on bulk mass aggregates is noise.
  */
 export function resources(db, { location = "both", limit = 10 } = {}) {
+  // Each branch wraps an aggregation and LEFT JOINs element_names so Claude
+  // gets human-readable names alongside the raw SimHash IDs.
   let sql;
   if (location === "storage") {
     sql = `
-      SELECT element_id, SUM(units) AS raw_units, COUNT(*) AS items
-      FROM storage_contents
-      WHERE element_id IS NOT NULL
-      GROUP BY element_id
+      SELECT agg.element_id, en.name AS element_name,
+             SUM(agg.units) AS raw_units, COUNT(*) AS items
+      FROM storage_contents agg
+      LEFT JOIN element_names en ON en.element_id = agg.element_id
+      WHERE agg.element_id IS NOT NULL
+      GROUP BY agg.element_id
       ORDER BY raw_units DESC LIMIT ?`;
   } else if (location === "world") {
     sql = `
-      SELECT element_id, SUM(units) AS raw_units, COUNT(*) AS items
-      FROM world_objects
-      WHERE element_id IS NOT NULL
-      GROUP BY element_id
+      SELECT agg.element_id, en.name AS element_name,
+             SUM(agg.units) AS raw_units, COUNT(*) AS items
+      FROM world_objects agg
+      LEFT JOIN element_names en ON en.element_id = agg.element_id
+      WHERE agg.element_id IS NOT NULL
+      GROUP BY agg.element_id
       ORDER BY raw_units DESC LIMIT ?`;
   } else {
     sql = `
-      SELECT element_id,
-             SUM(raw_units) AS raw_units,
-             SUM(items) AS items
+      SELECT sub.element_id, en.name AS element_name,
+             SUM(sub.raw_units) AS raw_units,
+             SUM(sub.items) AS items
       FROM (
         SELECT element_id, SUM(units) AS raw_units, COUNT(*) AS items
         FROM world_objects WHERE element_id IS NOT NULL GROUP BY element_id
         UNION ALL
         SELECT element_id, SUM(units) AS raw_units, COUNT(*) AS items
         FROM storage_contents WHERE element_id IS NOT NULL GROUP BY element_id
-      )
-      GROUP BY element_id
+      ) sub
+      LEFT JOIN element_names en ON en.element_id = sub.element_id
+      GROUP BY sub.element_id
       ORDER BY raw_units DESC LIMIT ?`;
   }
   return db.prepare(sql).all(limit).map((r) => ({
     element_id: r.element_id,
+    // Resolve element_id to a human-readable name via the lookup table written
+    // by the pipeline (src/elements.js → element_names). Falls back to the raw
+    // hash if the element isn't in the table (e.g. unknown DLC element).
+    element_name: r.element_name ?? `id:${r.element_id}`,
     total_units: r.raw_units >= 100 ? Math.round(r.raw_units) : Number(r.raw_units.toFixed(2)),
     items: r.items,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Food in storage
+// ---------------------------------------------------------------------------
+
+/**
+ * Food items currently in storage, joined with food_meta for display names,
+ * kcal values, and morale bonus. Grouped by prefab_id, sorted by stack count.
+ *
+ * Items whose prefab_id isn't in food_meta (e.g. new DLC food) still appear;
+ * name/kcal/morale are null for those rows so callers can handle gracefully.
+ *
+ * @param {object} opts
+ * @param {number} [opts.limit=20]
+ */
+export function food(db, { limit = 20 } = {}) {
+  return db.prepare(
+    `SELECT sc.item_prefab_id AS prefab_id,
+            fm.name,
+            fm.kcal,
+            fm.morale,
+            COUNT(*) AS qty
+     FROM storage_contents sc
+     LEFT JOIN food_meta fm ON fm.prefab_id = sc.item_prefab_id
+     WHERE sc.item_prefab_id IS NOT NULL
+       AND sc.element_id IS NULL
+     GROUP BY sc.item_prefab_id
+     ORDER BY qty DESC
+     LIMIT ?`
+  ).all(limit);
 }
 
 // ---------------------------------------------------------------------------
@@ -374,8 +420,8 @@ export function status(db, opts = {}) {
  *     base_name, cycle, save_version, parsed_at, age_seconds, source_file,
  *     counts: { duplicants, critters, geysers, buildings },
  *     top_dupes: [{ name, stress, current_role }, ...],
- *     geyser_types: [{ type_id, count }, ...],
- *     top_resources: [{ element_id, total_units, items }, ...],
+ *     geyser_types: [{ type_id, type_name, count }, ...],
+ *     top_resources: [{ element_id, element_name, total_units, items }, ...],
  *   }
  */
 export function statusObject(db, { dupeLimit = 5, geyserLimit = 10, resourceLimit = 5 } = {}) {
@@ -390,8 +436,18 @@ export function statusObject(db, { dupeLimit = 5, geyserLimit = 10, resourceLimi
   };
 
   const top_dupes = dupes(db, { sort: "stress", fields: ["name", "stress", "current_role"], limit: dupeLimit });
+  // LEFT JOIN geyser_type_names so the MCP oni_status response includes
+  // human-readable geyser names alongside the raw SimHash type_id.
   const geyser_types = db
-    .prepare("SELECT type_id, COUNT(*) AS count FROM geysers GROUP BY type_id ORDER BY count DESC, type_id LIMIT ?")
+    .prepare(
+      `SELECT g.type_id, COALESCE(gtn.name, 'hash:' || g.type_id) AS type_name,
+              COUNT(*) AS count
+       FROM geysers g
+       LEFT JOIN geyser_type_names gtn ON gtn.type_id = g.type_id
+       GROUP BY g.type_id
+       ORDER BY count DESC, g.type_id
+       LIMIT ?`
+    )
     .all(geyserLimit)
     .map((r) => ({ ...r }));
   const top_resources = resources(db, { location: "both", limit: resourceLimit });

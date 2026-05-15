@@ -18,7 +18,6 @@ import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
 import { statusObject } from "../oni-vision-plugin/lib/queries.js";
-import { ELEMENT_NAMES } from "./elements.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(HERE, "web");
@@ -144,6 +143,10 @@ function serveEvents(res) {
  *   - per-dupe active effects/diseases (from duplicant_effects)
  *   - individual geyser quality rolls (replaces the grouped geyser_types)
  *   - food in storage by type (from storage_contents)
+ *   - all stored elements and in-game stockpile filter settings
+ *   - lookup tables (element_names, geyser_type_names, food_meta,
+ *     effect_labels, skill_labels) queried from DB so the frontend
+ *     needs no hardcoded copies
  */
 function serveStatus(res, outputDir) {
   const dbPath = join(outputDir, "current.sqlite");
@@ -240,10 +243,33 @@ function serveStatus(res, outputDir) {
     }
     payload.stockpile_filters = [...stockpileFilters];
 
-    // ── Element name map (single source of truth from elements.js) ────────────
-    // The frontend uses this to resolve SimHash integer IDs to display names,
-    // eliminating its own hardcoded copy that would inevitably drift.
-    payload.element_names = Object.fromEntries(ELEMENT_NAMES);
+    // ── Lookup tables from DB (single source of truth) ────────────────────────
+    // These are populated into current.sqlite during buildOutputs() from the
+    // src/*.js source files. Serving them here lets the frontend drop all its
+    // hardcoded JS tables and always stay in sync with the parser.
+    const toMap = (rows, keyCol, valCol) =>
+      Object.fromEntries(rows.map((r) => [String(r[keyCol]), r[valCol]]));
+
+    payload.element_names = toMap(
+      db.prepare("SELECT element_id, name FROM element_names").all(),
+      "element_id", "name"
+    );
+    payload.geyser_type_names = toMap(
+      db.prepare("SELECT type_id, name FROM geyser_type_names").all(),
+      "type_id", "name"
+    );
+    payload.food_meta = Object.fromEntries(
+      db.prepare("SELECT prefab_id, name, kcal, morale FROM food_meta").all()
+        .map((r) => [r.prefab_id, { name: r.name, kcal: r.kcal, morale: r.morale }])
+    );
+    payload.effect_labels = Object.fromEntries(
+      db.prepare("SELECT effect, label, severity FROM effect_labels").all()
+        .map((r) => [r.effect, { label: r.label, cls: r.severity }])
+    );
+    payload.skill_labels = toMap(
+      db.prepare("SELECT branch, label FROM skill_labels").all(),
+      "branch", "label"
+    );
 
     res.writeHead(200, {
       "Content-Type": "application/json",

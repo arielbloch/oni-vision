@@ -218,7 +218,7 @@ export function renderDupes(db, { color = false, limit = 12 } = {}) {
 }
 
 // Skill branch labels (prefix → display name).
-const SKILL_LABELS = new Map([
+export const SKILL_LABELS = new Map([
   ["mining",       "Miner"],
   ["building",     "Builder"],
   ["researching",  "Researcher"],

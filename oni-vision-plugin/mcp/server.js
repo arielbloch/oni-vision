@@ -32,6 +32,7 @@ import {
   dupeDetail,
   geysers,
   resources,
+  food,
   query,
   status,
   schema,
@@ -115,6 +116,17 @@ const TOOLS = [
           description: "Default: both.",
         },
         limit: { type: "integer", description: "Max rows. Default: 10." },
+        format: { type: "string", enum: ["json", "tsv"], description: "Output format. Default: json." },
+      },
+    },
+  },
+  {
+    name: "oni_food",
+    description: "Food items currently in colony storage, with display name, kcal per item, morale bonus, and stack count. JOINs the food_meta lookup table so results are human-readable. Unknown food items (new DLC) appear with null name/kcal/morale.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "integer", description: "Max food types to return. Default: 20." },
         format: { type: "string", enum: ["json", "tsv"], description: "Output format. Default: json." },
       },
     },
@@ -216,6 +228,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         break;
       case "oni_resources":
         payload = withDb((db) => resources(db, args));
+        break;
+      case "oni_food":
+        payload = withDb((db) => food(db, args));
         break;
       case "oni_query":
         payload = withDb((db) => query(db, args.sql, args.params ?? []));
