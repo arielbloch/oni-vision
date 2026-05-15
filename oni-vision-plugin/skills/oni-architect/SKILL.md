@@ -33,7 +33,7 @@ Cycle-relative thinking helps: 1 cycle = 600 seconds = 10 minutes of in-game tim
 
 ## Cardinal numbers (ground these into every answer)
 
-- **Duplicant per cycle:** 1000 kcal food, ~60 kg O2 (with mouth breather: 30 kg), ~120 kg CO2 exhaled, ~40 kg PolutedWater (urine). One dupe sleeps ~25% of the cycle.
+- **Duplicant per cycle:** 1000 kcal food, ~60 kg O2 (with mouth breather: 30 kg), ~120 kg CO2 exhaled, ~40 kg PollutedWater (urine). One dupe sleeps ~25% of the cycle.
 - **Game tick:** 0.2 s. SHC math uses ticks for accuracy on small heat-transfer items.
 - **Wire ratings:** wire 1 kW, conductive wire 2 kW, heavi-watt wire 20 kW, heavi-watt conductive 50 kW.
 - **Pipe throughput:** 10 kg/packet liquids, 1 kg/packet gas (insulated/radiant don't change throughput, only conductivity).

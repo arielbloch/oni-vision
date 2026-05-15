@@ -71,7 +71,7 @@ Totals ≥100 kg are reported as integers (rounding noise stripped). Default lim
 Food items currently in colony storage, with display name, kcal per item, morale bonus, and stack count. Joins the `food_meta` lookup table so results are human-readable. Unknown food items (new DLC) appear with null name/kcal/morale. Default limit is 20.
 
 ### `oni_query({ sql, params?, format? })`
-SELECT-only escape hatch over the whole DB schema. Reject any non-SELECT statement; multiple statements aren't allowed either. **Caveat:** semicolons anywhere in the SQL string are rejected, even inside string literals (`WHERE name = ';'` will fail — use a different quote or omit the semicolon). Use `format: "tsv"` for large tabular returns.
+SELECT-only escape hatch over the whole DB schema. Reject any non-SELECT statement; multiple statements aren't allowed either. **Caveat:** a trailing semicolon is silently stripped, but an interior semicolon anywhere in the string is rejected (so `WHERE name = ';'` will fail — avoid interior semicolons entirely). Use `format: "tsv"` for large tabular returns.
 
 ### Schema crib for `oni_query`
 

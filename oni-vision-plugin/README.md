@@ -6,7 +6,7 @@ Claude Code / Cowork plugin that lets Claude query your live **Oxygen Not Includ
 
 ## Prerequisites
 
-- **oni-vision daemon running** — `npm start` in the `oni-vision` repo while ONI is open. The daemon watches for new saves and reparsed them automatically.
+- **oni-vision daemon running** — `npm start` in the `oni-vision` repo while ONI is open. The daemon watches for new saves and reparses them automatically.
 - **Node.js ≥ 22.5** — required by both the daemon and the MCP server (`node:sqlite` is built-in from 22.5).
 - **Claude Code** — the CLI tool (`npm install -g @anthropic-ai/claude-code`).
 
@@ -260,9 +260,10 @@ Activates for strategy, design, and debugging questions: "what should I build ne
 
 Reference material loaded on demand from `skills/oni-architect/references/`:
 - `geysers.md` — geyser type table with SimHash integers, roll-to-kg/s formula, tameability heuristics, overpressure rules
-- `critters.md` — critter ranching reference
-- `plants.md` — plant farming reference
-- `buildings.md` — building power and throughput reference
+- `throughput.md` — oxygen, food, power, heat throughput numbers and cardinal rates
+- `duplicants.md` — trait quick reference, skill build order, stress management
+- `plants-and-critters.md` — plant farming conditions, critter ranching inputs/outputs
+- `common-asks.md` — canned answers for the most frequent colony questions
 
 ---
 

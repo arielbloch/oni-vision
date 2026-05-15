@@ -29,7 +29,7 @@ Calorie demand is **1000 kcal/cycle/dupe**. Multiply by dupes; double-check agai
 | Pepper Bread        | 4000       | 1 sleet wheat + 3 peppers, Electric Grill        |
 | Frost Bun           | 1700       | Sleet wheat, Electric Grill                      |
 | BBQ                 | 4000       | Cooked hatch meat, Electric Grill                |
-| Surf 'n' Turf       | 8000       | Cooked pacu fillet + cooked omelette             |
+| Surf 'n' Turf       | 6000       | Cooked pacu fillet + cooked omelette             |
 
 A 12-dupe colony needs ≈12,000 kcal/cycle. Pepper Bread × 3 dupe-cycles per loaf — a dozen plants is plenty.
 

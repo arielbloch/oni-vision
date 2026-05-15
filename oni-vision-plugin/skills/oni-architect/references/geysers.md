@@ -31,7 +31,7 @@ Output element is what comes out; output temperature is roughly fixed per type w
 
 | type_id (name)        | SimHash integer | Output             | Rate range (kg/s)   | Out temp (°C) |
 |-----------------------|-----------------|--------------------|---------------------|---------------|
-| `steam`               | -899515856      | Cool Steam Vent water | 1.0 – 2.0       | 110           |
+| `steam`               | -899515856      | Steam → condenses to water | 1.0 – 2.0  | 110           |
 | `hot_steam`           | -2022709954     | Steam Vent steam   | 0.5 – 2.0           | 500           |
 | `hot_water`           | 713477285       | Water Geyser       | 1.0 – 3.0           | 95            |
 | `slush_water`         | 1280790313      | Cool Slush Geyser  | 1.0 – 2.0           | -10 (PW)      |
@@ -57,7 +57,7 @@ Output element is what comes out; output temperature is roughly fixed per type w
 | `tungsten`            | -1058835580     | Tungsten Volcano   | 8 – 24 (tungsten magma) | 4426      |
 | `niobium`             | -1779895821     | Niobium Volcano    | 8 – 24 (niobium magma) | 4126       |
 
-(Numbers are author's best recall as of the Frosty Planet patch; verify against [oxygennotincluded.fandom.com/wiki/Geyser](https://oxygennotincluded.fandom.com/wiki/Geyser) when in doubt. Klei occasionally rebalances.)
+(SimHash integers are programmatically derived from ONI's SDBM algorithm and match the values in the DB exactly. Rate ranges and output temperatures reflect the Frosty Planet patch; verify against [oxygennotincluded.fandom.com/wiki/Geyser](https://oxygennotincluded.fandom.com/wiki/Geyser) if Klei has rebalanced since.)
 
 ## Worth-taming heuristic
 

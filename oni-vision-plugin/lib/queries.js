@@ -355,7 +355,7 @@ export function food(db, { limit = 20 } = {}) {
      GROUP BY sc.item_prefab_id
      ORDER BY qty DESC
      LIMIT ?`
-  ).all(limit);
+  ).all(limit).map((r) => ({ ...r }));
 }
 
 // ---------------------------------------------------------------------------
