@@ -201,7 +201,7 @@ A non-exhaustive list of subject areas, sourced from the official Klei wiki and 
 
 ---
 
-## 5. Zero-config experience — 🔜 next
+## 5. Zero-config experience — ✅ Waves 26–31
 
 ### Goal
 
@@ -414,4 +414,4 @@ A reasonable order, roughly increasing scope:
 3. **MCP plugin** — ✅ Wave 8
 4. **ONI architect skill** — ✅ Wave 9
 5. **Zero-config experience** — ✅ Waves 26–31
-6. **DB as single source of truth** — 🔜 next
+6. **DB as single source of truth** — ✅ Wave 32+
