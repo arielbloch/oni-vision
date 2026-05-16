@@ -67,6 +67,16 @@
   td.pct { width: 7%; text-align: right; color: var(--fg-dim); }
   td.skills { color: var(--fg-dim); font-size: 12px; width: 20%; }
   td.focus { font-size: 11px; width: 31%; }
+  .sp-badge {
+    display: inline-block; padding: 1px 5px; border-radius: 3px;
+    font-size: 11px; font-weight: 600; margin-right: 4px;
+    background: rgba(255,255,255,0.04); color: var(--fg-dim);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .sp-badge.has-sp {
+    background: rgba(250,204,21,0.18); color: var(--hi);
+    border-color: rgba(250,204,21,0.4);
+  }
   /* p5 = highest (Attacking/Toggling): yellow like the header hi-color */
   .focus-tag {
     display: inline-block; padding: 1px 5px; border-radius: 3px; margin: 1px 2px 1px 0;
@@ -199,34 +209,19 @@
   }
 
   /**
-   * Parse a comma-separated skills string into { label, moraleCost }.
-   * e.g. "Mining1,Mining2,Building1" →
-   *   { label: "Miner II, Builder I", moraleCost: 4 }
-   * Morale cost = sum of tier numbers (Mining1=1, Building2=2, etc.).
-   * Note: raw morale available isn't in the save file (runtime-computed),
-   * so we show only what skills cost.
+   * Sum the morale cost of a comma-separated mastered-skills string.
+   * Each skill's tier number (e.g. Mining2 → 2, Hauling1 → 1) contributes
+   * directly to the morale cost shown in-game.
+   * Morale available is runtime-computed and not stored in the save.
    */
-  function parseSkills(raw) {
-    if (!raw) return { label: "", moraleCost: 0 };
-    const bestLevel = {};
-    let moraleCost = 0;
+  function moraleCostOf(raw) {
+    if (!raw) return 0;
+    let cost = 0;
     for (const skill of raw.split(",")) {
-      const m = skill.match(/^([A-Za-z]+?)(\d+)?$/);
-      if (!m) continue;
-      const branch = m[1].toLowerCase();
-      const tier = m[2] ? Number(m[2]) : 1;
-      moraleCost += tier;
-      if (!(branch in bestLevel) || tier > bestLevel[branch]) {
-        bestLevel[branch] = tier;
-      }
+      const m = skill.match(/\d+$/);
+      cost += m ? Number(m[0]) : 1;
     }
-    const parts = [];
-    for (const [branch, level] of Object.entries(bestLevel)) {
-      const label = SKILL_LABELS[branch] ?? (branch.charAt(0).toUpperCase() + branch.slice(1));
-      const roman = ROMAN[level] ?? String(level);
-      parts.push(roman ? `${label} ${roman}` : label);
-    }
-    return { label: parts.join(", "), moraleCost };
+    return cost;
   }
 
   // ── DOM helpers ──────────────────────────────────────────────────────────────
@@ -305,16 +300,11 @@
       const barCell = r.stress == null
         ? `<div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--bg-elev)"></div></div>`
         : bar(r.stress);
-      const { moraleCost } = parseSkills(r.skills);
-      const sp = r.skill_points ?? 0;
-      // Skill points badge: highlight if ≥1 unspent point so user notices
-      const spBadge = `<span style="margin-left:4px;padding:1px 5px;border-radius:3px;font-size:11px;font-weight:600;${
-        sp > 0
-          ? "background:rgba(250,204,21,0.18);color:#facc15;border:1px solid rgba(250,204,21,0.4)"
-          : "background:rgba(255,255,255,0.05);color:var(--fg-muted);border:1px solid rgba(255,255,255,0.08)"
-      }">${sp} SP</span>`;
-      // Skills cell: SP badge + morale cost only (no skill name list)
-      const skillsCell = `${spBadge}<span style="color:var(--fg-muted);margin-left:6px">${moraleCost} morale</span>`;
+      const cost = moraleCostOf(r.skills);
+      const sp   = r.skill_points ?? 0;
+      const spBadge = `<span class="sp-badge${sp > 0 ? " has-sp" : ""}">${sp} SP</span>`;
+      // Skills cell: SP badge + morale cost (skill names removed per design)
+      const skillsCell = `${spBadge}<span style="color:var(--fg-dim)">${cost} morale</span>`;
       const badges = (r.effects ?? [])
         .map(e => BAD_EFFECTS[e])
         .filter(Boolean)
