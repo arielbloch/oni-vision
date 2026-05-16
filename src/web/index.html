@@ -80,15 +80,19 @@
   /* Focus tags — monochrome body, domain colour lives only in the left accent bar.
      p4 = thin bar (2px), p5 = thick bar (3.5px) + bold.
      Studio palette: cyan (physical) · lavender (technical) · pink (care) · tangerine (combat) */
+  /* Focus tags — monochrome body, domain colour in left accent bar only.
+     Avoid border-left shorthand: it resets border-left-color and would
+     override the domain colour rules (specificity: .ft.p4 > .ft-cyan). */
   .ft {
     display: inline-block; padding: 1px 8px 1px 6px; margin: 1px 2px 1px 0;
     border-radius: 0 4px 4px 0;
     border-top: 0.5px solid var(--border); border-right: 0.5px solid var(--border);
     border-bottom: 0.5px solid var(--border);
+    border-left-style: solid;
     background: var(--bg-card); color: var(--fg);
   }
-  .ft.p4 { border-left: 2px solid;   }
-  .ft.p5 { border-left: 3.5px solid; font-weight: 600; }
+  .ft.p4 { border-left-width: 2px; }
+  .ft.p5 { border-left-width: 3.5px; font-weight: 600; }
   .ft-cyan      { border-left-color: #22D3EE; }
   .ft-lavender  { border-left-color: #A78BFA; }
   .ft-pink      { border-left-color: #F472B6; }
