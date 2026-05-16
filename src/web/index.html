@@ -70,23 +70,18 @@
        color: var(--fg-dim); padding: 2px 6px 6px; text-align: left; }
   /* Abbreviated text tags — domain colour in left accent bar.
      Studio palette: cyan=physical · lavender=technical · pink=care · tangerine=combat.
-     Use border-left-width/style separately to avoid shorthand clobbering the colour. */
+     Solid deep-fill tags — domain colour as background, light text. */
   .ft {
     display: inline-flex; align-items: center;
-    height: 20px; padding: 0 6px 0 5px; margin: 0 2px 0 0;
-    border-radius: 0 4px 4px 0;
-    border-top: 0.5px solid var(--border); border-right: 0.5px solid var(--border);
-    border-bottom: 0.5px solid var(--border);
-    border-left-style: solid;
-    background: var(--bg-card); color: var(--fg);
-    font-size: 11px; white-space: nowrap; vertical-align: middle;
+    height: 20px; padding: 0 7px; margin: 0 2px 0 0;
+    border-radius: 4px; border: none;
+    font-size: 11px; font-weight: 500; white-space: nowrap; vertical-align: middle;
   }
-  .ft.p4 { border-left-width: 2px; }
-  .ft.p5 { border-left-width: 3.5px; font-weight: 600; }
-  .ft-cyan      { border-left-color: #22D3EE; }
-  .ft-lavender  { border-left-color: #A78BFA; }
-  .ft-pink      { border-left-color: #F472B6; }
-  .ft-tangerine { border-left-color: #FB923C; }
+  .ft.p5 { font-weight: 700; }
+  .ft-cyan      { background: #0e7490; color: #cffafe; }
+  .ft-lavender  { background: #6d28d9; color: #ede9fe; }
+  .ft-pink      { background: #be185d; color: #fce7f3; }
+  .ft-tangerine { background: #c2410c; color: #fff7ed; }
   td.metric { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   .bar-track {
@@ -101,9 +96,9 @@
     background: var(--bg-card); border: 1px solid var(--bad); color: var(--bad);
     padding: 12px; border-radius: 6px;
   }
-  .badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-left: 5px; vertical-align: middle; }
-  .badge.bad  { background: rgba(248,113,113,0.15); color: var(--bad);  border: 1px solid rgba(248,113,113,0.3); }
-  .badge.warn { background: rgba(250,204,21,0.15);  color: var(--warn); border: 1px solid rgba(250,204,21,0.3); }
+  .badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 99px; margin-left: 5px; vertical-align: middle; }
+  .badge.bad  { background: #ef4444; color: #fff; }
+  .badge.warn { background: #f59e0b; color: #1a0e00; }
   .three-up { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
   @media (max-width: 600px) {
     .counts   { grid-template-columns: repeat(2, 1fr); }
