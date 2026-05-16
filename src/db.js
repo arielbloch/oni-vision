@@ -288,6 +288,33 @@ function buildInsertSql(tableName, cols) {
   return `INSERT INTO ${tableName}(${colList}) VALUES (${params})`;
 }
 
+// Lookup tables that must always be non-empty after a complete pipeline run.
+// An empty row set means the source JS module was accidentally cleared —
+// fail loudly rather than silently writing a DB where every JOIN returns NULL.
+const REQUIRED_LOOKUP_TABLES = [
+  "element_names",
+  "geyser_type_names",
+  "food_meta",
+  "effect_labels",
+  "skill_labels",
+  "chore_group_names",
+];
+
+/**
+ * Throw if any required lookup table is absent or empty in `tables`.
+ * Call this in pipeline.js after all lookup tables have been projected.
+ */
+export function assertLookupTablesPopulated(tables) {
+  for (const name of REQUIRED_LOOKUP_TABLES) {
+    if (!tables[name]?.length) {
+      throw new Error(
+        `Required lookup table "${name}" is empty or missing. ` +
+        `Check the corresponding src/${name}.js export.`
+      );
+    }
+  }
+}
+
 /** Build a fresh SQLite DB at `path`, populated from extractor output. */
 export function writeDatabase(path, tables) {
   const db = new DatabaseSync(path);

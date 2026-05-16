@@ -127,6 +127,7 @@ CI runs `npm ci && npm test` on Node 22.x and 24.x for every push.
 - Tile/element-by-cell map data is not exposed in tabular form — that's millions of cells. Use `current.json`'s world section, or the `buildings` / `world_objects` tables for material/temperature questions on placed objects.
 - Geyser output is exposed as the *configuration rolls* (0–1 percentiles), not resolved kg/s rates. Resolving requires the library's geyser const-data; not lifted yet. See `oni-vision-plugin/skills/oni-architect/references/geysers.md` for the formula.
 - DLC content (rockets, planetoids, clusters) is reachable through the generic `behaviors` table but doesn't yet have its own typed extractor.
+- **Privacy note.** `current.json` and the `save_meta` table store the full absolute path of the parsed `.sav` file (typically something like `/Users/<name>/Library/…/my_colony.sav`). This is a localhost-only tool and the data never leaves your machine, but be aware if you share the output files. The web port (default 8080, or the next free port up to 8089) is bound to `127.0.0.1` by default.
 - If parsing fails on a brand-new ONI patch, the fix typically lands in [`oni-save-parser`](https://github.com/RoboPhred/oni-save-parser) first; bump the dependency once it's released.
 
 ## License

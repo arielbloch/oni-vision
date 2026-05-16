@@ -9,7 +9,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import { parseSaveFile } from "./parser.js";
 import { extractAll } from "./extractors.js";
-import { writeDatabase } from "./db.js";
+import { writeDatabase, assertLookupTablesPopulated } from "./db.js";
 import { makeReplacer } from "./utils.js";
 import { render } from "./ui.js";
 import { SKILL_LABELS } from "./skills.js";
@@ -82,6 +82,7 @@ export async function buildOutputs({ savePath, outputDir }) {
   tables.effect_labels = EFFECT_LABELS;
   tables.skill_labels = SKILL_LABELS;
   tables.chore_group_names = CHORE_GROUP_NAMES;
+  assertLookupTablesPopulated(tables);
   const tExtracted = Date.now();
   console.log(
     `[pipeline]   extracted ${countRows(tables)} rows across ${Object.keys(tables).length} tables in ${tExtracted - tParsed} ms`

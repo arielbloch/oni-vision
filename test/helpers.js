@@ -8,6 +8,7 @@ import { GEYSER_TYPE_NAMES } from "../src/geyser_types.js";
 import { FOOD_META } from "../src/food.js";
 import { EFFECT_LABELS } from "../src/effects.js";
 import { SKILL_LABELS } from "../src/skills.js";
+import { CHORE_GROUP_NAMES } from "../src/chore_groups.js";
 import { FAKE_SAVE } from "./fixture.js";
 
 /**
@@ -32,6 +33,7 @@ export function buildFakeTables({ includeParsedAt = true, includeLookupTables = 
     tables.food_meta = FOOD_META;
     tables.effect_labels = EFFECT_LABELS;
     tables.skill_labels = SKILL_LABELS;
+    tables.chore_group_names = CHORE_GROUP_NAMES;
   }
 
   return tables;

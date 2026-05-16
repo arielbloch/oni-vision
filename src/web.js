@@ -102,6 +102,10 @@ function tryListen(server, host, port, attempt) {
       const addr = server.address();
       const realPort = typeof addr === "object" && addr ? addr.port : port;
       console.log(`[web] listening on http://${host}:${realPort}`);
+      // Replace the bind-time once handler with a permanent logger so
+      // post-bind runtime errors (e.g. TCP socket faults) don't crash the daemon.
+      server.removeAllListeners("error");
+      server.on("error", (err) => console.error(`[web] server error: ${err.message}`));
       resolve(server);
     });
   });

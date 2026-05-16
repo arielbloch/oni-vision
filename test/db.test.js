@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { extractAll } from "../src/extractors.js";
-import { writeDatabase, TABLE_COLUMNS } from "../src/db.js";
+import { writeDatabase, TABLE_COLUMNS, assertLookupTablesPopulated } from "../src/db.js";
 import { buildFakeTables } from "./helpers.js";
 import { FAKE_SAVE } from "./fixture.js";
 
@@ -230,6 +230,43 @@ describe("round-trip queries", () => {
       // Meep has Mining1 mastered (tier 1) → morale_cost = 1
       assert.equal(row.morale_cost, 1);
     });
+  });
+});
+
+describe("assertLookupTablesPopulated", () => {
+  test("passes when all required lookup tables are present", () => {
+    const tables = buildFakeTables({ includeLookupTables: true });
+    assert.doesNotThrow(() => assertLookupTablesPopulated(tables));
+  });
+
+  test("throws when a required lookup table is absent", () => {
+    const tables = buildFakeTables({ includeLookupTables: true });
+    delete tables.element_names;
+    assert.throws(
+      () => assertLookupTablesPopulated(tables),
+      /element_names/,
+      "should name the missing table in the error"
+    );
+  });
+
+  test("throws when a required lookup table is empty", () => {
+    const tables = buildFakeTables({ includeLookupTables: true });
+    tables.skill_labels = [];
+    assert.throws(
+      () => assertLookupTablesPopulated(tables),
+      /skill_labels/
+    );
+  });
+
+  test("passes when lookup tables are not present (raw extractor output)", () => {
+    // Extractor output doesn't include lookup tables — pipeline.js adds them.
+    // assertLookupTablesPopulated is only called after that step, not here.
+    // This test documents the expected call-site, not a passing case.
+    const tables = extractAll(FAKE_SAVE);
+    assert.throws(
+      () => assertLookupTablesPopulated(tables),
+      /element_names/
+    );
   });
 });
 
