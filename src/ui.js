@@ -8,61 +8,10 @@
 
 import { elementName } from "./elements.js";
 import { SKILL_LABELS as SKILL_LABELS_ARRAY } from "./skills.js";
+import { ANSI, paint, bar, pad, fit, lpad, formatMass, formatAge, stressColor } from "./format.js";
 
 // Build a Map once for O(1) lookup in formatSkills.
 const SKILL_LABEL_MAP = new Map(SKILL_LABELS_ARRAY.map(({ branch, label }) => [branch, label]));
-
-const ANSI = {
-  reset: "\x1b[0m",
-  dim: "\x1b[2m",
-  bold: "\x1b[1m",
-  cyan: "\x1b[36m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  red: "\x1b[31m",
-  blue: "\x1b[34m",
-  magenta: "\x1b[35m",
-};
-
-function paint(s, code, enabled) {
-  return enabled ? `${code}${s}${ANSI.reset}` : s;
-}
-
-/** Stress level → ANSI color code. */
-function stressColor(stress, enabled) {
-  if (!enabled) return "";
-  if (stress >= 60) return ANSI.red;
-  if (stress >= 30) return ANSI.yellow;
-  return ANSI.green;
-}
-
-/** Render a 10-segment ASCII bar. value is 0..1; bar fills proportionally. */
-function bar(value, width = 10) {
-  const v = Math.max(0, Math.min(1, value));
-  const filled = Math.round(v * width);
-  return "█".repeat(filled) + "░".repeat(width - filled);
-}
-
-function pad(s, n) {
-  s = String(s);
-  if (s.length >= n) return s;
-  return s + " ".repeat(n - s.length);
-}
-
-/** Pad-or-clip to exactly n columns. Long strings get an ellipsis. */
-function fit(s, n) {
-  s = String(s);
-  if (s.length === n) return s;
-  if (s.length < n) return s + " ".repeat(n - s.length);
-  if (n <= 1) return s.slice(0, n);
-  return s.slice(0, n - 1) + "…";
-}
-
-function lpad(s, n) {
-  s = String(s);
-  if (s.length >= n) return s;
-  return " ".repeat(n - s.length) + s;
-}
 
 /**
  * Pull the headline facts out of save_meta. Returns a plain object;
@@ -73,39 +22,36 @@ export function readMeta(db) {
   const out = {};
   for (const r of rows) out[r.key] = r.value;
   return {
-    baseName: out.baseName ?? null,
-    cycle: out.numberOfCycles != null ? Number(out.numberOfCycles) : null,
-    dupeCount: out.numberOfDuplicants != null ? Number(out.numberOfDuplicants) : null,
+    baseName:    out.baseName ?? null,
+    cycle:       out.numberOfCycles != null ? Number(out.numberOfCycles) : null,
+    dupeCount:   out.numberOfDuplicants != null ? Number(out.numberOfDuplicants) : null,
     saveVersion: out.saveVersion ?? null,
-    parsedAt: out.parsed_at ?? null,
-    sourceFile: out.source_file ?? null,
+    parsedAt:    out.parsed_at ?? null,
+    sourceFile:  out.source_file ?? null,
   };
 }
 
 /** Render the top banner: world name + cycle. */
 export function renderBanner(db, { color = false, width = 80 } = {}) {
   const meta = readMeta(db);
-  const left = meta.baseName ?? "(unnamed colony)";
-  const right = meta.cycle != null ? `cycle ${meta.cycle}` : "(unknown cycle)";
-  const middle = ` · `;
-  const line = `${left}${middle}${right}`;
-  // Trailing horizontal rule. Local name `trail` avoids shadowing the
-  // module-level `bar()` function for stress bars.
-  const trail = "═".repeat(Math.max(0, width - line.length - 8));
+  const left  = meta.baseName ?? "(unnamed colony)";
+  const right  = meta.cycle != null ? `cycle ${meta.cycle}` : "(unknown cycle)";
+  const line   = `${left} · ${right}`;
+  const trail  = "═".repeat(Math.max(0, width - line.length - 8));
   return `═══ ${paint(line, ANSI.bold + ANSI.cyan, color)} ${paint(trail, ANSI.dim, color)}═══`;
 }
 
 /** "12 duplicants · 4 critters · 7 geysers". */
 export function renderHeadCounts(db, { color = false } = {}) {
-  const dupes = db.prepare("SELECT COUNT(*) AS n FROM duplicants").get().n;
-  const critters = db.prepare("SELECT COUNT(*) AS n FROM critters").get().n;
-  const geysers = db.prepare("SELECT COUNT(*) AS n FROM geysers").get().n;
+  const dupes     = db.prepare("SELECT COUNT(*) AS n FROM duplicants").get().n;
+  const critters  = db.prepare("SELECT COUNT(*) AS n FROM critters").get().n;
+  const geysers   = db.prepare("SELECT COUNT(*) AS n FROM geysers").get().n;
   const buildings = db.prepare("SELECT COUNT(*) AS n FROM buildings").get().n;
   const sep = paint(" · ", ANSI.dim, color);
   return [
-    `${paint(dupes, ANSI.bold, color)} duplicants`,
-    `${paint(critters, ANSI.bold, color)} critters`,
-    `${paint(geysers, ANSI.bold, color)} geysers`,
+    `${paint(dupes,     ANSI.bold, color)} duplicants`,
+    `${paint(critters,  ANSI.bold, color)} critters`,
+    `${paint(geysers,   ANSI.bold, color)} geysers`,
     `${paint(buildings, ANSI.bold, color)} buildings`,
   ].join(sep);
 }
@@ -150,15 +96,12 @@ export function renderGeysers(db, { color = false } = {}) {
   if (rows.length === 0) return paint("Geysers: none", ANSI.dim, color);
 
   const header = paint("Geysers", ANSI.bold + ANSI.magenta, color);
-  const items = rows
-    .map((r) => `${pad(geyserName(r.type_id), 24)} ×${r.n}`)
-    .join("  ");
+  const items  = rows.map((r) => `${pad(geyserName(r.type_id), 24)} ×${r.n}`).join("  ");
   return `${header}\n  ${items}`;
 }
 
 /** Top elements by mass across loose piles + storage_contents. */
 export function renderStockpile(db, { color = false, limit = 8 } = {}) {
-  // Combine world_objects (loose piles) and storage_contents (in containers).
   const sql = `
     SELECT element_id,
            SUM(units) AS total_units,
@@ -181,7 +124,7 @@ export function renderStockpile(db, { color = false, limit = 8 } = {}) {
   if (rows.length === 0) return paint("Stockpile: empty", ANSI.dim, color);
 
   const header = paint("Stockpile (top elements by mass)", ANSI.bold + ANSI.green, color);
-  const lines = rows.map((r) => {
+  const lines  = rows.map((r) => {
     const name = elementName(r.element_id);
     const mass = formatMass(r.total_units);
     return `  ${pad(name, 20)} ${lpad(mass, 12)}   in ${r.items} place${r.items === 1 ? "" : "s"}`;
@@ -205,17 +148,17 @@ export function renderDupes(db, { color = false, limit = 12 } = {}) {
   if (rows.length === 0) return paint("Dupes: none", ANSI.dim, color);
 
   const header = paint("Dupes (sorted by stress)", ANSI.bold + ANSI.yellow, color);
-  const lines = rows.map((r) => {
+  const lines  = rows.map((r) => {
     const hasStress = r.stress != null;
-    const stress = hasStress ? r.stress : 0;
-    const c = stressColor(stress, color);
-    const reset = color ? ANSI.reset : "";
-    const bar10 = hasStress
+    const stress    = hasStress ? r.stress : 0;
+    const c         = stressColor(stress, color);
+    const reset     = color ? ANSI.reset : "";
+    const bar10     = hasStress
       ? `${c}${bar(stress / 100)}${reset}`
       : paint("──────────", ANSI.dim, color);
-    const pct = hasStress ? `${lpad(stress.toFixed(1), 5)}%` : `   — `;
+    const pct      = hasStress ? `${lpad(stress.toFixed(1), 5)}%` : `   — `;
     const skillsStr = formatSkills(r.skills);
-    const skillCol = skillsStr ? paint(skillsStr, ANSI.dim, color) : paint("no skills", ANSI.dim, color);
+    const skillCol  = skillsStr ? paint(skillsStr, ANSI.dim, color) : paint("no skills", ANSI.dim, color);
     return `  ${fit(r.name ?? "(unnamed)", 24)} ${bar10} ${pct}   ${skillCol}`;
   });
   return [header, ...lines].join("\n");
@@ -227,9 +170,6 @@ const ROMAN = ["", "I", "II", "III", "IV", "V"];
  * Convert a comma-separated skills string from GROUP_CONCAT into a compact
  * human-readable label. Groups skills by branch and keeps only the highest
  * level per branch. E.g. "Building1,Building2,Mining1" → "Builder II, Miner I".
- *
- * @param {string|null} raw
- * @returns {string}
  */
 function formatSkills(raw) {
   if (!raw) return "";
@@ -238,7 +178,7 @@ function formatSkills(raw) {
     const m = skill.match(/^([A-Za-z]+?)(\d+)?$/);
     if (!m) continue;
     const branch = m[1].toLowerCase();
-    const level = m[2] ? Number(m[2]) : 1;
+    const level  = m[2] ? Number(m[2]) : 1;
     if (!bestLevel.has(branch) || level > bestLevel.get(branch)) {
       bestLevel.set(branch, level);
     }
@@ -257,21 +197,14 @@ export function renderFreshness(db, { color = false } = {}) {
   const meta = readMeta(db);
   if (!meta.parsedAt) return paint("(no parsed_at stamp — older watcher version?)", ANSI.dim, color);
 
-  const ageMs = Date.now() - new Date(meta.parsedAt).getTime();
-  const seconds = Math.floor(ageMs / 1000);
-  let human;
-  if (seconds < 90) human = `${seconds}s ago`;
-  else if (seconds < 5400) human = `${Math.floor(seconds / 60)}m ago`;
-  else if (seconds < 86400) human = `${Math.floor(seconds / 3600)}h ago`;
-  else human = `${Math.floor(seconds / 86400)}d ago`;
-
+  const seconds   = Math.floor((Date.now() - new Date(meta.parsedAt).getTime()) / 1000);
   const sourceTail = meta.sourceFile ? meta.sourceFile.split(/[\\/]/).pop() : "?";
-  return paint(`Parsed ${human} from ${sourceTail}`, ANSI.dim, color);
+  return paint(`Parsed ${formatAge(seconds)} from ${sourceTail}`, ANSI.dim, color);
 }
 
 /** Compose the full status block. */
 export function render(db, opts = {}) {
-  const sections = [
+  return [
     renderBanner(db, opts),
     "",
     renderHeadCounts(db, opts),
@@ -282,19 +215,5 @@ export function render(db, opts = {}) {
     renderStockpile(db, opts),
     "",
     renderDupes(db, opts),
-  ];
-  return sections.join("\n");
-}
-
-/**
- * Format a mass in raw ONI "units" (which are kg) into a compact string.
- * Tiers: kg → t (tonnes, 1000 kg) → kt (kilotonnes, 1000 t).
- */
-function formatMass(units) {
-  if (units == null) return "?";
-  const u = Number(units);
-  if (Number.isNaN(u)) return "?";
-  if (u >= 1_000_000) return `${(u / 1_000_000).toFixed(2)} kt`;
-  if (u >= 1_000) return `${(u / 1_000).toFixed(2)} t`;
-  return `${u.toFixed(0)} kg`;
+  ].join("\n");
 }

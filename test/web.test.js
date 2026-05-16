@@ -49,6 +49,22 @@ describe("GET /", () => {
     assert.match(body, /<!doctype html>/i);
   });
 
+  test("/app.js serves with application/javascript content-type", async () => {
+    const res = await fetch(`${baseUrl}/app.js`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type"), /javascript/);
+    const body = await res.text();
+    assert.match(body, /refresh/); // app.js defines a refresh() function
+  });
+
+  test("/styles.css serves with text/css content-type", async () => {
+    const res = await fetch(`${baseUrl}/styles.css`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type"), /text\/css/);
+    const body = await res.text();
+    assert.match(body, /--bg/); // styles.css defines CSS custom properties
+  });
+
   test("unknown path 404s", async () => {
     const res = await fetch(`${baseUrl}/nope`);
     assert.equal(res.status, 404);

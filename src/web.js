@@ -66,6 +66,8 @@ export function startWeb({ port = 8080, host = "127.0.0.1", outputDir }) {
       if (url === "/api/events")  return serveEvents(res);
       if (url === "/api/status")  return serveStatus(res, outputDir);
       if (url === "/" || url === "/index.html") return serveStatic(res, "index.html");
+      if (url === "/app.js")    return serveStatic(res, "app.js");
+      if (url === "/styles.css") return serveStatic(res, "styles.css");
       res.writeHead(404, { "Content-Type": "text/plain" });
       res.end("not found");
     } catch (err) {
@@ -115,7 +117,11 @@ async function serveStatic(res, filename) {
     return;
   }
   const body = await readFile(path);
-  const contentType = filename.endsWith(".html") ? "text/html; charset=utf-8" : "text/plain; charset=utf-8";
+  const contentType =
+    filename.endsWith(".html") ? "text/html; charset=utf-8" :
+    filename.endsWith(".js")   ? "application/javascript; charset=utf-8" :
+    filename.endsWith(".css")  ? "text/css; charset=utf-8" :
+    "text/plain; charset=utf-8";
   res.writeHead(200, { "Content-Type": contentType, "Cache-Control": "no-cache" });
   res.end(body);
 }
