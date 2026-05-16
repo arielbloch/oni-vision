@@ -63,18 +63,19 @@
   table { width: 100%; border-collapse: collapse; font-family: var(--mono); }
   td { padding: 4px 6px; vertical-align: middle; }
   td.name { width: 20%; white-space: nowrap; }
-  td.bar { width: 26%; padding-right: 12px; }
-  td.pct { width: 8%; text-align: right; color: var(--fg-dim); }
+  td.bar { width: 22%; padding-right: 12px; }
+  td.pct { width: 7%; text-align: right; color: var(--fg-dim); }
   td.skills { color: var(--fg-dim); font-size: 12px; width: 20%; }
-  td.focus { font-size: 11px; width: 26%; }
+  td.focus { font-size: 11px; width: 31%; }
+  /* p5 = highest (Attacking/Toggling): yellow like the header hi-color */
   .focus-tag {
     display: inline-block; padding: 1px 5px; border-radius: 3px; margin: 1px 2px 1px 0;
-    background: rgba(127,119,221,0.15); color: var(--accent);
-    border: 1px solid rgba(127,119,221,0.3);
+    background: rgba(251,146,60,0.15); color: #fb923c;
+    border: 1px solid rgba(251,146,60,0.35);
   }
   .focus-tag.p5 {
-    background: rgba(74,222,128,0.15); color: var(--good);
-    border-color: rgba(74,222,128,0.35);
+    background: rgba(250,204,21,0.15); color: var(--hi);
+    border-color: rgba(250,204,21,0.4);
   }
   td.metric { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
@@ -198,20 +199,25 @@
   }
 
   /**
-   * Convert a comma-separated skills string (GROUP_CONCAT output) into a
-   * compact human-readable label, e.g. "Mining1,Mining2,Building1" → "Miner II, Builder I".
-   * Groups by branch prefix, keeps highest level per branch.
+   * Parse a comma-separated skills string into { label, moraleCost }.
+   * e.g. "Mining1,Mining2,Building1" →
+   *   { label: "Miner II, Builder I", moraleCost: 4 }
+   * Morale cost = sum of tier numbers (Mining1=1, Building2=2, etc.).
+   * Note: raw morale available isn't in the save file (runtime-computed),
+   * so we show only what skills cost.
    */
-  function formatSkills(raw) {
-    if (!raw) return "";
+  function parseSkills(raw) {
+    if (!raw) return { label: "", moraleCost: 0 };
     const bestLevel = {};
+    let moraleCost = 0;
     for (const skill of raw.split(",")) {
       const m = skill.match(/^([A-Za-z]+?)(\d+)?$/);
       if (!m) continue;
       const branch = m[1].toLowerCase();
-      const level = m[2] ? Number(m[2]) : 1;
-      if (!(branch in bestLevel) || level > bestLevel[branch]) {
-        bestLevel[branch] = level;
+      const tier = m[2] ? Number(m[2]) : 1;
+      moraleCost += tier;
+      if (!(branch in bestLevel) || tier > bestLevel[branch]) {
+        bestLevel[branch] = tier;
       }
     }
     const parts = [];
@@ -220,7 +226,7 @@
       const roman = ROMAN[level] ?? String(level);
       parts.push(roman ? `${label} ${roman}` : label);
     }
-    return parts.join(", ");
+    return { label: parts.join(", "), moraleCost };
   }
 
   // ── DOM helpers ──────────────────────────────────────────────────────────────
@@ -299,7 +305,18 @@
       const barCell = r.stress == null
         ? `<div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--bg-elev)"></div></div>`
         : bar(r.stress);
-      const skillsLabel = formatSkills(r.skills);
+      const { label: skillsLabel, moraleCost } = parseSkills(r.skills);
+      const sp = r.skill_points ?? 0;
+      // Skill points badge: highlight if ≥1 unspent point so user notices
+      const spBadge = `<span style="margin-left:4px;padding:1px 5px;border-radius:3px;font-size:11px;font-weight:600;${
+        sp > 0
+          ? "background:rgba(250,204,21,0.18);color:#facc15;border:1px solid rgba(250,204,21,0.4)"
+          : "background:rgba(255,255,255,0.05);color:var(--fg-muted);border:1px solid rgba(255,255,255,0.08)"
+      }">${sp} SP</span>`;
+      // Skills cell: SP badge + skill names + morale cost
+      const skillsCell = skillsLabel
+        ? `${spBadge} ${escapeHtml(skillsLabel)}<span style="color:var(--fg-muted);margin-left:6px">${moraleCost} morale</span>`
+        : `${spBadge} <span style="color:var(--fg-muted)">no skills</span>`;
       const badges = (r.effects ?? [])
         .map(e => BAD_EFFECTS[e])
         .filter(Boolean)
@@ -311,12 +328,13 @@
           return `<span class="${cls}">${escapeHtml(f.label)}</span>`;
         })
         .join("");
+      // Column order: name | focus (roles) | skills+morale | stress
       return `<tr>
         <td class="name">${escapeHtml(r.name ?? "(unnamed)")}${badges}</td>
+        <td class="focus">${focusTags || '<span style="color:var(--fg-muted)">—</span>'}</td>
+        <td class="skills">${skillsCell}</td>
         <td class="bar">${barCell}</td>
         <td class="pct">${pct}</td>
-        <td class="skills">${escapeHtml(skillsLabel)}</td>
-        <td class="focus">${focusTags || '<span style="color:var(--fg-muted)">—</span>'}</td>
       </tr>`;
     }).join("");
     setHTML("dupes-card", `<table><tbody>${html}</tbody></table>`);

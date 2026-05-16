@@ -202,10 +202,27 @@ function serveStatus(res, outputDir) {
       focusByName.get(row.name).push({ group: row.chore_group, label: row.label, priority: row.priority });
     }
 
+    // Per-dupe unspent skill points.
+    // ONI formula: cumulative XP threshold for n points = 1000*n*(n+1)/2
+    // → n = floor((-1 + sqrt(1 + 8*xp/1000)) / 2)
+    // Spent = number of mastered skills; available = max(0, earned - spent).
+    const skillPtsByName = new Map();
+    for (const row of db.prepare(
+      `SELECT d.name,
+              MAX(0, CAST((-1 + SQRT(1 + 8.0 * d.total_experience / 1000)) / 2 AS INTEGER)
+                  - COUNT(ds.skill)) AS skill_points
+       FROM duplicants d
+       LEFT JOIN duplicant_skills ds ON ds.duplicant_id = d.game_object_id
+       GROUP BY d.game_object_id`
+    ).all()) {
+      skillPtsByName.set(row.name, row.skill_points ?? 0);
+    }
+
     for (const dupe of payload.top_dupes) {
-      dupe.skills  = skillsByName.get(dupe.name)  ?? null;
-      dupe.effects = effectsByName.get(dupe.name) ?? [];
-      dupe.focus   = focusByName.get(dupe.name)   ?? [];
+      dupe.skills       = skillsByName.get(dupe.name)   ?? null;
+      dupe.effects      = effectsByName.get(dupe.name)  ?? [];
+      dupe.focus        = focusByName.get(dupe.name)    ?? [];
+      dupe.skill_points = skillPtsByName.get(dupe.name) ?? 0;
     }
 
     // ── Geysers: individual rows with quality rolls ───────────────────────────
