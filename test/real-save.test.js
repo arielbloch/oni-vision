@@ -28,7 +28,7 @@ import { ELEMENT_NAMES } from "../src/elements.js";
 import { GEYSER_TYPE_NAMES } from "../src/geyser_types.js";
 import { FOOD_META } from "../src/food.js";
 import { EFFECT_LABELS } from "../src/effects.js";
-import { SKILL_LABELS } from "../src/ui.js";
+import { SKILL_LABELS } from "../src/skills.js";
 import { statusObject } from "../oni-vision-plugin/lib/queries.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -65,7 +65,7 @@ describe("real ONI save end-to-end", { skip: skipReason }, () => {
     tables.geyser_type_names = GEYSER_TYPE_NAMES;
     tables.food_meta = FOOD_META;
     tables.effect_labels = EFFECT_LABELS;
-    tables.skill_labels = [...SKILL_LABELS.entries()].map(([branch, label]) => ({ branch, label }));
+    tables.skill_labels = SKILL_LABELS;
     writeDatabase(dbPath, tables);
     db = new DatabaseSync(dbPath, { readOnly: true });
   });

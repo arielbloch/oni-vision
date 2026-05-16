@@ -88,6 +88,31 @@ SELECT trait FROM duplicant_traits  WHERE duplicant_id = (SELECT game_object_id 
 SELECT skill  FROM duplicant_skills WHERE duplicant_id = (SELECT game_object_id FROM duplicants WHERE name='Meep');
 ```
 
+## Lookup tables
+
+Five static tables written once per parse let you resolve SimHash integers to human-readable names in any query:
+
+| Table | Key column | Name column | Use for |
+|-------|-----------|-------------|---------|
+| `element_names(element_id, name)` | `element_id` (INTEGER) | `name` | elements in `world_objects`, `storage_contents`, `buildings` |
+| `geyser_type_names(type_id, name)` | `type_id` (INTEGER) | `name` | geysers |
+| `food_meta(prefab_id, name, kcal, morale)` | `prefab_id` (TEXT) | `name` | food in `storage_contents` |
+| `effect_labels(effect, label, severity)` | `effect` (TEXT) | `label` | dupe status effects |
+| `skill_labels(branch, label)` | `branch` (TEXT) | `label` | skill branches |
+
+**Example — elements by mass with human-readable names:**
+
+```sql
+SELECT en.name, ROUND(SUM(sc.units), 0) AS total_kg
+FROM storage_contents sc
+JOIN element_names en ON en.element_id = sc.element_id
+GROUP BY sc.element_id
+ORDER BY total_kg DESC
+LIMIT 10;
+```
+
+Without the JOIN you get raw SimHash integers like `1836671383` (= Water). Always JOIN against the lookup table for readable output.
+
 ## When to fall back to JSON
 
 `current.json` has the save header (`gameInfo` — cycle, base name, version), `settings` (game/sandbox state), and a stripped `gameData` (with the giant binary blobs replaced by markers). Read it only when the question is clearly about save metadata or game settings.

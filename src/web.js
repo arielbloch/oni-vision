@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
 import { statusObject } from "../oni-vision-plugin/lib/queries.js";
+import { THRESHOLDS } from "./thresholds.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(HERE, "web");
@@ -177,6 +178,13 @@ function serveStatus(res, outputDir) {
       skillsByName.set(row.name, row.skills ?? null);
     }
 
+    const moraleCostByName = new Map();
+    for (const row of db.prepare(
+      `SELECT name, morale_cost FROM duplicants`
+    ).all()) {
+      moraleCostByName.set(row.name, row.morale_cost ?? 0);
+    }
+
     const effectsByName = new Map();
     for (const row of db.prepare(
       `SELECT d.name, de.effect
@@ -204,9 +212,10 @@ function serveStatus(res, outputDir) {
 
 
     for (const dupe of payload.top_dupes) {
-      dupe.skills  = skillsByName.get(dupe.name)  ?? null;
-      dupe.effects = effectsByName.get(dupe.name) ?? [];
-      dupe.focus   = focusByName.get(dupe.name)   ?? [];
+      dupe.skills      = skillsByName.get(dupe.name)      ?? null;
+      dupe.effects     = effectsByName.get(dupe.name)     ?? [];
+      dupe.focus       = focusByName.get(dupe.name)       ?? [];
+      dupe.morale_cost = moraleCostByName.get(dupe.name)  ?? 0;
     }
 
     // ── Geysers: individual rows with quality rolls ───────────────────────────
@@ -286,6 +295,9 @@ function serveStatus(res, outputDir) {
       db.prepare("SELECT branch, label FROM skill_labels").all(),
       "branch", "label"
     );
+
+    // Game-rule constants from the single source of truth in src/thresholds.js.
+    payload.thresholds = THRESHOLDS;
 
     res.writeHead(200, {
       "Content-Type": "application/json",

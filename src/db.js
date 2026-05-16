@@ -61,7 +61,8 @@ const SCHEMA = [
      decor REAL,
      immune REAL,
      temperature_dupe REAL,
-     body_temperature REAL
+     body_temperature REAL,
+     morale_cost INTEGER
    )`,
   `CREATE TABLE duplicant_traits (
      duplicant_id INTEGER NOT NULL,
@@ -242,6 +243,7 @@ export const TABLE_COLUMNS = {
     "total_experience", "position_x", "position_y",
     "stress", "calories", "stamina", "bladder", "breath",
     "hp", "decor", "immune", "temperature_dupe", "body_temperature",
+    "morale_cost",
   ],
   duplicant_traits: ["duplicant_id", "trait"],
   duplicant_skills: ["duplicant_id", "skill"],

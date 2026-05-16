@@ -11,6 +11,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import { extractAll } from "../src/extractors.js";
 import { writeDatabase, TABLE_COLUMNS } from "../src/db.js";
+import { buildFakeTables } from "./helpers.js";
 import { FAKE_SAVE } from "./fixture.js";
 
 function buildDb() {
@@ -219,6 +220,73 @@ describe("round-trip queries", () => {
     withDb((db) => {
       const species = db.prepare("SELECT prefab_id FROM critters ORDER BY prefab_id").all().map((r) => r.prefab_id);
       assert.deepEqual(species, ["Hatch", "Pip"]);
+    });
+  });
+
+  test("duplicants table includes morale_cost computed from mastered skills", () => {
+    withDb((db) => {
+      const row = db.prepare("SELECT name, morale_cost FROM duplicants WHERE name = 'Meep'").get();
+      assert.ok(row, "Meep should be in duplicants");
+      // Meep has Mining1 mastered (tier 1) → morale_cost = 1
+      assert.equal(row.morale_cost, 1);
+    });
+  });
+});
+
+describe("lookup-table round-trips", () => {
+  function buildLookupDb() {
+    const tables = buildFakeTables({ includeLookupTables: true });
+    const dir = mkdtempSync(join(tmpdir(), "oni-lookup-test-"));
+    const dbPath = join(dir, "lookup.sqlite");
+    writeDatabase(dbPath, tables);
+    return new DatabaseSync(dbPath);
+  }
+
+  function withLookupDb(fn) {
+    const db = buildLookupDb();
+    try { return fn(db); } finally { db.close(); }
+  }
+
+  test("element_names resolves Water SimHash (1836671383) to 'Water'", () => {
+    withLookupDb((db) => {
+      const row = db.prepare("SELECT name FROM element_names WHERE element_id = 1836671383").get();
+      assert.ok(row, "element_names should contain Water's SimHash");
+      assert.equal(row.name, "Water");
+    });
+  });
+
+  test("geyser_type_names resolves Steam Vent hash (-899515856) to 'Steam Vent'", () => {
+    withLookupDb((db) => {
+      const row = db.prepare("SELECT name FROM geyser_type_names WHERE type_id = -899515856").get();
+      assert.ok(row, "geyser_type_names should contain Steam Vent hash");
+      assert.equal(row.name, "Steam Vent");
+    });
+  });
+
+  test("JOIN geyser_type_names against geysers resolves geyser names", () => {
+    withLookupDb((db) => {
+      const rows = db.prepare(
+        `SELECT g.type_id, gtn.name
+         FROM geysers g
+         JOIN geyser_type_names gtn ON gtn.type_id = g.type_id
+         ORDER BY g.type_id`
+      ).all();
+      assert.ok(rows.length > 0, "JOIN should return at least one geyser row");
+      for (const r of rows) {
+        assert.ok(r.name, `type_id ${r.type_id} should resolve to a geyser name`);
+      }
+      // FAKE_SAVE has -899515856 (Steam Vent) and -1592417549 (Volcano)
+      const steam = rows.find(r => r.type_id === -899515856);
+      assert.ok(steam, "Steam Vent should be in the JOIN result");
+      assert.equal(steam.name, "Steam Vent");
+    });
+  });
+
+  test("skill_labels covers the 'mining' branch", () => {
+    withLookupDb((db) => {
+      const row = db.prepare("SELECT label FROM skill_labels WHERE branch = 'mining'").get();
+      assert.ok(row, "skill_labels should include 'mining'");
+      assert.equal(row.label, "Miner");
     });
   });
 });

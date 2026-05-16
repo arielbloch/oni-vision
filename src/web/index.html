@@ -232,26 +232,21 @@
     return GEYSER_NAMES[key] ?? `hash:${key}`;
   }
 
-  /**
-   * Sum the morale cost of a comma-separated mastered-skills string.
-   * Each skill's tier number (e.g. Mining2 → 2, Hauling1 → 1) contributes
-   * directly to the morale cost shown in-game.
-   * Morale available is runtime-computed and not stored in the save.
-   */
-  function moraleCostOf(raw) {
-    if (!raw) return 0;
-    let cost = 0;
-    for (const skill of raw.split(",")) {
-      const m = skill.match(/\d+$/);
-      cost += m ? Number(m[0]) : 1;
-    }
-    return cost;
-  }
-
   // ── DOM helpers ──────────────────────────────────────────────────────────────
 
-  const POLL_MS = 10000;        // polling fallback (SSE is the primary push path)
-  const STALE_AFTER_S = 600;   // 10 minutes — UI flips dot to "stale"
+  const POLL_MS = 10000;  // polling fallback (SSE is the primary push path)
+
+  // Game-rule thresholds — defaults mirror src/thresholds.js; overwritten from
+  // /api/status on every refresh so the frontend is always in sync.
+  let T = {
+    stale_after_s:       600,
+    stress_warn:          30,
+    stress_bad:           60,
+    geyser_quality_good:  70,
+    geyser_quality_warn:  40,
+    morale_bar_max:       20,
+    priority_boost:        5,
+  };
 
   function $(id) { return document.getElementById(id); }
   function setText(id, t) { const el = $(id); if (el) el.textContent = t; }
@@ -285,7 +280,7 @@
 
   function bar(pct) {
     const v = Math.max(0, Math.min(100, Number(pct) || 0));
-    const cls = v >= 60 ? "high" : v >= 30 ? "med" : "";
+    const cls = v >= T.stress_bad ? "high" : v >= T.stress_warn ? "med" : "";
     return `<div class="bar-track"><div class="bar-fill ${cls}" style="width: ${v}%"></div></div>`;
   }
 
@@ -314,9 +309,6 @@
     ).join(""));
   }
 
-  // Max morale cost used to scale the morale bar (cap at 20 for display).
-  const MORALE_BAR_MAX = 20;
-
   function renderDupes(rows) {
     if (!rows || rows.length === 0) {
       setHTML("dupes-card", `<div class="empty">no duplicants in this save</div>`);
@@ -326,8 +318,7 @@
       const stressBar = r.stress == null
         ? `<div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--bg-elev)"></div></div>`
         : bar(r.stress);
-      const cost = moraleCostOf(r.skills);
-      const moralePct = Math.min(100, Math.round(cost / MORALE_BAR_MAX * 100));
+      const moralePct = Math.min(100, Math.round((r.morale_cost ?? 0) / T.morale_bar_max * 100));
       const moraleBar = `<div class="bar-track"><div class="bar-fill" style="width:${moralePct}%;background:var(--good)"></div></div>`;
       const badges = (r.effects ?? [])
         .map(e => BAD_EFFECTS[e])
@@ -339,7 +330,7 @@
         .sort((a, b) => (CHORE_META[a.group]?.order ?? 99) - (CHORE_META[b.group]?.order ?? 99))
         .map(f => {
           const meta = CHORE_META[f.group] ?? { domain: "tangerine", abbr: "?" };
-          const pri  = f.priority >= 5 ? "p5" : "p4";
+          const pri  = f.priority >= T.priority_boost ? "p5" : "p4";
           return `<span class="ft ${pri} ft-${meta.domain}">${meta.abbr}</span>`;
         })
         .join("");
@@ -366,7 +357,7 @@
     }
     const html = rows.map(r => {
       const quality = Math.round(((Number(r.rate_roll) + Number(r.year_percent_roll)) / 2) * 100);
-      const cls = quality >= 70 ? "" : quality >= 40 ? "med" : "high"; // reuse stress bar colours inverted
+      const cls = quality >= T.geyser_quality_good ? "" : quality >= T.geyser_quality_warn ? "med" : "high";
       return `<tr>
         <td style="font-size:12px">${escapeHtml(geyserName(r.type_id))}</td>
         <td class="bar" style="width:50%">
@@ -533,18 +524,19 @@
       const age = data.age_seconds;
       if (age == null) {
         setLiveness("cold", "no parse yet");
-      } else if (age >= STALE_AFTER_S) {
+      } else if (age >= T.stale_after_s) {
         setLiveness("stale", `parsed ${fmtAge(age)} (stale)`);
       } else {
         setLiveness("live", `parsed ${fmtAge(age)}`);
       }
 
-      // Populate lookup tables from the DB-backed API response.
+      // Populate lookup tables and thresholds from the DB-backed API response.
       if (data.element_names)     ELEMENT_NAMES = data.element_names;
       if (data.geyser_type_names) GEYSER_NAMES  = data.geyser_type_names;
       if (data.food_meta)         FOOD          = data.food_meta;
       if (data.effect_labels)     BAD_EFFECTS   = data.effect_labels;
       if (data.skill_labels)      SKILL_LABELS  = data.skill_labels;
+      if (data.thresholds)        T             = { ...T, ...data.thresholds };
 
       renderCounts(data.counts || {});
       renderDupes(data.top_dupes || []);

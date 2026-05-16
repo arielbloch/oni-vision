@@ -105,6 +105,22 @@ describe("GET /api/status", () => {
       "skill_labels should be a non-null object");
     assert.equal(body.skill_labels["mining"], "Miner",
       "skill_labels should resolve mining branch");
+
+    // Thresholds block.
+    assert.ok(body.thresholds && typeof body.thresholds === "object",
+      "thresholds should be a non-null object");
+    assert.equal(body.thresholds.stale_after_s, 600,
+      "stale_after_s should be 600 seconds");
+    assert.equal(body.thresholds.morale_bar_max, 20,
+      "morale_bar_max should be 20");
+    assert.equal(body.thresholds.stress_bad, 60,
+      "stress_bad should be 60");
+
+    // morale_cost on top_dupes.
+    const meep = body.top_dupes.find(d => d.name === "Meep");
+    assert.ok(meep, "Meep should be in top_dupes");
+    assert.equal(meep.morale_cost, 1,
+      "Meep has Mining1 mastered → morale_cost = 1");
   });
 
   test("returns 503 with a structured error when current.sqlite is missing", async () => {

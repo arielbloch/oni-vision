@@ -7,6 +7,10 @@
 // whether to enable color based on stdout.isTTY and NO_COLOR.
 
 import { elementName } from "./elements.js";
+import { SKILL_LABELS as SKILL_LABELS_ARRAY } from "./skills.js";
+
+// Build a Map once for O(1) lookup in formatSkills.
+const SKILL_LABEL_MAP = new Map(SKILL_LABELS_ARRAY.map(({ branch, label }) => [branch, label]));
 
 const ANSI = {
   reset: "\x1b[0m",
@@ -217,26 +221,6 @@ export function renderDupes(db, { color = false, limit = 12 } = {}) {
   return [header, ...lines].join("\n");
 }
 
-// Skill branch labels (prefix → display name).
-export const SKILL_LABELS = new Map([
-  ["mining",       "Miner"],
-  ["building",     "Builder"],
-  ["researching",  "Researcher"],
-  ["farming",      "Farmer"],
-  ["cooking",      "Cook"],
-  ["ranching",     "Rancher"],
-  ["arting",       "Artist"],
-  ["doctoring",    "Medic"],
-  ["hauling",      "Hauler"],
-  ["suit",         "Suit"],
-  ["power",        "Engineer"],
-  ["plumbing",     "Plumber"],
-  ["hvac",         "HVAC"],
-  ["rocketry",     "Rocketry"],
-  ["farming2",     "Botanist"],  // DLC branch
-  ["spaceanalysis","Space"],
-]);
-
 const ROMAN = ["", "I", "II", "III", "IV", "V"];
 
 /**
@@ -261,7 +245,7 @@ function formatSkills(raw) {
   }
   const parts = [];
   for (const [branch, level] of bestLevel) {
-    const label = SKILL_LABELS.get(branch) ?? (branch.charAt(0).toUpperCase() + branch.slice(1));
+    const label = SKILL_LABEL_MAP.get(branch) ?? (branch.charAt(0).toUpperCase() + branch.slice(1));
     const roman = ROMAN[level] ?? String(level);
     parts.push(roman ? `${label} ${roman}` : label);
   }

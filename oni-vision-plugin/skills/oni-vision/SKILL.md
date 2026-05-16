@@ -73,6 +73,29 @@ Food items currently in colony storage, with display name, kcal per item, morale
 ### `oni_query({ sql, params?, format? })`
 SELECT-only escape hatch over the whole DB schema. Reject any non-SELECT statement; multiple statements aren't allowed either. **Caveat:** a trailing semicolon is silently stripped, but an interior semicolon anywhere in the string is rejected (so `WHERE name = ';'` will fail — avoid interior semicolons entirely). Use `format: "tsv"` for large tabular returns.
 
+### Lookup tables
+
+Five static tables resolve SimHash integers to human-readable strings. Always JOIN against them when querying element IDs or geyser type IDs:
+
+| Table | Key → value |
+|-------|------------|
+| `element_names(element_id, name)` | SimHash → element name (Water, Algae, …) |
+| `geyser_type_names(type_id, name)` | SimHash → geyser name (Steam Vent, Volcano, …) |
+| `food_meta(prefab_id, name, kcal, morale)` | prefab → food display name + nutrition |
+| `effect_labels(effect, label, severity)` | effect string → readable label + severity |
+| `skill_labels(branch, label)` | branch prefix → display name |
+
+**Example — stored resources with readable names:**
+
+```sql
+SELECT en.name, ROUND(SUM(sc.units), 0) AS kg
+FROM storage_contents sc
+JOIN element_names en ON en.element_id = sc.element_id
+GROUP BY sc.element_id ORDER BY kg DESC LIMIT 10;
+```
+
+Without the JOIN, `element_id` returns raw integers like `1836671383` that the model cannot interpret.
+
 ### Schema crib for `oni_query`
 
 | Table | Key columns |

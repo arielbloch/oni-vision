@@ -37,6 +37,7 @@ import {
 
 import { safeStringify } from "./utils.js";
 import { CHORE_GROUP_BY_HASH } from "./chore_groups.js";
+import { moraleCostOf } from "./skills.js";
 
 const PREFAB_DUPLICANT = "Minion";
 
@@ -174,6 +175,12 @@ function extractDuplicant(go, goId, instanceId, tables) {
     amountByName[a.name] = a?.value?.value ?? null;
   }
 
+  // Collect mastered skills up front so we can compute morale_cost before
+  // pushing the duplicant row (it's a single-pass scan of MasteryBySkillID).
+  const masteredSkills = (resume.MasteryBySkillID ?? [])
+    .filter(([, mastered]) => mastered)
+    .map(([skillId]) => skillId);
+
   tables.duplicants.push({
     game_object_id: goId,
     instance_id: instanceId,
@@ -196,6 +203,7 @@ function extractDuplicant(go, goId, instanceId, tables) {
     immune: amountByName.ImmuneLevel ?? amountByName.Immune ?? null,
     temperature_dupe: amountByName.Temperature ?? null,
     body_temperature: amountByName.BodyTemperature ?? null,
+    morale_cost: moraleCostOf(masteredSkills.join(",")),
   });
 
   for (const trait of findBehavior(go, AITraitsBehavior)?.templateData?.TraitIds ?? []) {
@@ -203,8 +211,8 @@ function extractDuplicant(go, goId, instanceId, tables) {
   }
 
   // Skills the dupe has mastered (true value means mastered).
-  for (const [skillId, mastered] of resume.MasteryBySkillID ?? []) {
-    if (mastered) tables.duplicant_skills.push({ duplicant_id: goId, skill: skillId });
+  for (const skillId of masteredSkills) {
+    tables.duplicant_skills.push({ duplicant_id: goId, skill: skillId });
   }
 
   for (const lvl of findBehavior(go, AIAttributeLevelsBehavior)?.templateData?.saveLoadLevels ?? []) {

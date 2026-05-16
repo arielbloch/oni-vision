@@ -11,7 +11,8 @@ import { parseSaveFile } from "./parser.js";
 import { extractAll } from "./extractors.js";
 import { writeDatabase } from "./db.js";
 import { makeReplacer } from "./utils.js";
-import { render, SKILL_LABELS } from "./ui.js";
+import { render } from "./ui.js";
+import { SKILL_LABELS } from "./skills.js";
 // Static lookup tables written into current.sqlite so both web and MCP
 // consumers can resolve human-readable names via SQL JOINs.
 import { ELEMENT_NAMES } from "./elements.js";
@@ -79,7 +80,7 @@ export async function buildOutputs({ savePath, outputDir }) {
   tables.geyser_type_names = GEYSER_TYPE_NAMES;
   tables.food_meta = FOOD_META;
   tables.effect_labels = EFFECT_LABELS;
-  tables.skill_labels = [...SKILL_LABELS.entries()].map(([branch, label]) => ({ branch, label }));
+  tables.skill_labels = SKILL_LABELS;
   tables.chore_group_names = CHORE_GROUP_NAMES;
   const tExtracted = Date.now();
   console.log(
