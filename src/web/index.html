@@ -70,18 +70,22 @@
        color: var(--fg-dim); padding: 2px 6px 6px; text-align: left; }
   /* Abbreviated text tags — domain colour in left accent bar.
      Studio palette: cyan=physical · lavender=technical · pink=care · tangerine=combat.
-     Solid deep-fill tags — domain colour as background, light text. */
+     p4 = outline only; p5 = solid deep fill. */
   .ft {
     display: inline-flex; align-items: center;
     height: 20px; padding: 0 7px; margin: 0 2px 0 0;
-    border-radius: 4px; border: none;
+    border-radius: 4px; background: transparent;
     font-size: 11px; font-weight: 500; white-space: nowrap; vertical-align: middle;
   }
-  .ft.p5 { font-weight: 700; }
-  .ft-cyan      { background: #0e7490; color: #cffafe; }
-  .ft-lavender  { background: #6d28d9; color: #ede9fe; }
-  .ft-pink      { background: #be185d; color: #fce7f3; }
-  .ft-tangerine { background: #c2410c; color: #fff7ed; }
+  .ft.p4.ft-cyan      { border: 1.5px solid #22D3EE; color: #22D3EE; }
+  .ft.p4.ft-lavender  { border: 1.5px solid #A78BFA; color: #A78BFA; }
+  .ft.p4.ft-pink      { border: 1.5px solid #F472B6; color: #F472B6; }
+  .ft.p4.ft-tangerine { border: 1.5px solid #FB923C; color: #FB923C; }
+  .ft.p5 { border: none; font-weight: 700; }
+  .ft.p5.ft-cyan      { background: #0e7490; color: #cffafe; }
+  .ft.p5.ft-lavender  { background: #6d28d9; color: #ede9fe; }
+  .ft.p5.ft-pink      { background: #be185d; color: #fce7f3; }
+  .ft.p5.ft-tangerine { background: #c2410c; color: #fff7ed; }
   td.metric { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   .bar-track {
