@@ -77,16 +77,22 @@
     background: rgba(250,204,21,0.18); color: var(--hi);
     border-color: rgba(250,204,21,0.4);
   }
-  /* p5 = highest (Attacking/Toggling): yellow like the header hi-color */
-  .focus-tag {
-    display: inline-block; padding: 1px 5px; border-radius: 3px; margin: 1px 2px 1px 0;
-    background: rgba(251,146,60,0.15); color: #fb923c;
-    border: 1px solid rgba(251,146,60,0.35);
+  /* Focus tags — monochrome body, domain colour lives only in the left accent bar.
+     p4 = thin bar (2px), p5 = thick bar (3.5px) + bold.
+     Studio palette: cyan (physical) · lavender (technical) · pink (care) · tangerine (combat) */
+  .ft {
+    display: inline-block; padding: 1px 8px 1px 6px; margin: 1px 2px 1px 0;
+    border-radius: 0 4px 4px 0;
+    border-top: 0.5px solid var(--border); border-right: 0.5px solid var(--border);
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg-card); color: var(--fg);
   }
-  .focus-tag.p5 {
-    background: rgba(250,204,21,0.15); color: var(--hi);
-    border-color: rgba(250,204,21,0.4);
-  }
+  .ft.p4 { border-left: 2px solid;   }
+  .ft.p5 { border-left: 3.5px solid; font-weight: 600; }
+  .ft-cyan      { border-left-color: #22D3EE; }
+  .ft-lavender  { border-left-color: #A78BFA; }
+  .ft-pink      { border-left-color: #F472B6; }
+  .ft-tangerine { border-left-color: #FB923C; }
   td.metric { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   .bar-track {
@@ -193,6 +199,28 @@
   let FOOD             = {};  // prefab_id            → { name, kcal, morale }
   let SKILL_LABELS     = {};  // branch               → label
   const ROMAN = ["", "I", "II", "III", "IV", "V"];
+
+  // Domain colour for each chore group (Studio palette).
+  // Maps chore_group name (from DB) → CSS class suffix for .ft-{domain}.
+  // docs/frontend-design.md documents the full palette exploration.
+  const CHORE_DOMAIN = {
+    Dig:              "cyan",
+    Hauling:          "cyan",
+    Build:            "cyan",
+    Basekeeping:      "cyan",
+    Storage:          "cyan",
+    LifeSupport:      "cyan",
+    Research:         "lavender",
+    MachineOperating: "lavender",
+    Toggle:           "lavender",
+    Cook:             "pink",
+    MedicalAid:       "pink",
+    Art:              "pink",
+    Farming:          "pink",
+    Ranching:         "pink",
+    Combat:           "tangerine",
+    Unknown:          "tangerine",
+  };
 
   /** Resolve a numeric element_id to a display name. */
   function elementName(id) {
@@ -312,8 +340,9 @@
         .join("");
       const focusTags = (r.focus ?? [])
         .map(f => {
-          const cls = f.priority >= 5 ? "focus-tag p5" : "focus-tag";
-          return `<span class="${cls}">${escapeHtml(f.label)}</span>`;
+          const domain = CHORE_DOMAIN[f.group] ?? "tangerine";
+          const pri    = f.priority >= 5 ? "p5" : "p4";
+          return `<span class="ft ${pri} ft-${domain}">${escapeHtml(f.label)}</span>`;
         })
         .join("");
       // Column order: name | focus (roles) | skills+morale | stress
