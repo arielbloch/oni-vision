@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>oni-vision</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
 <style>
   :root {
     --bg: #09090f;
@@ -63,40 +64,30 @@
   table { width: 100%; border-collapse: collapse; font-family: var(--mono); }
   td { padding: 4px 6px; vertical-align: middle; }
   td.name { width: 20%; white-space: nowrap; }
-  td.bar { width: 22%; padding-right: 12px; }
-  td.pct { width: 7%; text-align: right; color: var(--fg-dim); }
-  td.skills { color: var(--fg-dim); font-size: 12px; width: 20%; }
-  td.focus { font-size: 11px; width: 31%; }
-  .sp-badge {
-    display: inline-block; padding: 1px 5px; border-radius: 3px;
-    font-size: 11px; font-weight: 600; margin-right: 4px;
-    background: rgba(255,255,255,0.04); color: var(--fg-dim);
-    border: 1px solid rgba(255,255,255,0.08);
-  }
-  .sp-badge.has-sp {
-    background: rgba(250,204,21,0.18); color: var(--hi);
-    border-color: rgba(250,204,21,0.4);
-  }
-  /* Focus tags — monochrome body, domain colour lives only in the left accent bar.
-     p4 = thin bar (2px), p5 = thick bar (3.5px) + bold.
-     Studio palette: cyan (physical) · lavender (technical) · pink (care) · tangerine (combat) */
-  /* Focus tags — monochrome body, domain colour in left accent bar only.
-     Avoid border-left shorthand: it resets border-left-color and would
-     override the domain colour rules (specificity: .ft.p4 > .ft-cyan). */
-  .ft {
-    display: inline-block; padding: 1px 8px 1px 6px; margin: 1px 2px 1px 0;
+  td.bar { width: 18%; padding-right: 8px; }
+  td.pct { width: 6%; text-align: right; color: var(--fg-dim); font-size: 11px; }
+  td.skills { color: var(--fg-dim); font-size: 12px; width: 14%; }
+  td.focus { width: 42%; }
+  /* Icon chips — domain colour in left accent bar, icon centred in chip.
+     Studio palette: cyan=physical · lavender=technical · pink=care · tangerine=combat.
+     Avoid border-left shorthand (resets border-left-color, breaks specificity). */
+  .fc {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; margin: 1px 2px 1px 0;
     border-radius: 0 4px 4px 0;
     border-top: 0.5px solid var(--border); border-right: 0.5px solid var(--border);
     border-bottom: 0.5px solid var(--border);
     border-left-style: solid;
     background: var(--bg-card); color: var(--fg);
+    cursor: default;
   }
-  .ft.p4 { border-left-width: 2px; }
-  .ft.p5 { border-left-width: 3.5px; font-weight: 600; }
-  .ft-cyan      { border-left-color: #22D3EE; }
-  .ft-lavender  { border-left-color: #A78BFA; }
-  .ft-pink      { border-left-color: #F472B6; }
-  .ft-tangerine { border-left-color: #FB923C; }
+  .fc i { font-size: 13px; pointer-events: none; }
+  .fc.p4 { border-left-width: 2px; }
+  .fc.p5 { border-left-width: 3.5px; }
+  .fc-cyan      { border-left-color: #22D3EE; }
+  .fc-lavender  { border-left-color: #A78BFA; }
+  .fc-pink      { border-left-color: #F472B6; }
+  .fc-tangerine { border-left-color: #FB923C; }
   td.metric { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   .bar-track {
@@ -201,29 +192,29 @@
   let GEYSER_NAMES     = {};  // type_id (string)    → name
   let BAD_EFFECTS      = {};  // effect string        → { label, cls }
   let FOOD             = {};  // prefab_id            → { name, kcal, morale }
-  let SKILL_LABELS     = {};  // branch               → label
-  const ROMAN = ["", "I", "II", "III", "IV", "V"];
+  let SKILL_LABELS     = {};  // branch → label (kept for potential future use)
 
-  // Domain colour for each chore group (Studio palette).
-  // Maps chore_group name (from DB) → CSS class suffix for .ft-{domain}.
-  // docs/frontend-design.md documents the full palette exploration.
-  const CHORE_DOMAIN = {
-    Dig:              "cyan",
-    Hauling:          "cyan",
-    Build:            "cyan",
-    Basekeeping:      "cyan",
-    Storage:          "cyan",
-    LifeSupport:      "cyan",
-    Research:         "lavender",
-    MachineOperating: "lavender",
-    Toggle:           "lavender",
-    Cook:             "pink",
-    MedicalAid:       "pink",
-    Art:              "pink",
-    Farming:          "pink",
-    Ranching:         "pink",
-    Combat:           "tangerine",
-    Unknown:          "tangerine",
+  // Domain + icon for each chore group (Studio palette).
+  // domain → .fc-{domain} CSS class (bar colour)
+  // icon   → Tabler icon name (ti-*)
+  // docs/frontend-design.md documents the full design exploration.
+  const CHORE_META = {
+    Dig:              { domain: "cyan",      icon: "ti-pickaxe"           },
+    Hauling:          { domain: "cyan",      icon: "ti-package"           },
+    Build:            { domain: "cyan",      icon: "ti-hammer"            },
+    Basekeeping:      { domain: "cyan",      icon: "ti-broom"             },
+    Storage:          { domain: "cyan",      icon: "ti-box"               },
+    LifeSupport:      { domain: "cyan",      icon: "ti-air-conditioning"  },
+    Research:         { domain: "lavender",  icon: "ti-flask"             },
+    MachineOperating: { domain: "lavender",  icon: "ti-settings"          },
+    Toggle:           { domain: "lavender",  icon: "ti-toggle-right"      },
+    Cook:             { domain: "pink",      icon: "ti-salad"             },
+    MedicalAid:       { domain: "pink",      icon: "ti-first-aid-kit"     },
+    Art:              { domain: "pink",      icon: "ti-palette"           },
+    Farming:          { domain: "pink",      icon: "ti-plant-2"           },
+    Ranching:         { domain: "pink",      icon: "ti-paw"               },
+    Combat:           { domain: "tangerine", icon: "ti-sword"             },
+    Unknown:          { domain: "tangerine", icon: "ti-question-mark"     },
   };
 
   /** Resolve a numeric element_id to a display name. */
@@ -333,26 +324,25 @@
         ? `<div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--bg-elev)"></div></div>`
         : bar(r.stress);
       const cost = moraleCostOf(r.skills);
-      const sp   = r.skill_points ?? 0;
-      const spBadge = `<span class="sp-badge${sp > 0 ? " has-sp" : ""}">${sp} SP</span>`;
-      // Skills cell: SP badge + morale cost (skill names removed per design)
-      const skillsCell = `${spBadge}<span style="color:var(--fg-dim)">${cost} morale</span>`;
+      // Skills cell: morale cost only (SP removed — XP→SP formula unresolved)
+      const skillsCell = `<span style="color:var(--fg-dim)">${cost} morale</span>`;
       const badges = (r.effects ?? [])
         .map(e => BAD_EFFECTS[e])
         .filter(Boolean)
         .map(e => `<span class="badge ${e.cls}">${escapeHtml(e.label)}</span>`)
         .join("");
-      const focusTags = (r.focus ?? [])
+      // Icon chips — one 22×22 chip per boosted chore group, tooltip = label
+      const chips = (r.focus ?? [])
         .map(f => {
-          const domain = CHORE_DOMAIN[f.group] ?? "tangerine";
-          const pri    = f.priority >= 5 ? "p5" : "p4";
-          return `<span class="ft ${pri} ft-${domain}">${escapeHtml(f.label)}</span>`;
+          const meta = CHORE_META[f.group] ?? { domain: "tangerine", icon: "ti-question-mark" };
+          const pri  = f.priority >= 5 ? "p5" : "p4";
+          return `<span class="fc ${pri} fc-${meta.domain}" title="${escapeHtml(f.label)}"><i class="ti ${meta.icon}" aria-hidden="true"></i></span>`;
         })
         .join("");
-      // Column order: name | focus (roles) | skills+morale | stress
+      // Column order: name | focus chips | morale cost | stress
       return `<tr>
         <td class="name">${escapeHtml(r.name ?? "(unnamed)")}${badges}</td>
-        <td class="focus">${focusTags || '<span style="color:var(--fg-muted)">—</span>'}</td>
+        <td class="focus">${chips || '<span style="color:var(--fg-muted)">—</span>'}</td>
         <td class="skills">${skillsCell}</td>
         <td class="bar">${barCell}</td>
         <td class="pct">${pct}</td>
