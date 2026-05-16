@@ -62,11 +62,12 @@
   .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-top: 10px; }
   table { width: 100%; border-collapse: collapse; font-family: var(--mono); }
   td { padding: 4px 6px; vertical-align: middle; }
-  td.name { width: 20%; white-space: nowrap; }
-  td.bar { width: 18%; padding-right: 8px; }
-  td.pct { width: 6%; text-align: right; color: var(--fg-dim); font-size: 11px; }
-  td.skills { color: var(--fg-dim); font-size: 12px; width: 14%; }
-  td.focus { width: 42%; white-space: nowrap; overflow: hidden; }
+  td.name { width: 22%; white-space: nowrap; }
+  td.bar  { width: 19%; padding-right: 8px; }
+  td.skills { width: 19%; padding-right: 8px; }
+  td.focus { width: 40%; white-space: nowrap; overflow: hidden; }
+  th { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+       color: var(--fg-dim); padding: 2px 6px 6px; text-align: left; }
   /* Abbreviated text tags — domain colour in left accent bar.
      Studio palette: cyan=physical · lavender=technical · pink=care · tangerine=combat.
      Use border-left-width/style separately to avoid shorthand clobbering the colour. */
@@ -89,7 +90,7 @@
   td.metric { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   .bar-track {
-    background: var(--bg-elev); height: 10px; border-radius: 3px; overflow: hidden;
+    background: var(--bg-elev); height: 15px; border-radius: 3px; overflow: hidden;
     border: 1px solid var(--border);
   }
   .bar-fill { height: 100%; background: var(--good); transition: width 0.3s; }
@@ -313,25 +314,26 @@
     ).join(""));
   }
 
+  // Max morale cost used to scale the morale bar (cap at 20 for display).
+  const MORALE_BAR_MAX = 20;
+
   function renderDupes(rows) {
     if (!rows || rows.length === 0) {
       setHTML("dupes-card", `<div class="empty">no duplicants in this save</div>`);
       return;
     }
     const html = rows.map(r => {
-      const pct = r.stress == null ? "—" : `${Number(r.stress).toFixed(1)}%`;
-      const barCell = r.stress == null
+      const stressBar = r.stress == null
         ? `<div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--bg-elev)"></div></div>`
         : bar(r.stress);
       const cost = moraleCostOf(r.skills);
-      // Skills cell: morale cost only (SP removed — XP→SP formula unresolved)
-      const skillsCell = `<span style="color:var(--fg-dim)">${cost} morale</span>`;
+      const moralePct = Math.min(100, Math.round(cost / MORALE_BAR_MAX * 100));
+      const moraleBar = `<div class="bar-track"><div class="bar-fill" style="width:${moralePct}%;background:var(--accent)"></div></div>`;
       const badges = (r.effects ?? [])
         .map(e => BAD_EFFECTS[e])
         .filter(Boolean)
         .map(e => `<span class="badge ${e.cls}">${escapeHtml(e.label)}</span>`)
         .join("");
-      // Abbreviated text tags — one per boosted chore group, single line
       const chips = (r.focus ?? [])
         .map(f => {
           const meta = CHORE_META[f.group] ?? { domain: "tangerine", abbr: "?" };
@@ -339,16 +341,20 @@
           return `<span class="ft ${pri} ft-${meta.domain}">${meta.abbr}</span>`;
         })
         .join("");
-      // Column order: name | focus tags | morale cost | stress
       return `<tr>
         <td class="name">${escapeHtml(r.name ?? "(unnamed)")}${badges}</td>
         <td class="focus">${chips || '<span style="color:var(--fg-muted)">—</span>'}</td>
-        <td class="skills">${skillsCell}</td>
-        <td class="bar">${barCell}</td>
-        <td class="pct">${pct}</td>
+        <td class="skills">${moraleBar}</td>
+        <td class="bar">${stressBar}</td>
       </tr>`;
     }).join("");
-    setHTML("dupes-card", `<table><tbody>${html}</tbody></table>`);
+    const thead = `<thead><tr>
+      <th></th>
+      <th>Roles</th>
+      <th>Morale</th>
+      <th>Stress</th>
+    </tr></thead>`;
+    setHTML("dupes-card", `<table>${thead}<tbody>${html}</tbody></table>`);
   }
 
   function renderGeysers(rows) {

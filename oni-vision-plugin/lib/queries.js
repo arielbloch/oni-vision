@@ -472,7 +472,7 @@ export function statusObject(db, { dupeLimit = 5, geyserLimit = 10, resourceLimi
     buildings: db.prepare("SELECT COUNT(*) AS n FROM buildings").get().n,
   };
 
-  const top_dupes = dupes(db, { sort: "stress", fields: ["name", "stress", "current_role"], limit: dupeLimit });
+  const top_dupes = dupes(db, { sort: "name", fields: ["name", "stress", "current_role"], limit: dupeLimit });
   // LEFT JOIN geyser_type_names so the MCP oni_status response includes
   // human-readable geyser names alongside the raw SimHash type_id.
   const geyser_types = db
