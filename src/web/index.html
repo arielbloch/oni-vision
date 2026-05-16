@@ -305,7 +305,7 @@
       const barCell = r.stress == null
         ? `<div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--bg-elev)"></div></div>`
         : bar(r.stress);
-      const { label: skillsLabel, moraleCost } = parseSkills(r.skills);
+      const { moraleCost } = parseSkills(r.skills);
       const sp = r.skill_points ?? 0;
       // Skill points badge: highlight if ≥1 unspent point so user notices
       const spBadge = `<span style="margin-left:4px;padding:1px 5px;border-radius:3px;font-size:11px;font-weight:600;${
@@ -313,10 +313,8 @@
           ? "background:rgba(250,204,21,0.18);color:#facc15;border:1px solid rgba(250,204,21,0.4)"
           : "background:rgba(255,255,255,0.05);color:var(--fg-muted);border:1px solid rgba(255,255,255,0.08)"
       }">${sp} SP</span>`;
-      // Skills cell: SP badge + skill names + morale cost
-      const skillsCell = skillsLabel
-        ? `${spBadge} ${escapeHtml(skillsLabel)}<span style="color:var(--fg-muted);margin-left:6px">${moraleCost} morale</span>`
-        : `${spBadge} <span style="color:var(--fg-muted)">no skills</span>`;
+      // Skills cell: SP badge + morale cost only (no skill name list)
+      const skillsCell = `${spBadge}<span style="color:var(--fg-muted);margin-left:6px">${moraleCost} morale</span>`;
       const badges = (r.effects ?? [])
         .map(e => BAD_EFFECTS[e])
         .filter(Boolean)
