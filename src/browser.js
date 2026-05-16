@@ -7,10 +7,56 @@
 //   • Only once per process — an in-memory flag prevents re-opening on
 //     subsequent save events within the same daemon run.
 //
+// On macOS, tries to reuse an existing tab via AppleScript before falling
+// back to `open`, so restarting the daemon doesn't pile up tabs.
+//
 // The open command is fire-and-forget (detached child, stdio ignored).
 // Failure is logged as a warning but never fatal.
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+
+/**
+ * macOS only: use AppleScript to find a tab already showing `url` in any
+ * common Chromium-based browser and bring it to the front.
+ *
+ * Returns true if a tab was found and focused, false otherwise (including
+ * when osascript is unavailable or all browsers are closed).
+ */
+function tryFocusExistingTabMac(url) {
+  // Strip trailing slash for a stable prefix match inside the script.
+  const base = url.replace(/\/$/, "");
+  const script = [
+    `set u to "${base}"`,
+    `set browsers to {"Google Chrome", "Brave Browser", "Microsoft Edge", "Chromium"}`,
+    `repeat with b in browsers`,
+    `  try`,
+    `    tell application b`,
+    `      repeat with w in windows`,
+    `        repeat with t in tabs of w`,
+    `          if URL of t starts with u then`,
+    `            set active tab index of w to index of t`,
+    `            set index of w to 1`,
+    `            activate`,
+    `            return "ok"`,
+    `          end if`,
+    `        end repeat`,
+    `      end repeat`,
+    `    end tell`,
+    `  end try`,
+    `end repeat`,
+    `return "none"`,
+  ].join("\n");
+
+  try {
+    const result = spawnSync("osascript", ["-e", script], {
+      encoding: "utf8",
+      timeout: 3000,
+    });
+    return result.stdout?.trim() === "ok";
+  } catch {
+    return false;
+  }
+}
 
 /** Platform → command that opens a URL in the default browser. */
 const OPEN_CMD = {
@@ -45,6 +91,13 @@ export function openBrowser(url, {
 
   // Guard 2: only open once per daemon process.
   if (sessionOpened) return false;
+
+  // On macOS, prefer reusing an existing tab over opening a new one.
+  if (platform === "darwin" && tryFocusExistingTabMac(url)) {
+    sessionOpened = true;
+    console.log(`[vision] focused existing dashboard tab: ${url}`);
+    return true;
+  }
 
   const cmd = OPEN_CMD[platform] ?? "xdg-open";
   const prefix = OPEN_ARGS_PREFIX[platform] ?? [];
