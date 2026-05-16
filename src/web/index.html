@@ -327,7 +327,7 @@
         : bar(r.stress);
       const cost = moraleCostOf(r.skills);
       const moralePct = Math.min(100, Math.round(cost / MORALE_BAR_MAX * 100));
-      const moraleBar = `<div class="bar-track"><div class="bar-fill" style="width:${moralePct}%;background:var(--accent)"></div></div>`;
+      const moraleBar = `<div class="bar-track"><div class="bar-fill" style="width:${moralePct}%;background:var(--good)"></div></div>`;
       const badges = (r.effects ?? [])
         .map(e => BAD_EFFECTS[e])
         .filter(Boolean)
