@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <title>oni-vision</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
 <style>
   :root {
     --bg: #09090f;
@@ -67,27 +66,26 @@
   td.bar { width: 18%; padding-right: 8px; }
   td.pct { width: 6%; text-align: right; color: var(--fg-dim); font-size: 11px; }
   td.skills { color: var(--fg-dim); font-size: 12px; width: 14%; }
-  td.focus { width: 42%; }
-  /* Icon chips — domain colour in left accent bar, icon centred in chip.
+  td.focus { width: 42%; white-space: nowrap; overflow: hidden; }
+  /* Abbreviated text tags — domain colour in left accent bar.
      Studio palette: cyan=physical · lavender=technical · pink=care · tangerine=combat.
-     Avoid border-left shorthand (resets border-left-color, breaks specificity). */
-  .fc {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 22px; height: 22px; margin: 1px 2px 1px 0;
+     Use border-left-width/style separately to avoid shorthand clobbering the colour. */
+  .ft {
+    display: inline-flex; align-items: center;
+    height: 20px; padding: 0 6px 0 5px; margin: 0 2px 0 0;
     border-radius: 0 4px 4px 0;
     border-top: 0.5px solid var(--border); border-right: 0.5px solid var(--border);
     border-bottom: 0.5px solid var(--border);
     border-left-style: solid;
     background: var(--bg-card); color: var(--fg);
-    cursor: default;
+    font-size: 11px; white-space: nowrap; vertical-align: middle;
   }
-  .fc i { font-size: 13px; pointer-events: none; }
-  .fc.p4 { border-left-width: 2px; }
-  .fc.p5 { border-left-width: 3.5px; }
-  .fc-cyan      { border-left-color: #22D3EE; }
-  .fc-lavender  { border-left-color: #A78BFA; }
-  .fc-pink      { border-left-color: #F472B6; }
-  .fc-tangerine { border-left-color: #FB923C; }
+  .ft.p4 { border-left-width: 2px; }
+  .ft.p5 { border-left-width: 3.5px; font-weight: 600; }
+  .ft-cyan      { border-left-color: #22D3EE; }
+  .ft-lavender  { border-left-color: #A78BFA; }
+  .ft-pink      { border-left-color: #F472B6; }
+  .ft-tangerine { border-left-color: #FB923C; }
   td.metric { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   .bar-track {
@@ -198,23 +196,25 @@
   // domain → .fc-{domain} CSS class (bar colour)
   // icon   → Tabler icon name (ti-*)
   // docs/frontend-design.md documents the full design exploration.
+  // Domain colour + abbreviated label for each chore group (Studio palette).
+  // docs/frontend-design.md documents the full design exploration.
   const CHORE_META = {
-    Dig:              { domain: "cyan",      icon: "ti-pickaxe"           },
-    Hauling:          { domain: "cyan",      icon: "ti-package"           },
-    Build:            { domain: "cyan",      icon: "ti-hammer"            },
-    Basekeeping:      { domain: "cyan",      icon: "ti-broom"             },
-    Storage:          { domain: "cyan",      icon: "ti-box"               },
-    LifeSupport:      { domain: "cyan",      icon: "ti-air-conditioning"  },
-    Research:         { domain: "lavender",  icon: "ti-flask"             },
-    MachineOperating: { domain: "lavender",  icon: "ti-settings"          },
-    Toggle:           { domain: "lavender",  icon: "ti-toggle-right"      },
-    Cook:             { domain: "pink",      icon: "ti-salad"             },
-    MedicalAid:       { domain: "pink",      icon: "ti-first-aid-kit"     },
-    Art:              { domain: "pink",      icon: "ti-palette"           },
-    Farming:          { domain: "pink",      icon: "ti-plant-2"           },
-    Ranching:         { domain: "pink",      icon: "ti-paw"               },
-    Combat:           { domain: "tangerine", icon: "ti-sword"             },
-    Unknown:          { domain: "tangerine", icon: "ti-question-mark"     },
+    Dig:              { domain: "cyan",      abbr: "Dig"   },
+    Hauling:          { domain: "cyan",      abbr: "Haul"  },
+    Build:            { domain: "cyan",      abbr: "Build" },
+    Basekeeping:      { domain: "cyan",      abbr: "Tidy"  },
+    Storage:          { domain: "cyan",      abbr: "Store" },
+    LifeSupport:      { domain: "cyan",      abbr: "Life"  },
+    Research:         { domain: "lavender",  abbr: "Res"   },
+    MachineOperating: { domain: "lavender",  abbr: "Ops"   },
+    Toggle:           { domain: "lavender",  abbr: "Tog"   },
+    Cook:             { domain: "pink",      abbr: "Cook"  },
+    MedicalAid:       { domain: "pink",      abbr: "Med"   },
+    Art:              { domain: "pink",      abbr: "Art"   },
+    Farming:          { domain: "pink",      abbr: "Farm"  },
+    Ranching:         { domain: "pink",      abbr: "Ranch" },
+    Combat:           { domain: "tangerine", abbr: "Atk"   },
+    Unknown:          { domain: "tangerine", abbr: "?"     },
   };
 
   /** Resolve a numeric element_id to a display name. */
@@ -331,15 +331,15 @@
         .filter(Boolean)
         .map(e => `<span class="badge ${e.cls}">${escapeHtml(e.label)}</span>`)
         .join("");
-      // Icon chips — one 22×22 chip per boosted chore group, tooltip = label
+      // Abbreviated text tags — one per boosted chore group, single line
       const chips = (r.focus ?? [])
         .map(f => {
-          const meta = CHORE_META[f.group] ?? { domain: "tangerine", icon: "ti-question-mark" };
+          const meta = CHORE_META[f.group] ?? { domain: "tangerine", abbr: "?" };
           const pri  = f.priority >= 5 ? "p5" : "p4";
-          return `<span class="fc ${pri} fc-${meta.domain}" title="${escapeHtml(f.label)}"><i class="ti ${meta.icon}" aria-hidden="true"></i></span>`;
+          return `<span class="ft ${pri} ft-${meta.domain}">${meta.abbr}</span>`;
         })
         .join("");
-      // Column order: name | focus chips | morale cost | stress
+      // Column order: name | focus tags | morale cost | stress
       return `<tr>
         <td class="name">${escapeHtml(r.name ?? "(unnamed)")}${badges}</td>
         <td class="focus">${chips || '<span style="color:var(--fg-muted)">—</span>'}</td>
