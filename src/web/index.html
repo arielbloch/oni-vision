@@ -197,24 +197,25 @@
   // icon   → Tabler icon name (ti-*)
   // docs/frontend-design.md documents the full design exploration.
   // Domain colour + abbreviated label for each chore group (Studio palette).
+  // order matches the game's "Manage Duplicant Priorities" column order (left→right).
   // docs/frontend-design.md documents the full design exploration.
   const CHORE_META = {
-    Dig:              { domain: "cyan",      abbr: "Dig"   },
-    Hauling:          { domain: "cyan",      abbr: "Haul"  },
-    Build:            { domain: "cyan",      abbr: "Build" },
-    Basekeeping:      { domain: "cyan",      abbr: "Tidy"  },
-    Storage:          { domain: "cyan",      abbr: "Store" },
-    LifeSupport:      { domain: "cyan",      abbr: "Life"  },
-    Research:         { domain: "lavender",  abbr: "Res"   },
-    MachineOperating: { domain: "lavender",  abbr: "Ops"   },
-    Toggle:           { domain: "lavender",  abbr: "Tog"   },
-    Cook:             { domain: "pink",      abbr: "Cook"  },
-    MedicalAid:       { domain: "pink",      abbr: "Med"   },
-    Art:              { domain: "pink",      abbr: "Art"   },
-    Farming:          { domain: "pink",      abbr: "Farm"  },
-    Ranching:         { domain: "pink",      abbr: "Ranch" },
-    Combat:           { domain: "tangerine", abbr: "Atk"   },
-    Unknown:          { domain: "tangerine", abbr: "?"     },
+    Combat:           { domain: "tangerine", abbr: "Atk",   order:  1 },
+    LifeSupport:      { domain: "cyan",      abbr: "Life",  order:  2 },
+    Toggle:           { domain: "lavender",  abbr: "Tog",   order:  3 },
+    MedicalAid:       { domain: "pink",      abbr: "Med",   order:  4 },
+    Basekeeping:      { domain: "cyan",      abbr: "Tidy",  order:  5 },
+    Cook:             { domain: "pink",      abbr: "Cook",  order:  6 },
+    Art:              { domain: "pink",      abbr: "Art",   order:  7 },
+    Research:         { domain: "lavender",  abbr: "Res",   order:  8 },
+    MachineOperating: { domain: "lavender",  abbr: "Ops",   order:  9 },
+    Farming:          { domain: "pink",      abbr: "Farm",  order: 10 },
+    Ranching:         { domain: "pink",      abbr: "Ranch", order: 11 },
+    Build:            { domain: "cyan",      abbr: "Build", order: 12 },
+    Dig:              { domain: "cyan",      abbr: "Dig",   order: 13 },
+    Hauling:          { domain: "cyan",      abbr: "Haul",  order: 14 },
+    Storage:          { domain: "cyan",      abbr: "Store", order: 15 },
+    Unknown:          { domain: "tangerine", abbr: "?",     order: 99 },
   };
 
   /** Resolve a numeric element_id to a display name. */
@@ -334,6 +335,8 @@
         .map(e => `<span class="badge ${e.cls}">${escapeHtml(e.label)}</span>`)
         .join("");
       const chips = (r.focus ?? [])
+        .slice()
+        .sort((a, b) => (CHORE_META[a.group]?.order ?? 99) - (CHORE_META[b.group]?.order ?? 99))
         .map(f => {
           const meta = CHORE_META[f.group] ?? { domain: "tangerine", abbr: "?" };
           const pri  = f.priority >= 5 ? "p5" : "p4";
