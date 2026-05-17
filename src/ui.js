@@ -8,10 +8,12 @@
 
 import { elementName } from "./elements.js";
 import { SKILL_LABELS as SKILL_LABELS_ARRAY } from "./skills.js";
+import { GEYSER_TYPE_NAMES } from "./geyser_types.js";
 import { ANSI, paint, bar, pad, fit, lpad, formatMass, formatAge, stressColor } from "./format.js";
 
-// Build a Map once for O(1) lookup in formatSkills.
+// Build Maps once for O(1) lookup.
 const SKILL_LABEL_MAP = new Map(SKILL_LABELS_ARRAY.map(({ branch, label }) => [branch, label]));
+const GEYSER_NAMES    = new Map(GEYSER_TYPE_NAMES.map(({ type_id, name }) => [type_id, name]));
 
 /**
  * Pull the headline facts out of save_meta. Returns a plain object;
@@ -55,32 +57,6 @@ export function renderHeadCounts(db, { color = false } = {}) {
     `${paint(buildings, ANSI.bold, color)} buildings`,
   ].join(sep);
 }
-
-// Geyser type hash → human-readable name.
-// Hashes computed with the same SDBM algorithm as elements, over the
-// internal type string (e.g. "steam", "hot_water", "molten_iron").
-const GEYSER_NAMES = new Map([
-  [-899515856,   "Steam Vent"],
-  [-2022709954,  "Hot Steam Vent"],
-  [713477285,    "Hot Water Geyser"],
-  [630638510,    "Salt Water Geyser"],
-  [1280790313,   "Slush Geyser"],
-  [1483840464,   "Chlorine Vent"],
-  [-1046145888,  "Hydrogen Vent"],
-  [-841236436,   "Natural Gas Geyser"],
-  [-597658376,   "Leaky Oil Fissure"],
-  [1482090435,   "CO₂ Geyser"],
-  [-1765654948,  "Liquid Sulfur Geyser"],
-  [-471575302,   "Minor Volcano"],
-  [-1592417549,  "Volcano"],
-  [-695301211,   "Copper Volcano"],
-  [-1332060084,  "Gold Volcano"],
-  [254095636,    "Iron Volcano"],
-  [159381264,    "Tungsten Volcano"],
-  [1137916511,   "Cobalt Volcano"],
-  [-968505972,   "Aluminum Volcano"],
-  [976669543,    "Niobium Volcano"],
-]);
 
 function geyserName(typeId) {
   if (typeId == null) return "(unknown)";

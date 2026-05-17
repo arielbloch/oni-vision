@@ -12,6 +12,7 @@ import { DatabaseSync } from "node:sqlite";
 import { extractAll } from "../src/extractors.js";
 import { writeDatabase } from "../src/db.js";
 import { FAKE_SAVE } from "./fixture.js";
+import { GEYSER_TYPE_NAMES } from "../src/geyser_types.js";
 import {
   render,
   renderBanner,
@@ -196,5 +197,38 @@ describe("render", () => {
       // Dupes section
       assert.match(out, /Dupes/);
     });
+  });
+});
+
+describe("geyser name consistency", () => {
+  test("renderGeysers resolves every known type_id to a human-readable name", () => {
+    // Build a DB containing one geyser row for every type in GEYSER_TYPE_NAMES.
+    // renderGeysers must not emit any 'hash:' fallback for any of them.
+    const dir = mkdtempSync(join(tmpdir(), "oni-ui-geyser-"));
+    const dbPath = join(dir, "test.sqlite");
+    const tables = {
+      save_meta: [{ key: "baseName", value: "G" }, { key: "numberOfCycles", value: "1" }],
+      object_groups: [], game_objects: [], behaviors: [],
+      duplicants: [], duplicant_traits: [], duplicant_skills: [],
+      duplicant_attributes: [], duplicant_effects: [], duplicant_amounts: [],
+      buildings: [], world_objects: [], storage_contents: [], critters: [],
+      geysers: GEYSER_TYPE_NAMES.map(({ type_id }, i) => ({
+        game_object_id: i + 1,
+        prefab_id: `geyser_${i}`,
+        type_id,
+        rate_roll: 0.5,
+        year_percent_roll: 0.5,
+        position_x: i,
+        position_y: 0,
+      })),
+    };
+    writeDatabase(dbPath, tables);
+    const db = new DatabaseSync(dbPath);
+    try {
+      const out = renderGeysers(db, { color: false });
+      assert.doesNotMatch(out, /hash:/, "all known type_ids should resolve to names");
+    } finally {
+      db.close();
+    }
   });
 });
