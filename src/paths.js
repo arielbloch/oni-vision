@@ -48,7 +48,7 @@ function buildDefaults({ home, platform }) {
     // Where we write parsed output. Long-running daemon overwrites these.
     outputDir: join(home, ".oni-vision", "output"),
     // Whether to also crawl the auto_save subdir.
-    includeAutoSaves: false,
+    includeAutoSaves: true,
     // Wait this long after the last write before parsing (avoids partial files).
     debounceMs: 1500,
     // Web dashboard — on by default, localhost-only, no auth needed.

@@ -7,8 +7,8 @@
   "_comment_outputDir": "Where current.sqlite, current.json, and current.sav land. Defaults to ~/.oni-vision/output, which is fine for most setups. Override only if you want the parsed outputs somewhere else (a project folder, a synced drive, etc.). Path must be absolute.",
   "outputDir": "/Users/<USERNAME>/.oni-vision/output",
 
-  "_comment_includeAutoSaves": "If true, oni-vision reparses every auto_save (ONI auto-saves every cycle by default — that's noisy). Default false: only manual saves trigger a reparse.",
-  "includeAutoSaves": false,
+  "_comment_includeAutoSaves": "If true (default), oni-vision also watches the auto_save folder so the daemon picks up every ONI auto-save. Set false to watch only manual saves.",
+  "includeAutoSaves": true,
 
   "_comment_debounceMs": "How long to wait (ms) after the last write to a .sav file before reparsing. Stops us from racing the game while it's still writing. Default 1500 ms is comfortable for save files up to ~10 MB; bump it if you see truncated-file parse errors.",
   "debounceMs": 1500,

@@ -112,7 +112,7 @@ cp .config-example.json ~/.oni-vision/config.json
 $EDITOR ~/.oni-vision/config.json   # replace <USERNAME> etc.
 ```
 
-Keys: `saveDir` (string), `outputDir` (string, default `~/.oni-vision/output`), `includeAutoSaves` (boolean, default `false`), `debounceMs` (number, default `1500`). All are optional; missing keys fall back to platform defaults. There is no env-var override — config file is the only knob.
+Keys: `saveDir` (string), `outputDir` (string, default `~/.oni-vision/output`), `includeAutoSaves` (boolean, default `true`), `debounceMs` (number, default `1500`). All are optional; missing keys fall back to platform defaults. There is no env-var override — config file is the only knob.
 
 ## Output
 

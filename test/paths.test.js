@@ -63,7 +63,7 @@ describe("resolveConfig", () => {
     const cfg = await resolveConfig({ home, platform: "darwin" });
     assert.match(cfg.saveDir, /OxygenNotIncluded\/save_files$/);
     assert.match(cfg.outputDir, /\.oni-vision\/output$/);
-    assert.equal(cfg.includeAutoSaves, false);
+    assert.equal(cfg.includeAutoSaves, true);
     assert.equal(cfg.debounceMs, 1500);
     // Discovery ran but returned null because no folders exist under the synthetic home.
     assert.ok(cfg._autoDetected !== null);
