@@ -307,13 +307,16 @@ function serveStatus(res, outputDir) {
        ORDER BY type_id, rate_roll DESC`
     ).all();
 
-    // Food stack counts; client joins prefab_id → display via the foods lookup.
+    // Food in storage sorted by morale DESC (best food first); includes name,
+    // kcal, morale from the lookup so the FE can compute days without a
+    // second JOIN against the FOOD map it holds in memory.
     payload.food = db.prepare(
-      `SELECT item_prefab_id, COUNT(*) AS qty
-       FROM storage_contents
-       WHERE item_prefab_id IS NOT NULL AND element_id IS NULL
-       GROUP BY item_prefab_id
-       ORDER BY qty DESC
+      `SELECT sc.item_prefab_id, fm.name, fm.kcal, fm.morale, COUNT(*) AS qty
+       FROM storage_contents sc
+       LEFT JOIN foods fm ON fm.prefab_id = sc.item_prefab_id
+       WHERE sc.item_prefab_id IS NOT NULL AND sc.element_id IS NULL
+       GROUP BY sc.item_prefab_id
+       ORDER BY fm.morale DESC, (fm.kcal * COUNT(*)) DESC
        LIMIT 30`
     ).all();
 

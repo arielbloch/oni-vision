@@ -168,10 +168,14 @@ export function renderGeysers(db, { color = false } = {}) {
 }
 
 /**
- * Food in storage: display name | total kcal | morale bonus.
- * Joins the foods lookup table; unknown items (DLC) are skipped.
+ * Food in storage: display name | days remaining | morale bonus.
+ * Sorted by morale DESC (best food first) to mirror the web dashboard.
+ * Days = (qty × kcal) / 3000 / dupe_count — "how long does this food
+ * last at full colony consumption?"
  */
 export function renderFood(db, { color = false, limit = 8 } = {}) {
+  const dupeCount = db.prepare("SELECT COUNT(*) AS n FROM duplicants").get().n || 1;
+
   const rows = db.prepare(`
     SELECT COALESCE(fm.name, sc.item_prefab_id) AS name,
            fm.kcal,
@@ -182,7 +186,7 @@ export function renderFood(db, { color = false, limit = 8 } = {}) {
     WHERE sc.item_prefab_id IS NOT NULL AND sc.element_id IS NULL
       AND fm.kcal IS NOT NULL
     GROUP BY sc.item_prefab_id
-    ORDER BY (fm.kcal * COUNT(*)) DESC, qty DESC
+    ORDER BY fm.morale DESC, (fm.kcal * COUNT(*)) DESC
     LIMIT ?
   `).all(limit);
 
@@ -190,12 +194,15 @@ export function renderFood(db, { color = false, limit = 8 } = {}) {
 
   const header = paint("Food", ANSI.bold + ANSI.cyan, color);
   const lines  = rows.map((r) => {
-    const kcalStr = formatKcal(r.qty * r.kcal);
+    const days    = (r.qty * r.kcal) / 3000 / dupeCount;
+    const daysStr = Number.isFinite(days) && days > 0
+      ? (days > 999 ? ">999 d" : `${days.toFixed(1)} d`)
+      : "—";
     const m       = r.morale ?? 0;
     const mLabel  = m > 0 ? `+${m}` : String(m);
     const mColor  = !color ? "" : m > 0 ? ANSI.green : m < 0 ? ANSI.red : ANSI.dim;
     const mReset  = color ? ANSI.reset : "";
-    return `  ${fit(r.name, 22)}  ${lpad(kcalStr, 10)}   ${mColor}${mLabel}${mReset}`;
+    return `  ${fit(r.name, 22)}  ${lpad(daysStr, 8)}   ${mColor}${mLabel}${mReset}`;
   });
 
   return [header, ...lines].join("\n");

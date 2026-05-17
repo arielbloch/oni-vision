@@ -68,7 +68,9 @@ Element totals across containers, the floor, or both:
 Totals ≥100 kg are reported as integers (rounding noise stripped). Default limit is 10.
 
 ### `oni_food({ limit?, format? })`
-Food items currently in colony storage, with display name, kcal per item, morale bonus, and stack count. Joins the `foods` lookup table so results are human-readable. Unknown food items (new DLC) appear with null name/kcal/morale. Default limit is 20.
+Food items currently in colony storage, sorted by morale bonus (best food first). Returns display name, kcal per item, morale bonus, and stack count. Joins the `foods` lookup table so results are human-readable. Unknown food items (new DLC) appear with null name/kcal/morale. Default limit is 20.
+
+To compute days of food remaining per type: `days = (qty × kcal) / 3000 / dupe_count`. The denominator 3000 is the assumed kcal/dupe/day. Get `dupe_count` from `oni_save_meta().duplicant_count`.
 
 ### `oni_research()`
 Tech-tree snapshot from the singleton `Research` behavior: active and target tech, the global research-point inventory (basic / advanced / space / nuclear / orbital), counts of completed-vs-incomplete techs, and the list of techs that have accrued partial progress. Returns `null` on a brand-new save with no Research yet.
@@ -151,8 +153,9 @@ Convenience views: `v_resources_in_storage`, `v_world_objects_by_element`, `v_ge
 2. Mention the storage-vs-floor split if relevant.
 
 **"What food do I have?"**
-1. `oni_food()` — returns stored food with names, total kcal, and morale bonuses.
-2. If the user wants a specific item: filter the results or ask follow-up.
+1. `oni_food()` — returns stored food sorted by morale (best first), with name, kcal, morale, and qty.
+2. Compute days per type: `days = (qty × kcal) / 3000 / dupe_count`. Present as "X.X days".
+3. If the user wants a specific item: filter the results or ask follow-up.
 
 **"What's my cycle?"**
 1. `oni_save_meta()` — return cycle and base_name; that's a one-shot answer.

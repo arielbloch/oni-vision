@@ -77,6 +77,12 @@ function fmtKcal(kcal) {
   return `${k.toFixed(0)} kcal`;
 }
 
+function fmtDays(days) {
+  if (days == null || !Number.isFinite(days) || days <= 0) return "—";
+  if (days > 999) return ">999 d";
+  return `${days.toFixed(1)} d`;
+}
+
 function fmtMass(units) {
   if (units == null) return "?";
   const u = Number(units);
@@ -231,25 +237,24 @@ function onPickerChange() {
 
 // ── Renderers ─────────────────────────────────────────────────────────────────
 
-function renderFood(rows) {
-  const known = (rows ?? [])
-    .map(r => ({ info: FOOD[r.item_prefab_id], qty: r.qty }))
-    .filter(r => r.info)
-    .sort((a, b) => (b.qty * b.info.kcal) - (a.qty * a.info.kcal));
+function renderFood(rows, dupeCount) {
+  // rows are pre-sorted by morale DESC from the server; filter to known items.
+  const known = (rows ?? []).filter(r => r.kcal != null);
 
   if (known.length === 0) {
     setHTML("food-card", `<div class="empty">no food in storage</div>`);
     return;
   }
 
+  const n = dupeCount > 0 ? dupeCount : 1;
   const html = known.map(r => {
-    const totalKcal = r.qty * r.info.kcal;
-    const m = r.info.morale;
+    const days = (r.qty * r.kcal) / 3000 / n;
+    const m = r.morale ?? 0;
     const mLabel = m > 0 ? `+${m}` : String(m);
     const mColor = m > 0 ? "var(--good)" : m < 0 ? "var(--bad)" : "var(--fg-muted)";
     return `<tr>
-      <td style="font-size:12px">${escapeHtml(r.info.name)}</td>
-      <td class="metric">${fmtKcal(totalKcal)}</td>
+      <td style="font-size:12px">${escapeHtml(r.name ?? r.item_prefab_id)}</td>
+      <td class="metric">${fmtDays(days)}</td>
       <td class="metric" style="color:${mColor};width:28px">${mLabel}</td>
     </tr>`;
   }).join("");
@@ -350,7 +355,7 @@ async function refresh() {
     renderCounts(data.counts || {});
     renderDupes(data.top_dupes || []);
     renderGeysers(data.geysers || []);
-    renderFood(data.food || []);
+    renderFood(data.food || [], data.counts?.duplicants ?? 0);
 
     // Update in-game filter defaults before rendering resources.
     if (data.stockpile_filters && data.stockpile_filters.length > 0) {

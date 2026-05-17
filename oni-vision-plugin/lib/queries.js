@@ -390,7 +390,7 @@ export function food(db, { limit = 20 } = {}) {
      WHERE sc.item_prefab_id IS NOT NULL
        AND sc.element_id IS NULL
      GROUP BY sc.item_prefab_id
-     ORDER BY qty DESC
+     ORDER BY fm.morale DESC, (fm.kcal * COUNT(*)) DESC
      LIMIT ?`
   ).all(limit).map((r) => ({ ...r }));
 }
