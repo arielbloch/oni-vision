@@ -58,8 +58,12 @@ The MCP tools become available in the current project; skills must be loaded sep
 ```
 oni-vision-plugin/
 ├── .claude-plugin/
-│   └── plugin.json          # Claude Code plugin manifest
-├── .mcp.json                # MCP server spawn config (Claude Code reads this)
+│   └── plugin.json          # Canonical Claude Code plugin manifest.
+│                            # Declares the MCP server + skill paths.
+│                            # Used by /plugin install.
+├── .mcp.json                # Per-project MCP registration helper.
+│                            # Used by `claude mcp add` (no plugin system).
+│                            # Distinct from .claude-plugin/ — see below.
 ├── mcp/
 │   └── server.js            # MCP server entry point
 ├── lib/
@@ -73,6 +77,12 @@ oni-vision-plugin/
 │       └── references/
 └── README.md
 ```
+
+**Two config files, two concepts:**
+
+- `.claude-plugin/plugin.json` — the **plugin manifest** consumed by `/plugin install`. It declares the MCP server to spawn (via `${CLAUDE_PLUGIN_ROOT}`) and the skills to load. Use this path when you want the full plugin experience (tools + skills).
+
+- `.mcp.json` — a **per-project MCP registration** file consumed by `claude mcp add --file` or by placing it in a project root. It registers only the MCP server without the plugin system. Use this if you want to add the MCP tools to a specific project without a global plugin install.
 
 The MCP server is stateless: it opens `~/.oni-vision/output/current.sqlite` read-only on each tool call, so it always reads the freshest snapshot the daemon produced.
 
