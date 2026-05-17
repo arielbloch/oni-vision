@@ -95,7 +95,7 @@ export function renderDupes(db, { color = false, limit = 12 } = {}) {
     focusByDupe.get(duplicant_id).push(abbr);
   }
 
-  const sectionLabel = paint("Dupes (sorted by stress)", ANSI.bold + ANSI.yellow, color);
+  const sectionLabel = paint("Dupes (sorted by stress)", ANSI.bold + ANSI.green, color);
   const colHeader = paint(
     `  ${"".padEnd(22)}  ${"Roles".padEnd(12)}  ${"Morale".padEnd(10)}  Stress`,
     ANSI.dim, color
@@ -107,7 +107,7 @@ export function renderDupes(db, { color = false, limit = 12 } = {}) {
     const nameCol   = fit(nameStr, 22);
 
     const focusStr  = (focusByDupe.get(r.game_object_id) ?? []).join(" ");
-    const focusCol  = pad(focusStr, 12);
+    const focusCol  = fit(focusStr, 12);
 
     const moralePct = Math.min(1, (r.morale_cost ?? 0) / THRESHOLDS.morale_bar_max);
     const moraleBar = color
@@ -147,7 +147,7 @@ export function renderGeysers(db, { color = false } = {}) {
 
   if (rows.length === 0) return paint("Geysers: none", ANSI.dim, color);
 
-  const header = paint("Geysers", ANSI.bold + ANSI.magenta, color);
+  const header = paint("Geysers", ANSI.bold + ANSI.green, color);
   const lines  = rows.map((r) => {
     const quality = r.quality ?? 0;
     let qc = "";
@@ -192,7 +192,7 @@ export function renderFood(db, { color = false, limit = 8 } = {}) {
 
   if (rows.length === 0) return paint("Food: none in storage", ANSI.dim, color);
 
-  const header = paint("Food", ANSI.bold + ANSI.cyan, color);
+  const header = paint("Food", ANSI.bold + ANSI.green, color);
   const lines  = rows.map((r) => {
     const days    = (r.qty * r.kcal) / 3000 / dupeCount;
     const daysStr = Number.isFinite(days) && days > 0
@@ -212,12 +212,12 @@ export function renderFood(db, { color = false, limit = 8 } = {}) {
 export function renderStockpile(db, { color = false, limit = 8 } = {}) {
   const rows = db.prepare(`
     SELECT COALESCE(en.name, sub.element_id) AS name,
-           SUM(sub.units) AS total_units, SUM(sub.items) AS items
+           SUM(sub.units) AS total_units
     FROM (
-      SELECT element_id, SUM(units) AS units, COUNT(*) AS items
+      SELECT element_id, SUM(units) AS units
       FROM world_objects WHERE element_id IS NOT NULL GROUP BY element_id
       UNION ALL
-      SELECT element_id, SUM(units) AS units, COUNT(*) AS items
+      SELECT element_id, SUM(units) AS units
       FROM storage_contents WHERE element_id IS NOT NULL GROUP BY element_id
     ) sub
     LEFT JOIN elements en ON en.element_id = sub.element_id
@@ -231,7 +231,7 @@ export function renderStockpile(db, { color = false, limit = 8 } = {}) {
   const header = paint("Stockpile (top elements by mass)", ANSI.bold + ANSI.green, color);
   const lines  = rows.map((r) => {
     const mass = formatMass(r.total_units);
-    return `  ${pad(r.name, 20)} ${lpad(mass, 12)}   in ${r.items} place${r.items === 1 ? "" : "s"}`;
+    return `  ${pad(r.name, 20)} ${lpad(mass, 12)}`;
   });
   return [header, ...lines].join("\n");
 }

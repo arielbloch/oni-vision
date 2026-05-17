@@ -93,6 +93,9 @@ export const ELEMENT_NAMES = new Map([
   [-123825053,  "Super Coolant"],
   [-1713958528, "Super Insulator"],
   [1071649902,  "Katairite"],
+  [-721320011,  "Lime"],
+  [-1142341158, "Polypropylene"],
+  [976099455,   "Organic"],       // "creature" element — default for plants, critters, food
 
   // Elemental solids
   [-220394187,  "Phosphorus"],
