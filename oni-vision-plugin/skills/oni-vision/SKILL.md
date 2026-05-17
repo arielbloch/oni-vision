@@ -70,6 +70,18 @@ Totals ≥100 kg are reported as integers (rounding noise stripped). Default lim
 ### `oni_food({ limit?, format? })`
 Food items currently in colony storage, with display name, kcal per item, morale bonus, and stack count. Joins the `foods` lookup table so results are human-readable. Unknown food items (new DLC) appear with null name/kcal/morale. Default limit is 20.
 
+### `oni_research()`
+Tech-tree snapshot from the singleton `Research` behavior: active and target tech, the global research-point inventory (basic / advanced / space / nuclear / orbital), counts of completed-vs-incomplete techs, and the list of techs that have accrued partial progress. Returns `null` on a brand-new save with no Research yet.
+
+### `oni_schedules()`
+Colony schedules with each schedule's 24-block timetable compacted into `Work×N, Downtime×N, Bedtime×N` runs, plus the list of assigned-dupe instance_ids. Use for "who's on which schedule?" / "what does Shift 30 look like?" questions.
+
+### `oni_power()`
+Power-related buildings grouped by category: `generators`, `consumers`, `transformers`. Each entry has `prefab_id` and instance count. For per-instance detail (current watts, battery charge), JOIN `buildings` with the `EnergyGenerator` / `EnergyConsumer` behaviors via `oni_query`.
+
+### `oni_plants({ wiltingOnly?, readyOnly?, limit? })`
+Every plant on the map (world_objects with a `Growing` behaviour) with `prefab_id`, position, wilting state, and harvest readiness. Use `wiltingOnly` for triage ("what's dying?") and `readyOnly` for "what's ready to harvest?" Species naming is the raw prefab_id (BristleBlossom, Mealwood, SwampLily, …); the catalog of human-readable names is a future Wave.
+
 ### `oni_germs({ minCount?, limit? })`
 Objects with germ contamination (Slimelung, Food Poisoning, etc.). Unions across `buildings`, `world_objects`, and `storage_contents`, joined against the `diseases` lookup so the disease name is human-readable. Use for "where's my Slimelung?" and "what's contaminated?" questions. Default `minCount` is 1000 (below that germs are usually noise — bump down to surface low-level contamination).
 

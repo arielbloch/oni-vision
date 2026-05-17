@@ -20,6 +20,10 @@ import {
   resources,
   food,
   germs,
+  research,
+  schedules,
+  power,
+  plants,
   query,
   status,
   statusObject,
@@ -511,6 +515,231 @@ describe("statusObject", () => {
       assert.match(block, new RegExp(`duplicants=${o.counts.duplicants}`));
       if (o.top_dupes[0]) assert.match(block, new RegExp(o.top_dupes[0].name));
       });
+  });
+});
+
+describe("research", () => {
+  function dbWithResearch(researchTemplateData) {
+    const tables = buildFakeTables();
+    if (researchTemplateData) {
+      tables.behaviors.push({
+        id: 99001,
+        game_object_id: 99001,
+        name: "Research",
+        template_data: JSON.stringify(researchTemplateData),
+        extra_data: null,
+      });
+      tables.game_objects.push({
+        id: 99001, instance_id: 99001, prefab_id: "ResearchSingleton",
+        position_x: 0, position_y: 0, position_z: 0,
+        scale_x: 1, scale_y: 1, folder: 0,
+      });
+    }
+    const dir = mkdtempSync(join(tmpdir(), "oni-mcp-research-"));
+    const dbPath = join(dir, "test.sqlite");
+    writeDatabase(dbPath, tables);
+    return new DatabaseSync(dbPath);
+  }
+
+  test("returns null when no Research behavior exists", () => {
+    const db = dbWithResearch(null);
+    try {
+      assert.equal(research(db), null);
+    } finally { db.close(); }
+  });
+
+  test("decodes active/target tech, points, and progress", () => {
+    const db = dbWithResearch({
+      globalPointInventory: { PointsByTypeID: [["basic", 12], ["advanced", 4]] },
+      saveData: {
+        activeResearchId: "FarmingTech",
+        targetResearchId: "FineDining",
+        techs: [
+          { techId: "FarmingTech", complete: true,  inventoryIDs: ["basic", "advanced"], inventoryValues: [0, 0] },
+          { techId: "FineDining",  complete: false, inventoryIDs: ["basic", "advanced"], inventoryValues: [5, 0] },
+          { techId: "Unused",      complete: false, inventoryIDs: ["basic", "advanced"], inventoryValues: [0, 0] },
+        ],
+      },
+    });
+    try {
+      const r = research(db);
+      assert.equal(r.active_tech, "FarmingTech");
+      assert.equal(r.target_tech, "FineDining");
+      assert.deepEqual(r.points, { basic: 12, advanced: 4 });
+      assert.equal(r.techs_completed, 1);
+      assert.equal(r.techs_total, 3);
+      assert.deepEqual(r.completed, ["FarmingTech"]);
+      assert.equal(r.in_progress.length, 1, "Unused tech has no points and shouldn't show");
+      assert.equal(r.in_progress[0].tech_id, "FineDining");
+      assert.deepEqual(r.in_progress[0].progress, { basic: 5, advanced: 0 });
+    } finally { db.close(); }
+  });
+});
+
+describe("schedules", () => {
+  function dbWithSchedules(scheduleData) {
+    const tables = buildFakeTables();
+    tables.behaviors.push({
+      id: 88001,
+      game_object_id: 88001,
+      name: "ScheduleManager",
+      template_data: JSON.stringify(scheduleData),
+      extra_data: null,
+    });
+    tables.game_objects.push({
+      id: 88001, instance_id: 88001, prefab_id: "ScheduleManagerSingleton",
+      position_x: 0, position_y: 0, position_z: 0,
+      scale_x: 1, scale_y: 1, folder: 0,
+    });
+    const dir = mkdtempSync(join(tmpdir(), "oni-mcp-schedules-"));
+    const dbPath = join(dir, "test.sqlite");
+    writeDatabase(dbPath, tables);
+    return new DatabaseSync(dbPath);
+  }
+
+  test("compacts a 24-block timetable into Work×N runs", () => {
+    const blocks = [];
+    for (let i = 0; i < 16; i++) blocks.push({ name: "Work", GroupId: "Worktime" });
+    for (let i = 0; i < 4; i++)  blocks.push({ name: "Downtime", GroupId: "Recreation" });
+    for (let i = 0; i < 4; i++)  blocks.push({ name: "Bedtime",  GroupId: "Sleep" });
+    const db = dbWithSchedules({
+      schedules: [
+        { name: "Standard", blocks, assigned: [{ id: 100 }, { id: 200 }] },
+      ],
+    });
+    try {
+      const s = schedules(db);
+      assert.equal(s.length, 1);
+      assert.equal(s[0].name, "Standard");
+      assert.equal(s[0].summary, "Work×16, Downtime×4, Bedtime×4");
+      assert.deepEqual(s[0].assigned_instance_ids, [100, 200]);
+    } finally { db.close(); }
+  });
+
+  test("returns [] when no ScheduleManager exists", () => {
+    const tables = buildFakeTables();
+    const dir = mkdtempSync(join(tmpdir(), "oni-mcp-no-sched-"));
+    const dbPath = join(dir, "test.sqlite");
+    writeDatabase(dbPath, tables);
+    const db = new DatabaseSync(dbPath);
+    try {
+      assert.deepEqual(schedules(db), []);
+    } finally { db.close(); }
+  });
+});
+
+describe("power", () => {
+  function dbWithPower() {
+    const tables = buildFakeTables();
+    // Two Generators (EnergyGenerator) and three Refrigerators (EnergyConsumer).
+    const add = (id, prefab, behaviorName) => {
+      tables.buildings.push({
+        game_object_id: id, prefab_id: prefab,
+        position_x: 0, position_y: 0,
+        element_id: null, units: null, temperature: 300,
+        disease_id: null, disease_count: null,
+      });
+      tables.behaviors.push({
+        id, game_object_id: id, name: behaviorName,
+        template_data: "{}", extra_data: null,
+      });
+      tables.game_objects.push({
+        id, instance_id: id, prefab_id: prefab,
+        position_x: 0, position_y: 0, position_z: 0,
+        scale_x: 1, scale_y: 1, folder: 0,
+      });
+    };
+    add(7001, "Generator", "EnergyGenerator");
+    add(7002, "Generator", "EnergyGenerator");
+    add(7101, "Refrigerator", "EnergyConsumer");
+    add(7102, "Refrigerator", "EnergyConsumer");
+    add(7103, "AirFilter",    "EnergyConsumer");
+    const dir = mkdtempSync(join(tmpdir(), "oni-mcp-power-"));
+    const dbPath = join(dir, "test.sqlite");
+    writeDatabase(dbPath, tables);
+    return new DatabaseSync(dbPath);
+  }
+
+  test("groups generators and consumers by prefab_id with counts", () => {
+    const db = dbWithPower();
+    try {
+      const p = power(db);
+      assert.deepEqual(p.generators, [{ prefab_id: "Generator", n: 2 }]);
+      // Refrigerator (×2) listed before AirFilter (×1).
+      assert.equal(p.consumers.length, 2);
+      assert.equal(p.consumers[0].prefab_id, "Refrigerator");
+      assert.equal(p.consumers[0].n, 2);
+      assert.deepEqual(p.transformers, []);
+    } finally { db.close(); }
+  });
+});
+
+describe("plants", () => {
+  function dbWithPlants() {
+    const tables = buildFakeTables();
+    const add = (id, prefab, opts = {}) => {
+      tables.world_objects.push({
+        game_object_id: id, prefab_id: prefab,
+        position_x: 5, position_y: 5,
+        element_id: null, units: null, temperature: 295,
+        disease_id: null, disease_count: null,
+      });
+      tables.behaviors.push({ id: id * 10 + 1, game_object_id: id, name: "Growing", template_data: "{}", extra_data: null });
+      tables.behaviors.push({
+        id: id * 10 + 2, game_object_id: id, name: "WiltCondition",
+        template_data: JSON.stringify({ wilting: !!opts.wilting, goingToWilt: false }),
+        extra_data: null,
+      });
+      tables.behaviors.push({
+        id: id * 10 + 3, game_object_id: id, name: "Harvestable",
+        template_data: JSON.stringify({ canBeHarvested: !!opts.harvestable, numberOfUses: 6, workTimeRemaining: 10 }),
+        extra_data: null,
+      });
+      tables.game_objects.push({
+        id, instance_id: id, prefab_id: prefab,
+        position_x: 5, position_y: 5, position_z: 0,
+        scale_x: 1, scale_y: 1, folder: 0,
+      });
+    };
+    add(8001, "BristleBlossom", {});
+    add(8002, "BristleBlossom", { wilting: true });
+    add(8003, "Mealwood",       { harvestable: true });
+    const dir = mkdtempSync(join(tmpdir(), "oni-mcp-plants-"));
+    const dbPath = join(dir, "test.sqlite");
+    writeDatabase(dbPath, tables);
+    return new DatabaseSync(dbPath);
+  }
+
+  test("lists every Growing world_object with wilt/harvest state", () => {
+    const db = dbWithPlants();
+    try {
+      const pl = plants(db);
+      assert.equal(pl.length, 3);
+      const wilt = pl.find(p => p.wilting === 1);
+      assert.ok(wilt, "should surface the wilting plant");
+      const ready = pl.find(p => p.harvestable === 1);
+      assert.ok(ready, "should surface the harvestable plant");
+      assert.equal(ready.prefab_id, "Mealwood");
+    } finally { db.close(); }
+  });
+
+  test("wiltingOnly filter returns only wilting plants", () => {
+    const db = dbWithPlants();
+    try {
+      const pl = plants(db, { wiltingOnly: true });
+      assert.equal(pl.length, 1);
+      assert.equal(pl[0].wilting, 1);
+    } finally { db.close(); }
+  });
+
+  test("readyOnly filter returns only harvestable plants", () => {
+    const db = dbWithPlants();
+    try {
+      const pl = plants(db, { readyOnly: true });
+      assert.equal(pl.length, 1);
+      assert.equal(pl[0].harvestable, 1);
+      assert.equal(pl[0].prefab_id, "Mealwood");
+    } finally { db.close(); }
   });
 });
 

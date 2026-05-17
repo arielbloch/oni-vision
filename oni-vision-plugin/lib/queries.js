@@ -396,6 +396,176 @@ export function food(db, { limit = 20 } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Research progress
+// ---------------------------------------------------------------------------
+
+/**
+ * Tech-tree snapshot from the singleton `Research` behavior. Returns the
+ * active/target tech, the global research-point inventory (basic, advanced,
+ * space, nuclear, orbital), counts of completed vs incomplete techs, and
+ * the list of techs that have accrued some points but aren't yet finished.
+ *
+ * Returns `null` if the save has no Research behavior (very early game).
+ */
+export function research(db) {
+  const row = db.prepare(
+    `SELECT
+        json_extract(template_data, '$.saveData.activeResearchId') AS active_tech,
+        json_extract(template_data, '$.saveData.targetResearchId') AS target_tech,
+        json_extract(template_data, '$.globalPointInventory.PointsByTypeID') AS points_json,
+        json_extract(template_data, '$.saveData.techs') AS techs_json
+     FROM behaviors WHERE name = 'Research' LIMIT 1`
+  ).get();
+  if (!row) return null;
+
+  let points = {};
+  try {
+    points = Object.fromEntries(JSON.parse(row.points_json ?? "[]"));
+  } catch { /* malformed JSON — treat as empty */ }
+
+  let techs = [];
+  try {
+    techs = JSON.parse(row.techs_json ?? "[]");
+  } catch { /* malformed — treat as empty */ }
+
+  const completed = techs.filter(t => t.complete).map(t => t.techId);
+  const in_progress = techs
+    .filter(t => !t.complete && (t.inventoryValues ?? []).some(v => v > 0))
+    .map(t => ({
+      tech_id: t.techId,
+      progress: Object.fromEntries((t.inventoryIDs ?? []).map((id, i) => [id, t.inventoryValues?.[i] ?? 0])),
+    }));
+
+  return {
+    active_tech: row.active_tech,
+    target_tech: row.target_tech,
+    points,
+    techs_completed: completed.length,
+    techs_total: techs.length,
+    completed,
+    in_progress,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Schedules
+// ---------------------------------------------------------------------------
+
+/**
+ * Colony schedules from the singleton `ScheduleManager` behavior. Each
+ * schedule has a 24-block timetable (Work / Downtime / Bedtime, with a
+ * GroupId for sub-categorisation) and a list of assigned-dupe instance_ids.
+ *
+ * Returns `[]` if the save has no ScheduleManager (shouldn't happen on a
+ * real colony, but defensive).
+ */
+export function schedules(db) {
+  const row = db.prepare(
+    `SELECT template_data FROM behaviors WHERE name = 'ScheduleManager' LIMIT 1`
+  ).get();
+  if (!row) return [];
+
+  let data = {};
+  try { data = JSON.parse(row.template_data ?? "{}"); } catch { return []; }
+
+  return (data.schedules ?? []).map((s) => {
+    const blocks = (s.blocks ?? []).map(b => b.name);
+    // Compact block summary: count consecutive runs.
+    // "Work×18, Downtime×2, Bedtime×4" is more useful than the raw 24 entries.
+    const runs = [];
+    let last = null;
+    let count = 0;
+    for (const name of blocks) {
+      if (name === last) {
+        count++;
+      } else {
+        if (last) runs.push(`${last}×${count}`);
+        last = name;
+        count = 1;
+      }
+    }
+    if (last) runs.push(`${last}×${count}`);
+
+    return {
+      name: s.name ?? null,
+      summary: runs.join(", "),
+      assigned_instance_ids: (s.assigned ?? []).map(a => a.id).filter(Boolean),
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Power network
+// ---------------------------------------------------------------------------
+
+/**
+ * Power-related buildings grouped by category. Walks `behaviors` looking
+ * for `EnergyGenerator`, `EnergyConsumer`, and `PowerTransformer`,
+ * joining back to `buildings` to surface prefab_id + position.
+ *
+ * Returns three buckets: generators, consumers, transformers — each with
+ * the building's prefab and count. Useful for "what's drawing power" and
+ * "what generates my electricity" questions without forcing oni_query.
+ */
+export function power(db) {
+  const aggregate = (behaviorName) =>
+    db.prepare(
+      `SELECT b.prefab_id, COUNT(*) AS n
+       FROM behaviors beh
+       JOIN buildings b ON b.game_object_id = beh.game_object_id
+       WHERE beh.name = ?
+       GROUP BY b.prefab_id
+       ORDER BY n DESC, b.prefab_id`
+    ).all(behaviorName).map(r => ({ ...r }));
+
+  return {
+    generators: aggregate("EnergyGenerator"),
+    consumers: aggregate("EnergyConsumer"),
+    transformers: aggregate("PowerTransformer"),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Plants
+// ---------------------------------------------------------------------------
+
+/**
+ * Plants currently on the map — every world_object that has a `Growing`
+ * behavior — with their grow/wilt/harvest state pulled from sibling
+ * behaviors (`WiltCondition`, `Harvestable`). The species name is the
+ * raw prefab_id (the catalog of human-readable plant names would be a
+ * future Wave; in the meantime, prefab_ids like "BristleBlossom",
+ * "MealwoodFood", "SwampLily" are themselves descriptive).
+ *
+ * @param {object} opts
+ * @param {boolean} [opts.wiltingOnly=false]  only return wilting plants
+ * @param {boolean} [opts.readyOnly=false]    only return harvestable plants
+ * @param {number}  [opts.limit=50]
+ */
+export function plants(db, { wiltingOnly = false, readyOnly = false, limit = 50 } = {}) {
+  return db.prepare(
+    `SELECT
+        wo.prefab_id,
+        wo.position_x, wo.position_y,
+        wo.temperature,
+        json_extract(MAX(CASE WHEN beh.name = 'WiltCondition' THEN beh.template_data END), '$.wilting')      AS wilting,
+        json_extract(MAX(CASE WHEN beh.name = 'WiltCondition' THEN beh.template_data END), '$.goingToWilt') AS going_to_wilt,
+        json_extract(MAX(CASE WHEN beh.name = 'Harvestable'   THEN beh.template_data END), '$.canBeHarvested') AS harvestable,
+        json_extract(MAX(CASE WHEN beh.name = 'Harvestable'   THEN beh.template_data END), '$.numberOfUses')   AS uses_remaining
+     FROM behaviors beh
+     JOIN world_objects wo ON wo.game_object_id = beh.game_object_id
+     WHERE beh.game_object_id IN (
+       SELECT DISTINCT game_object_id FROM behaviors WHERE name = 'Growing'
+     )
+     GROUP BY wo.game_object_id
+     HAVING (? = 0 OR wilting = 1)
+        AND (? = 0 OR harvestable = 1)
+     ORDER BY wo.prefab_id, wo.position_y DESC
+     LIMIT ?`
+  ).all(wiltingOnly ? 1 : 0, readyOnly ? 1 : 0, limit).map(r => ({ ...r }));
+}
+
+// ---------------------------------------------------------------------------
 // Germ contamination
 // ---------------------------------------------------------------------------
 

@@ -314,6 +314,36 @@ Same shape.
 
 ---
 
+## Wave 37.5 — README architecture overview
+
+### Goal
+
+The top-level `README.md` describes how to install and run oni-vision
+but doesn't quickly answer "how is this thing actually wired up?"
+Add a concise **Architecture** section near the top of the README
+that's friendly to a new contributor or AI agent.
+
+### Content
+
+Bullet breakdown covering:
+- The save → parser → extractors → SQLite → consumers pipeline
+- The three consumers (CLI banner, web dashboard, MCP plugin) and
+  what each one is for
+- The knowledge-module pattern: each `src/*.js` knowledge file →
+  one SQLite lookup table → JOINed by every consumer
+- The atomic-write guarantee (write to `.tmp`, rename(2) into place)
+- The two-process model: oni-vision daemon writes, everything else
+  reads read-only
+
+A small ASCII diagram of the data flow if it fits naturally.
+
+### Deliverable
+
+- `README.md`: new "Architecture" section after "Features" or before
+  "Build". 30–60 lines. Bullets, no prose paragraphs.
+
+---
+
 ## Wave 38 — Completeness: rockets and planetoid clusters (DLC)
 
 **ONI concept:** Spaced Out DLC. Multiple asteroids, rockets with
@@ -343,6 +373,7 @@ requests it explicitly, or until we have a DLC save to inspect.
 | 35 | Research | medium-high (gameData paths unknown) | 2h |
 | 36 | Schedules | medium | 1.5h |
 | 37 | Power metrics | medium | 1.5h |
+| 37.5 | README architecture | low | 30min |
 | 38 | Rockets / DLC | high (needs DLC save) | deferred |
 
 Waves 30–32 ship now. Waves 33+ require investigation of real-save

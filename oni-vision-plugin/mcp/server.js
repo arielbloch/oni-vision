@@ -34,6 +34,10 @@ import {
   resources,
   food,
   germs,
+  research,
+  schedules,
+  power,
+  plants,
   query,
   status,
   schema,
@@ -140,6 +144,34 @@ const TOOLS = [
       type: "object",
       properties: {
         format: { type: "string", enum: ["json", "tsv"], description: "Output format. Default: json. Use tsv for large results." },
+      },
+    },
+  },
+  {
+    name: "oni_research",
+    description: "Tech-tree snapshot: active/target research, global research-point inventory (basic/advanced/space/nuclear/orbital), counts of completed vs incomplete techs, and the list of techs with partial progress. Use for 'what should I research next?' / 'how far am I in the tech tree?' questions.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "oni_schedules",
+    description: "Colony schedules with each schedule's 24-block timetable (summarised as Work×N, Downtime×N, Bedtime×N runs) and the list of assigned-dupe instance_ids. Use for 'who's on which schedule?' questions.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "oni_power",
+    description: "Power-related buildings grouped by category — generators, consumers, transformers — counted by prefab_id. Use for 'what's drawing power' / 'what generates my electricity' overviews. For per-instance detail, join `buildings` with the `EnergyGenerator`/`EnergyConsumer` behaviors via oni_query.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "oni_plants",
+    description: "Every plant on the map (world_objects with a Growing behavior), with prefab_id, position, wilting state, and harvest readiness. Use for 'what's wilting?' / 'what's ready to harvest?' questions. Filter via wiltingOnly or readyOnly.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        wiltingOnly: { type: "boolean", description: "Only plants whose WiltCondition.wilting is true. Default: false." },
+        readyOnly: { type: "boolean", description: "Only plants whose Harvestable.canBeHarvested is true. Default: false." },
+        limit: { type: "integer", description: "Max rows. Default: 50." },
+        format: { type: "string", enum: ["json", "tsv"], description: "Output format. Default: json." },
       },
     },
   },
@@ -261,6 +293,18 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         break;
       case "oni_germs":
         payload = withDb((db) => germs(db, args));
+        break;
+      case "oni_research":
+        payload = withDb((db) => research(db));
+        break;
+      case "oni_schedules":
+        payload = withDb((db) => schedules(db));
+        break;
+      case "oni_power":
+        payload = withDb((db) => power(db));
+        break;
+      case "oni_plants":
+        payload = withDb((db) => plants(db, args));
         break;
       case "oni_query":
         payload = withDb((db) => query(db, args.sql, args.params ?? []));
