@@ -69,6 +69,12 @@ describe("GET /", () => {
     const res = await fetch(`${baseUrl}/nope`);
     assert.equal(res.status, 404);
   });
+
+  test("non-GET method returns 405 with Allow: GET header", async () => {
+    const res = await fetch(`${baseUrl}/api/status`, { method: "POST" });
+    assert.equal(res.status, 405);
+    assert.equal(res.headers.get("allow"), "GET");
+  });
 });
 
 describe("GET /api/status", () => {

@@ -247,7 +247,7 @@ function extractDuplicant(go, goId, instanceId, tables) {
   for (const pair of choreConsumer?.choreGroupPriorities ?? []) {
     const hash = pair[0]?.hash;
     const priority = pair[1]?.priority;
-    if (hash == null || priority == null) continue;
+    if (hash == null || priority == null) continue; // loose: catches both null and undefined
     const group = CHORE_GROUP_BY_HASH.get(hash);
     tables.duplicant_priorities.push({
       duplicant_id: goId,

@@ -61,6 +61,11 @@ const PORT_FALLBACK_LIMIT = 10;
 export function startWeb({ port = 8080, host = "127.0.0.1", outputDir }) {
   const server = http.createServer(async (req, res) => {
     try {
+      if (req.method !== "GET") {
+        res.writeHead(405, { "Content-Type": "text/plain", "Allow": "GET" });
+        res.end("method not allowed");
+        return;
+      }
       // Strip query string so /api/status?t=1 routes correctly.
       const url = (req.url ?? "/").split("?")[0];
       if (url === "/api/events")  return serveEvents(res);
@@ -80,35 +85,41 @@ export function startWeb({ port = 8080, host = "127.0.0.1", outputDir }) {
     }
   });
 
-  return tryListen(server, host, port, 0);
+  return tryListen(server, host, port);
 }
 
 /**
  * Attempt to bind on `port`; if EADDRINUSE, retry on port+1 up to
  * PORT_FALLBACK_LIMIT attempts. Resolves with the bound server.
  */
-function tryListen(server, host, port, attempt) {
-  return new Promise((resolve, reject) => {
-    server.once("error", (err) => {
-      if (err.code === "EADDRINUSE" && attempt < PORT_FALLBACK_LIMIT) {
-        server.removeAllListeners("error");
-        console.warn(`[web] port ${port} in use, trying ${port + 1}…`);
-        resolve(tryListen(server, host, port + 1, attempt + 1));
-      } else {
-        reject(err);
+async function tryListen(server, host, port) {
+  for (let attempt = 0; attempt <= PORT_FALLBACK_LIMIT; attempt++) {
+    const p = port + attempt;
+    const bound = await new Promise((resolve, reject) => {
+      function onError(err) {
+        server.removeListener("error", onError);
+        if (err.code === "EADDRINUSE" && attempt < PORT_FALLBACK_LIMIT) {
+          console.warn(`[web] port ${p} in use, trying ${p + 1}…`);
+          resolve(false);
+        } else {
+          reject(err);
+        }
       }
+      server.once("error", onError);
+      server.listen(p, host, () => {
+        server.removeListener("error", onError);
+        resolve(true);
+      });
     });
-    server.listen(port, host, () => {
+    if (bound) {
       const addr = server.address();
-      const realPort = typeof addr === "object" && addr ? addr.port : port;
+      const realPort = typeof addr === "object" && addr ? addr.port : p;
       console.log(`[web] listening on http://${host}:${realPort}`);
-      // Replace the bind-time once handler with a permanent logger so
-      // post-bind runtime errors (e.g. TCP socket faults) don't crash the daemon.
-      server.removeAllListeners("error");
+      // Permanent error logger so post-bind TCP faults don't crash the daemon.
       server.on("error", (err) => console.error(`[web] server error: ${err.message}`));
-      resolve(server);
-    });
-  });
+      return server;
+    }
+  }
 }
 
 // ── route handlers ────────────────────────────────────────────────────────────
