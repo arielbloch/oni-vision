@@ -20,32 +20,9 @@ let GEYSER_NAMES     = {};  // type_id (string)    → name
 let BAD_EFFECTS      = {};  // effect string        → { label, cls }
 let FOOD             = {};  // prefab_id            → { name, kcal, morale }
 let SKILL_LABELS     = {};  // branch → label (kept for potential future use)
-
-// Domain + icon for each chore group (Studio palette).
-// domain → .fc-{domain} CSS class (bar colour)
-// icon   → Tabler icon name (ti-*)
-// docs/frontend-design.md documents the full design exploration.
-// Domain colour + abbreviated label for each chore group (Studio palette).
-// order matches the game's "Manage Duplicant Priorities" column order (left→right).
-// docs/frontend-design.md documents the full design exploration.
-const CHORE_META = {
-  Combat:           { domain: "tangerine", abbr: "Atk",   order:  1 },
-  LifeSupport:      { domain: "cyan",      abbr: "Life",  order:  2 },
-  Toggle:           { domain: "lavender",  abbr: "Tog",   order:  3 },
-  MedicalAid:       { domain: "pink",      abbr: "Med",   order:  4 },
-  Basekeeping:      { domain: "cyan",      abbr: "Tidy",  order:  5 },
-  Cook:             { domain: "pink",      abbr: "Cook",  order:  6 },
-  Art:              { domain: "pink",      abbr: "Art",   order:  7 },
-  Research:         { domain: "lavender",  abbr: "Res",   order:  8 },
-  MachineOperating: { domain: "lavender",  abbr: "Ops",   order:  9 },
-  Farming:          { domain: "pink",      abbr: "Farm",  order: 10 },
-  Ranching:         { domain: "pink",      abbr: "Ranch", order: 11 },
-  Build:            { domain: "cyan",      abbr: "Build", order: 12 },
-  Dig:              { domain: "cyan",      abbr: "Dig",   order: 13 },
-  Hauling:          { domain: "cyan",      abbr: "Haul",  order: 14 },
-  Storage:          { domain: "cyan",      abbr: "Store", order: 15 },
-  Unknown:          { domain: "tangerine", abbr: "?",     order: 99 },
-};
+let CHORE_GROUPS     = {};  // chore_group internal name → { label, domain, abbr, sort_order }
+                            // Populated from /api/status; source of truth is src/chore_groups.js.
+                            // docs/frontend-design.md documents the colour/abbr design exploration.
 
 /** Resolve a numeric element_id to a display name. */
 function elementName(id) {
@@ -65,8 +42,10 @@ function geyserName(id) {
 
 const POLL_MS = 10000;  // polling fallback (SSE is the primary push path)
 
-// Game-rule thresholds — defaults mirror src/thresholds.js; overwritten from
-// /api/status on every refresh so the frontend is always in sync.
+// Game-rule thresholds. These defaults mirror src/thresholds.js and are used
+// only for the brief window between page load and the first /api/status
+// response; from then on every refresh overwrites T with the server values,
+// keeping the FE always in sync with the canonical source.
 let T = {
   stale_after_s:       600,
   stress_warn:          30,
@@ -156,9 +135,9 @@ function renderDupes(rows) {
       .join("");
     const chips = (r.focus ?? [])
       .slice()
-      .sort((a, b) => (CHORE_META[a.group]?.order ?? 99) - (CHORE_META[b.group]?.order ?? 99))
+      .sort((a, b) => (CHORE_GROUPS[a.group]?.sort_order ?? 99) - (CHORE_GROUPS[b.group]?.sort_order ?? 99))
       .map(f => {
-        const meta = CHORE_META[f.group] ?? { domain: "tangerine", abbr: "?" };
+        const meta = CHORE_GROUPS[f.group] ?? { domain: "tangerine", abbr: "?" };
         const pri  = f.priority >= T.priority_boost ? "p5" : "p4";
         return `<span class="ft ${pri} ft-${meta.domain}">${meta.abbr}</span>`;
       })
@@ -365,6 +344,7 @@ async function refresh() {
     if (data.food_meta)         FOOD          = data.food_meta;
     if (data.effect_labels)     BAD_EFFECTS   = data.effect_labels;
     if (data.skill_labels)      SKILL_LABELS  = data.skill_labels;
+    if (data.chore_groups)      CHORE_GROUPS  = data.chore_groups;
     if (data.thresholds)        T             = { ...T, ...data.thresholds };
 
     renderCounts(data.counts || {});

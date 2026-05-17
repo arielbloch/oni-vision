@@ -127,6 +127,16 @@ describe("GET /api/status", () => {
       "skill_labels should be a non-null object");
     assert.equal(body.skill_labels["mining"], "Miner",
       "skill_labels should resolve mining branch");
+    assert.ok(body.chore_groups && typeof body.chore_groups === "object",
+      "chore_groups should be a non-null object");
+    assert.ok(body.chore_groups["Combat"],
+      "chore_groups should include Combat");
+    assert.equal(body.chore_groups["Combat"].domain, "tangerine",
+      "chore_groups.Combat.domain should be 'tangerine'");
+    assert.equal(body.chore_groups["Combat"].abbr, "Atk",
+      "chore_groups.Combat.abbr should be 'Atk'");
+    assert.equal(body.chore_groups["Combat"].sort_order, 1,
+      "chore_groups.Combat.sort_order should be 1");
 
     // Thresholds block.
     assert.ok(body.thresholds && typeof body.thresholds === "object",

@@ -160,15 +160,121 @@ function serveEvents(res) {
 }
 
 /**
- * Status endpoint. Wraps statusObject() and enriches the payload with:
- *   - per-dupe mastered skills (from duplicant_skills)
- *   - per-dupe active effects/diseases (from duplicant_effects)
- *   - individual geyser quality rolls (replaces the grouped geyser_types)
- *   - food in storage by type (from storage_contents)
- *   - all stored elements and in-game stockpile filter settings
- *   - lookup tables (element_names, geyser_type_names, food_meta,
- *     effect_labels, skill_labels) queried from DB so the frontend
- *     needs no hardcoded copies
+ * Add per-dupe skills, morale_cost, active effects, and boosted focus
+ * (priority > 3) into the existing dupes array in place. Four bulk queries
+ * keyed by dupe name (names are unique within a colony per ONI rules).
+ */
+function enrichDupes(db, dupes) {
+  const skillsByName = new Map();
+  for (const row of db.prepare(
+    `SELECT d.name, GROUP_CONCAT(ds.skill, ',') AS skills
+     FROM duplicants d
+     LEFT JOIN duplicant_skills ds ON ds.duplicant_id = d.game_object_id
+     GROUP BY d.game_object_id`
+  ).all()) {
+    skillsByName.set(row.name, row.skills ?? null);
+  }
+
+  const moraleCostByName = new Map();
+  for (const row of db.prepare(`SELECT name, morale_cost FROM duplicants`).all()) {
+    moraleCostByName.set(row.name, row.morale_cost ?? 0);
+  }
+
+  const effectsByName = new Map();
+  for (const row of db.prepare(
+    `SELECT d.name, de.effect
+     FROM duplicant_effects de
+     JOIN duplicants d ON d.game_object_id = de.duplicant_id
+     WHERE de.time_remaining > 0 OR de.time_remaining IS NULL`
+  ).all()) {
+    if (!effectsByName.has(row.name)) effectsByName.set(row.name, []);
+    effectsByName.get(row.name).push(row.effect);
+  }
+
+  const focusByName = new Map();
+  for (const row of db.prepare(
+    `SELECT d.name, dp.chore_group, COALESCE(cgn.label, dp.chore_group) AS label, dp.priority
+     FROM duplicant_priorities dp
+     JOIN duplicants d ON d.game_object_id = dp.duplicant_id
+     LEFT JOIN chore_group_names cgn ON cgn.name = dp.chore_group
+     WHERE dp.priority > 3
+     ORDER BY dp.priority DESC, dp.chore_group`
+  ).all()) {
+    if (!focusByName.has(row.name)) focusByName.set(row.name, []);
+    focusByName.get(row.name).push({ group: row.chore_group, label: row.label, priority: row.priority });
+  }
+
+  for (const dupe of dupes) {
+    dupe.skills      = skillsByName.get(dupe.name)      ?? null;
+    dupe.effects     = effectsByName.get(dupe.name)     ?? [];
+    dupe.focus       = focusByName.get(dupe.name)       ?? [];
+    dupe.morale_cost = moraleCostByName.get(dupe.name)  ?? 0;
+  }
+}
+
+/**
+ * Read the union of element hashes accepted by any TreeFilterable behaviour
+ * (storage buildings). Used by the FE as the default stockpile filter.
+ */
+function readStockpileFilters(db) {
+  const hashes = new Set();
+  for (const row of db.prepare(
+    `SELECT template_data FROM behaviors WHERE name = 'TreeFilterable'`
+  ).all()) {
+    try {
+      const parsed = JSON.parse(row.template_data || "{}");
+      for (const tag of parsed.acceptedTagSet ?? []) {
+        if (tag.hash != null) hashes.add(tag.hash);
+      }
+    } catch { /* malformed JSON, skip */ }
+  }
+  return [...hashes];
+}
+
+/**
+ * Serialize all lookup tables from current.sqlite for the FE. These are the
+ * single source of truth (populated from src/*.js during buildOutputs); the
+ * frontend never hardcodes a copy.
+ */
+function serveLookups(db) {
+  const toMap = (rows, keyCol, valCol) =>
+    Object.fromEntries(rows.map((r) => [String(r[keyCol]), r[valCol]]));
+
+  return {
+    element_names: toMap(
+      db.prepare("SELECT element_id, name FROM element_names").all(),
+      "element_id", "name"
+    ),
+    geyser_type_names: toMap(
+      db.prepare("SELECT type_id, name FROM geyser_type_names").all(),
+      "type_id", "name"
+    ),
+    food_meta: Object.fromEntries(
+      db.prepare("SELECT prefab_id, name, kcal, morale FROM food_meta").all()
+        .map((r) => [r.prefab_id, { name: r.name, kcal: r.kcal, morale: r.morale }])
+    ),
+    effect_labels: Object.fromEntries(
+      db.prepare("SELECT effect, label, severity FROM effect_labels").all()
+        .map((r) => [r.effect, { label: r.label, cls: r.severity }])
+    ),
+    skill_labels: toMap(
+      db.prepare("SELECT branch, label FROM skill_labels").all(),
+      "branch", "label"
+    ),
+    // Chore groups indexed by `name` since duplicant_priorities joins on the
+    // internal string. Carries full display metadata for the FE focus chips.
+    chore_groups: Object.fromEntries(
+      db.prepare("SELECT hash, name, label, domain, abbr, sort_order FROM chore_group_names").all()
+        .map((r) => [r.name, { hash: r.hash, label: r.label, domain: r.domain, abbr: r.abbr, sort_order: r.sort_order }])
+    ),
+  };
+}
+
+/**
+ * Status endpoint. Returns a single JSON payload with the colony summary
+ * (statusObject) plus per-dupe enrichment, per-geyser detail, food/resources
+ * aggregates, in-game stockpile filters, all lookup tables, and the FE
+ * thresholds. The FE consumes this on every refresh.
  */
 function serveStatus(res, outputDir) {
   const dbPath = join(outputDir, "current.sqlite");
@@ -186,70 +292,16 @@ function serveStatus(res, outputDir) {
     db = new DatabaseSync(dbPath, { readOnly: true });
     const payload = statusObject(db, { dupeLimit: 50 });
 
-    // ── Dupe enrichment: skills + active effects ──────────────────────────────
-    // Two bulk queries keyed by dupe name (unique within a colony per ONI rules).
+    enrichDupes(db, payload.top_dupes);
 
-    const skillsByName = new Map();
-    for (const row of db.prepare(
-      `SELECT d.name, GROUP_CONCAT(ds.skill, ',') AS skills
-       FROM duplicants d
-       LEFT JOIN duplicant_skills ds ON ds.duplicant_id = d.game_object_id
-       GROUP BY d.game_object_id`
-    ).all()) {
-      skillsByName.set(row.name, row.skills ?? null);
-    }
-
-    const moraleCostByName = new Map();
-    for (const row of db.prepare(
-      `SELECT name, morale_cost FROM duplicants`
-    ).all()) {
-      moraleCostByName.set(row.name, row.morale_cost ?? 0);
-    }
-
-    const effectsByName = new Map();
-    for (const row of db.prepare(
-      `SELECT d.name, de.effect
-       FROM duplicant_effects de
-       JOIN duplicants d ON d.game_object_id = de.duplicant_id
-       WHERE de.time_remaining > 0 OR de.time_remaining IS NULL`
-    ).all()) {
-      if (!effectsByName.has(row.name)) effectsByName.set(row.name, []);
-      effectsByName.get(row.name).push(row.effect);
-    }
-
-    // Per-dupe boosted priorities (chore_group priority > 3 only).
-    const focusByName = new Map();
-    for (const row of db.prepare(
-      `SELECT d.name, dp.chore_group, COALESCE(cgn.label, dp.chore_group) AS label, dp.priority
-       FROM duplicant_priorities dp
-       JOIN duplicants d ON d.game_object_id = dp.duplicant_id
-       LEFT JOIN chore_group_names cgn ON cgn.name = dp.chore_group
-       WHERE dp.priority > 3
-       ORDER BY dp.priority DESC, dp.chore_group`
-    ).all()) {
-      if (!focusByName.has(row.name)) focusByName.set(row.name, []);
-      focusByName.get(row.name).push({ group: row.chore_group, label: row.label, priority: row.priority });
-    }
-
-
-    for (const dupe of payload.top_dupes) {
-      dupe.skills      = skillsByName.get(dupe.name)      ?? null;
-      dupe.effects     = effectsByName.get(dupe.name)     ?? [];
-      dupe.focus       = focusByName.get(dupe.name)       ?? [];
-      dupe.morale_cost = moraleCostByName.get(dupe.name)  ?? 0;
-    }
-
-    // ── Geysers: individual rows with quality rolls ───────────────────────────
-    // Replace the grouped geyser_types from statusObject with per-geyser data.
+    // Per-geyser quality rolls replace statusObject's grouped geyser_types.
     payload.geyser_types = db.prepare(
       `SELECT type_id, rate_roll, year_percent_roll
        FROM geysers
        ORDER BY type_id, rate_roll DESC`
     ).all();
 
-    // ── Food by type in storage ───────────────────────────────────────────────
-    // Counts stacks of each food item across all storage buildings.
-    // The client maps item_prefab_id → { name, kcal, morale } for display.
+    // Food stack counts; client joins prefab_id → display via food_meta.
     payload.food = db.prepare(
       `SELECT item_prefab_id, COUNT(*) AS qty
        FROM storage_contents
@@ -259,9 +311,8 @@ function serveStatus(res, outputDir) {
        LIMIT 30`
     ).all();
 
-    // ── All stored elements (for the user-configurable stockpile picker) ──────
-    // Returns every element found in containers or loose in the world, sorted
-    // by total mass. The client filters this down to the user's selection.
+    // Every stored element (containers + loose), sorted by total mass. The
+    // client filters this down to the user's selection or in-game filter.
     payload.all_resources = db.prepare(
       `SELECT element_id, SUM(units) AS total_units
        FROM (
@@ -273,51 +324,8 @@ function serveStatus(res, outputDir) {
        ORDER BY total_units DESC`
     ).all();
 
-    // ── In-game storage filter settings (TreeFilterable) ─────────────────────
-    // Union of all element hashes accepted by any storage building. Used as
-    // the default stockpile display in the UI before the user customises it.
-    const stockpileFilters = new Set();
-    for (const row of db.prepare(
-      `SELECT template_data FROM behaviors WHERE name = 'TreeFilterable'`
-    ).all()) {
-      try {
-        const parsed = JSON.parse(row.template_data || "{}");
-        for (const tag of parsed.acceptedTagSet ?? []) {
-          if (tag.hash != null) stockpileFilters.add(tag.hash);
-        }
-      } catch { /* malformed JSON, skip */ }
-    }
-    payload.stockpile_filters = [...stockpileFilters];
-
-    // ── Lookup tables from DB (single source of truth) ────────────────────────
-    // These are populated into current.sqlite during buildOutputs() from the
-    // src/*.js source files. Serving them here lets the frontend drop all its
-    // hardcoded JS tables and always stay in sync with the parser.
-    const toMap = (rows, keyCol, valCol) =>
-      Object.fromEntries(rows.map((r) => [String(r[keyCol]), r[valCol]]));
-
-    payload.element_names = toMap(
-      db.prepare("SELECT element_id, name FROM element_names").all(),
-      "element_id", "name"
-    );
-    payload.geyser_type_names = toMap(
-      db.prepare("SELECT type_id, name FROM geyser_type_names").all(),
-      "type_id", "name"
-    );
-    payload.food_meta = Object.fromEntries(
-      db.prepare("SELECT prefab_id, name, kcal, morale FROM food_meta").all()
-        .map((r) => [r.prefab_id, { name: r.name, kcal: r.kcal, morale: r.morale }])
-    );
-    payload.effect_labels = Object.fromEntries(
-      db.prepare("SELECT effect, label, severity FROM effect_labels").all()
-        .map((r) => [r.effect, { label: r.label, cls: r.severity }])
-    );
-    payload.skill_labels = toMap(
-      db.prepare("SELECT branch, label FROM skill_labels").all(),
-      "branch", "label"
-    );
-
-    // Game-rule constants from the single source of truth in src/thresholds.js.
+    payload.stockpile_filters = readStockpileFilters(db);
+    Object.assign(payload, serveLookups(db));
     payload.thresholds = THRESHOLDS;
 
     res.writeHead(200, {

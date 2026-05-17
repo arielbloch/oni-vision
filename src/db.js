@@ -193,9 +193,12 @@ const SCHEMA = [
      label  TEXT NOT NULL
    )`,
   `CREATE TABLE chore_group_names (
-     hash  INTEGER PRIMARY KEY,
-     name  TEXT NOT NULL,
-     label TEXT NOT NULL
+     hash       INTEGER PRIMARY KEY,
+     name       TEXT NOT NULL,
+     label      TEXT NOT NULL,
+     domain     TEXT NOT NULL,
+     abbr       TEXT NOT NULL,
+     sort_order INTEGER NOT NULL
    )`,
   `CREATE TABLE duplicant_priorities (
      duplicant_id INTEGER NOT NULL,
@@ -278,7 +281,7 @@ export const TABLE_COLUMNS = {
   food_meta:        ["prefab_id", "name", "kcal", "morale"],
   effect_labels:    ["effect", "label", "severity"],
   skill_labels:     ["branch", "label"],
-  chore_group_names:     ["hash", "name", "label"],
+  chore_group_names:     ["hash", "name", "label", "domain", "abbr", "sort_order"],
   duplicant_priorities:  ["duplicant_id", "chore_group", "priority"],
 };
 
@@ -318,43 +321,46 @@ export function assertLookupTablesPopulated(tables) {
 /** Build a fresh SQLite DB at `path`, populated from extractor output. */
 export function writeDatabase(path, tables) {
   const db = new DatabaseSync(path);
-  // Speed pragmas for bulk insert. SAFETY NOTE: journal_mode=MEMORY +
-  // synchronous=OFF means a process kill mid-COMMIT can leave the DB
-  // file inconsistent. Pipeline.js mitigates this by writing to a temp
-  // path and atomically rename()-ing into place only after this function
-  // returns; readers never see the temp file. So a crash here just
-  // strands an abandoned tmp file, which is fine.
-  db.exec("PRAGMA journal_mode = MEMORY");
-  db.exec("PRAGMA synchronous = OFF");
-  db.exec("BEGIN");
-  for (const stmt of SCHEMA) db.exec(stmt);
+  try {
+    // Speed pragmas for bulk insert. SAFETY NOTE: journal_mode=MEMORY +
+    // synchronous=OFF means a process kill mid-COMMIT can leave the DB
+    // file inconsistent. Pipeline.js mitigates this by writing to a temp
+    // path and atomically rename()-ing into place only after this function
+    // returns; readers never see the temp file. So a crash here just
+    // strands an abandoned tmp file, which is fine.
+    db.exec("PRAGMA journal_mode = MEMORY");
+    db.exec("PRAGMA synchronous = OFF");
+    db.exec("BEGIN");
+    for (const stmt of SCHEMA) db.exec(stmt);
 
-  for (const [tableName, rows] of Object.entries(tables)) {
-    if (!rows?.length) continue;
-    const cols = TABLE_COLUMNS[tableName];
-    if (!cols) {
-      throw new Error(`No column list defined for table ${tableName}`);
-    }
-    const stmt = db.prepare(buildInsertSql(tableName, cols));
-    for (const row of rows) {
-      const bound = toBindObject(row, cols);
-      try {
-        stmt.run(bound);
-      } catch (err) {
-        // node:sqlite gives us "Provided value cannot be bound to SQLite
-        // parameter N" with no hint of which table/column N corresponds
-        // to. Surface enough context to debug it.
-        throw new Error(
-          `Insert into "${tableName}" failed: ${err.message}. ` +
-          `Bound row: ${diagnosticRowDump(bound, cols)}`,
-          { cause: err }
-        );
+    for (const [tableName, rows] of Object.entries(tables)) {
+      if (!rows?.length) continue;
+      const cols = TABLE_COLUMNS[tableName];
+      if (!cols) {
+        throw new Error(`No column list defined for table ${tableName}`);
+      }
+      const stmt = db.prepare(buildInsertSql(tableName, cols));
+      for (const row of rows) {
+        const bound = toBindObject(row, cols);
+        try {
+          stmt.run(bound);
+        } catch (err) {
+          // node:sqlite gives us "Provided value cannot be bound to SQLite
+          // parameter N" with no hint of which table/column N corresponds
+          // to. Surface enough context to debug it.
+          throw new Error(
+            `Insert into "${tableName}" failed: ${err.message}. ` +
+            `Bound row: ${diagnosticRowDump(bound, cols)}`,
+            { cause: err }
+          );
+        }
       }
     }
-  }
 
-  db.exec("COMMIT");
-  db.close();
+    db.exec("COMMIT");
+  } finally {
+    try { db.close(); } catch { /* ignore */ }
+  }
 }
 
 /**

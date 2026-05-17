@@ -70,6 +70,9 @@ Totals ≥100 kg are reported as integers (rounding noise stripped). Default lim
 ### `oni_food({ limit?, format? })`
 Food items currently in colony storage, with display name, kcal per item, morale bonus, and stack count. Joins the `food_meta` lookup table so results are human-readable. Unknown food items (new DLC) appear with null name/kcal/morale. Default limit is 20.
 
+### `oni_priorities()`
+One row per (dupe, chore_group) pair where priority differs from the default (3). Returns `dupe_name`, `chore_group` (internal string), `label` (display name from the game UI), and `priority` (1-5). Use this for "which dupes are specialising in what" questions — much cheaper than chaining `oni_dupe` for every dupe. A missing `(dupe, group)` row means priority is at the default 3.
+
 ### `oni_query({ sql, params?, format? })`
 SELECT-only escape hatch over the whole DB schema. Reject any non-SELECT statement; multiple statements aren't allowed either. **Caveat:** a trailing semicolon is silently stripped, but an interior semicolon anywhere in the string is rejected (so `WHERE name = ';'` will fail — avoid interior semicolons entirely). Use `format: "tsv"` for large tabular returns.
 

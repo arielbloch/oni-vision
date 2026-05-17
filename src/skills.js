@@ -23,6 +23,14 @@ export const SKILL_LABELS = [
 ];
 
 /**
+ * Roman numerals for skill tiers (1-based: ROMAN_NUMERALS[1] = "I").
+ * ONI skills cap at tier 5; index 0 is empty so a raw level number is the
+ * natural index. Mirrored client-side in src/web/app.js (it can't import
+ * server code) — keep both in sync if ONI ever ships tier 6+.
+ */
+export const ROMAN_NUMERALS = ["", "I", "II", "III", "IV", "V"];
+
+/**
  * Sum the morale cost of a comma-separated mastered-skills string.
  * Each skill's trailing tier digit contributes directly to the morale
  * cost shown in-game (e.g. "Mining2" → 2, "Hauling1" → 1, "Suit" → 1).

@@ -7,7 +7,7 @@
 // whether to enable color based on stdout.isTTY and NO_COLOR.
 
 import { elementName } from "./elements.js";
-import { SKILL_LABELS as SKILL_LABELS_ARRAY } from "./skills.js";
+import { SKILL_LABELS as SKILL_LABELS_ARRAY, ROMAN_NUMERALS } from "./skills.js";
 import { GEYSER_TYPE_NAMES } from "./geyser_types.js";
 import { ANSI, paint, bar, pad, fit, lpad, formatMass, formatAge, stressColor } from "./format.js";
 
@@ -140,7 +140,6 @@ export function renderDupes(db, { color = false, limit = 12 } = {}) {
   return [header, ...lines].join("\n");
 }
 
-const ROMAN = ["", "I", "II", "III", "IV", "V"];
 
 /**
  * Convert a comma-separated skills string from GROUP_CONCAT into a compact
@@ -162,7 +161,7 @@ function formatSkills(raw) {
   const parts = [];
   for (const [branch, level] of bestLevel) {
     const label = SKILL_LABEL_MAP.get(branch) ?? (branch.charAt(0).toUpperCase() + branch.slice(1));
-    const roman = ROMAN[level] ?? String(level);
+    const roman = ROMAN_NUMERALS[level] ?? String(level);
     parts.push(roman ? `${label} ${roman}` : label);
   }
   return parts.join(", ");
