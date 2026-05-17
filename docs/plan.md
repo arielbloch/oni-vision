@@ -2,7 +2,7 @@
 
 This document is the design north star for oni-vision. Each section is a self-contained mini-design: what we want, the rough shape of the solution, what ships, and what we still need to decide.
 
-> **Status (post Wave 23):** Features 1–4 are implemented and committed. Feature 5 (zero-config experience) is the active design goal. This doc is kept as living design rationale; the §"Open questions" notes capture calls made during implementation.
+> **Status (post Wave 26):** Features 1–4 are implemented and committed. Feature 5 (zero-config experience) is the active design goal. This doc is kept as living design rationale; the §"Open questions" notes capture calls made during implementation. Shipped feature-design docs are archived in [`docs/history/`](history/).
 
 ---
 

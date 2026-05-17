@@ -82,8 +82,20 @@ sqlite3 ~/.oni-vision/output/current.sqlite \
 
 **Query from Claude.** Two integration paths:
 
-- **Lightweight.** Drop the contents of [`CLAUDE.md`](./CLAUDE.md) into your project's `CLAUDE.md`. Claude then writes raw `sqlite3` queries against the DB.
-- **Full-fat.** Install the [`oni-vision-plugin/`](./oni-vision-plugin) into Claude Code or Cowork. Typed read-only tools + skills, no raw SQL needed for typical questions. See the plugin's own README.
+- **Lightweight.** Drop the contents of [`CLAUDE.md`](./CLAUDE.md) into your project's `CLAUDE.md`. Claude then writes raw `sqlite3` queries against the DB, using the lookup-table JOIN examples to get human-readable names.
+
+- **Full-fat (recommended).** Install the [`oni-vision-plugin/`](./oni-vision-plugin) into Claude Code. Typed read-only tools + skills, no raw SQL needed for common questions. See [`oni-vision-plugin/README.md`](./oni-vision-plugin/README.md) for full details. Quick start:
+
+  ```bash
+  # Option A — Claude Code plugin system
+  /plugin install /path/to/oni-vision/oni-vision-plugin
+
+  # Option B — register only the MCP server (no plugin system required)
+  claude mcp add oni-vision -- node --no-warnings=ExperimentalWarning \
+    /path/to/oni-vision/oni-vision-plugin/mcp/server.js
+  ```
+
+  Verify the plugin loaded: ask Claude "what tools do you have for oni-vision?" — it should list `oni_status`, `oni_dupes`, `oni_query`, etc. If tools are missing, run `claude mcp list` to check the server is registered.
 
 ## Configuration
 
