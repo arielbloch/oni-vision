@@ -311,12 +311,17 @@ function serveStatus(res, outputDir) {
     // kcal, morale from the lookup so the FE can compute days without a
     // second JOIN against the FOOD map it holds in memory.
     payload.food = db.prepare(
-      `SELECT sc.item_prefab_id, fm.name, fm.kcal, fm.morale, COUNT(*) AS qty
-       FROM storage_contents sc
-       LEFT JOIN foods fm ON fm.prefab_id = sc.item_prefab_id
-       WHERE sc.item_prefab_id IS NOT NULL AND sc.element_id IS NULL
-       GROUP BY sc.item_prefab_id
-       ORDER BY fm.morale DESC, (fm.kcal * COUNT(*)) DESC
+      `SELECT src.pid AS item_prefab_id, fm.name, fm.kcal, fm.morale, SUM(src.cnt) AS qty
+       FROM (
+         SELECT item_prefab_id AS pid, COUNT(*) AS cnt
+         FROM storage_contents GROUP BY item_prefab_id
+         UNION ALL
+         SELECT prefab_id AS pid, COUNT(*) AS cnt
+         FROM world_objects GROUP BY prefab_id
+       ) src
+       JOIN foods fm ON fm.prefab_id = src.pid
+       GROUP BY src.pid
+       ORDER BY fm.morale DESC, (fm.kcal * SUM(src.cnt)) DESC
        LIMIT 30`
     ).all();
 

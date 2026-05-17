@@ -238,27 +238,45 @@ function onPickerChange() {
 // ── Renderers ─────────────────────────────────────────────────────────────────
 
 function renderFood(rows, dupeCount) {
-  // rows are pre-sorted by morale DESC from the server; filter to known items.
   const known = (rows ?? []).filter(r => r.kcal != null);
 
   if (known.length === 0) {
-    setHTML("food-card", `<div class="empty">no food in storage</div>`);
+    setHTML("food-card", `<div class="empty">no food</div>`);
     return;
   }
 
   const n = dupeCount > 0 ? dupeCount : 1;
-  const html = known.map(r => {
+
+  // Total days bar
+  const totalKcal = known.reduce((s, r) => s + r.kcal * r.qty, 0);
+  const totalDays = totalKcal / 3000 / n;
+  const filled    = Math.min(10, Math.floor(totalDays));
+  const over      = totalDays > 10;
+
+  const SEG  = `width:13px;height:13px;flex-shrink:0`;
+  const FULL = `${SEG};background:var(--good)`;
+  const EMPTY= `${SEG};background:#501414`;
+  const segs = [
+    ...Array.from({ length: filled },    () => `<div style="${FULL}"></div>`),
+    ...Array.from({ length: 10-filled }, () => `<div style="${EMPTY}"></div>`),
+    over
+      ? `<div style="${SEG};width:26px;background:var(--good);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#000">&gt;10</div>`
+      : `<div style="${SEG};width:26px;background:#501414;display:flex;align-items:center;justify-content:center;font-size:9px;color:#7a3030">&gt;10</div>`,
+  ].join("");
+
+  const totalStr = fmtDays(totalDays);
+  const bar = `<div style="display:flex;gap:2px;align-items:center;margin:6px 0 10px">${segs}<span style="margin-left:8px;font-size:12px;color:var(--fg)">${escapeHtml(totalStr)}</span></div>`;
+
+  // Per-type list: days right-aligned, name left-aligned
+  const rows_html = known.map(r => {
     const days = (r.qty * r.kcal) / 3000 / n;
-    const m = r.morale ?? 0;
-    const mLabel = m > 0 ? `+${m}` : String(m);
-    const mColor = m > 0 ? "var(--good)" : m < 0 ? "var(--bad)" : "var(--fg-muted)";
     return `<tr>
+      <td class="metric" style="text-align:right;padding-right:10px;width:1%;white-space:nowrap">${fmtDays(days)}</td>
       <td style="font-size:12px">${escapeHtml(r.name ?? r.item_prefab_id)}</td>
-      <td class="metric">${fmtDays(days)}</td>
-      <td class="metric" style="color:${mColor};width:28px">${mLabel}</td>
     </tr>`;
   }).join("");
-  setHTML("food-card", `<table><tbody>${html}</tbody></table>`);
+
+  setHTML("food-card", `${bar}<table style="width:100%"><tbody>${rows_html}</tbody></table>`);
 }
 
 function renderResources(rows) {

@@ -3,15 +3,17 @@
 // Shared between src/ui.js (Node CLI) and tested by test/format.test.js.
 
 export const ANSI = {
-  reset:   "\x1b[0m",
-  dim:     "\x1b[2m",
-  bold:    "\x1b[1m",
-  cyan:    "\x1b[36m",
-  green:   "\x1b[32m",
-  yellow:  "\x1b[33m",
-  red:     "\x1b[31m",
-  blue:    "\x1b[34m",
-  magenta: "\x1b[35m",
+  reset:    "\x1b[0m",
+  dim:      "\x1b[2m",
+  bold:     "\x1b[1m",
+  cyan:     "\x1b[36m",
+  green:    "\x1b[32m",
+  yellow:   "\x1b[33m",
+  red:      "\x1b[31m",
+  blue:     "\x1b[34m",
+  magenta:  "\x1b[35m",
+  black:    "\x1b[30m",
+  bg_green: "\x1b[42m",
 };
 
 export function paint(s, code, enabled) {

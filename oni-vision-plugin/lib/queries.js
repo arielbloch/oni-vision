@@ -380,17 +380,21 @@ export function resources(db, { location = "both", limit = 10 } = {}) {
  */
 export function food(db, { limit = 20 } = {}) {
   return db.prepare(
-    `SELECT sc.item_prefab_id AS prefab_id,
+    `SELECT src.pid AS prefab_id,
             fm.name,
             fm.kcal,
             fm.morale,
-            COUNT(*) AS qty
-     FROM storage_contents sc
-     LEFT JOIN foods fm ON fm.prefab_id = sc.item_prefab_id
-     WHERE sc.item_prefab_id IS NOT NULL
-       AND sc.element_id IS NULL
-     GROUP BY sc.item_prefab_id
-     ORDER BY fm.morale DESC, (fm.kcal * COUNT(*)) DESC
+            SUM(src.cnt) AS qty
+     FROM (
+       SELECT item_prefab_id AS pid, COUNT(*) AS cnt
+       FROM storage_contents GROUP BY item_prefab_id
+       UNION ALL
+       SELECT prefab_id AS pid, COUNT(*) AS cnt
+       FROM world_objects GROUP BY prefab_id
+     ) src
+     JOIN foods fm ON fm.prefab_id = src.pid
+     GROUP BY src.pid
+     ORDER BY fm.morale DESC, (fm.kcal * SUM(src.cnt)) DESC
      LIMIT ?`
   ).all(limit).map((r) => ({ ...r }));
 }

@@ -189,7 +189,7 @@ describe("renderFood", () => {
     withDb((db) => {
       // FAKE_SAVE has no food items (only element-based storage contents).
       const out = renderFood(db, { color: false });
-      assert.match(out, /none in storage/);
+      assert.match(out, /none/);
     });
   });
 });

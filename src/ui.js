@@ -177,35 +177,48 @@ export function renderFood(db, { color = false, limit = 8 } = {}) {
   const dupeCount = db.prepare("SELECT COUNT(*) AS n FROM duplicants").get().n || 1;
 
   const rows = db.prepare(`
-    SELECT COALESCE(fm.name, sc.item_prefab_id) AS name,
-           fm.kcal,
-           fm.morale,
-           COUNT(*) AS qty
-    FROM storage_contents sc
-    LEFT JOIN foods fm ON fm.prefab_id = sc.item_prefab_id
-    WHERE sc.item_prefab_id IS NOT NULL AND sc.element_id IS NULL
-      AND fm.kcal IS NOT NULL
-    GROUP BY sc.item_prefab_id
-    ORDER BY fm.morale DESC, (fm.kcal * COUNT(*)) DESC
+    SELECT fm.name, fm.kcal, fm.morale, SUM(cnt) AS qty
+    FROM (
+      SELECT item_prefab_id AS pid, COUNT(*) AS cnt
+      FROM storage_contents GROUP BY item_prefab_id
+      UNION ALL
+      SELECT prefab_id AS pid, COUNT(*) AS cnt
+      FROM world_objects GROUP BY prefab_id
+    ) src
+    JOIN foods fm ON fm.prefab_id = src.pid
+    GROUP BY src.pid
+    ORDER BY fm.morale DESC, (fm.kcal * SUM(cnt)) DESC
     LIMIT ?
   `).all(limit);
 
-  if (rows.length === 0) return paint("Food: none in storage", ANSI.dim, color);
+  if (rows.length === 0) return paint("Food: none", ANSI.dim, color);
 
-  const header = paint("Food", ANSI.bold + ANSI.green, color);
-  const lines  = rows.map((r) => {
+  // Total days bar
+  const totalKcal = rows.reduce((s, r) => s + r.kcal * r.qty, 0);
+  const totalDays = totalKcal / 3000 / dupeCount;
+  const filled    = Math.min(10, Math.floor(totalDays));
+  const over      = totalDays > 10;
+
+  const filledBar = color ? `${ANSI.green}${"█".repeat(filled)}${ANSI.reset}` : "█".repeat(filled);
+  const emptyBar  = color ? `${ANSI.dim}${"░".repeat(10 - filled)}${ANSI.reset}` : "░".repeat(10 - filled);
+  const overBox   = !color
+    ? "[>10]"
+    : over
+      ? `${ANSI.bg_green}${ANSI.black}[>10]${ANSI.reset}`
+      : `${ANSI.dim}[>10]${ANSI.reset}`;
+
+  const totalStr  = totalDays > 999 ? ">999 d" : `${totalDays.toFixed(1)} d`;
+  const header    = paint("Food", ANSI.bold + ANSI.green, color);
+  const barLine   = `${header}  ${filledBar}${emptyBar}${overBox}  ${totalStr}`;
+
+  // Per-type list: days right-aligned in 6-char column, then name
+  const lines = rows.map((r) => {
     const days    = (r.qty * r.kcal) / 3000 / dupeCount;
-    const daysStr = Number.isFinite(days) && days > 0
-      ? (days > 999 ? ">999 d" : `${days.toFixed(1)} d`)
-      : "—";
-    const m       = r.morale ?? 0;
-    const mLabel  = m > 0 ? `+${m}` : String(m);
-    const mColor  = !color ? "" : m > 0 ? ANSI.green : m < 0 ? ANSI.red : ANSI.dim;
-    const mReset  = color ? ANSI.reset : "";
-    return `  ${fit(r.name, 22)}  ${lpad(daysStr, 8)}   ${mColor}${mLabel}${mReset}`;
+    const daysStr = days > 999 ? ">999 d" : `${days.toFixed(1)} d`;
+    return `  ${lpad(daysStr, 6)}  ${r.name}`;
   });
 
-  return [header, ...lines].join("\n");
+  return [barLine, ...lines].join("\n");
 }
 
 /** Top elements by mass across loose piles + storage_contents. */

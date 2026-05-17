@@ -833,12 +833,12 @@ describe("food", () => {
     }
   });
 
-  test("unknown food items appear with null metadata", () => {
+  test("unknown food items (not in foods lookup) are excluded", () => {
     const tables = buildFakeTables();
     tables.storage_contents.push({
       owner_id: 999,
       item_prefab_id: "MysteryFood DLC_X",
-      element_id: null,
+      element_id: "976099455.0",
       units: 1,
       temperature: 300,
       disease_id: null,
@@ -849,13 +849,9 @@ describe("food", () => {
     writeDatabase(dbPath, tables);
     const db = new DatabaseSync(dbPath);
     try {
-  
       const rows = food(db);
-      assert.equal(rows.length, 1);
-      assert.equal(rows[0].prefab_id, "MysteryFood DLC_X");
-      assert.equal(rows[0].name, null);
-      assert.equal(rows[0].kcal, null);
-      assert.equal(rows[0].morale, null);
+      // Unknown prefab has no foods entry; inner JOIN excludes it.
+      assert.equal(rows.length, 0);
     } finally {
       db.close();
     }
