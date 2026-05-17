@@ -189,7 +189,7 @@ describe("geysers", () => {
       });
   });
 
-    test("resolves type_name via geyser_type_names lookup table", () => {
+    test("resolves type_name via geyser_types lookup table", () => {
       withDb((db) => {
       const rows = geysers(db);
       const steam = rows.find((r) => r.type_id === -899515856);
@@ -236,10 +236,10 @@ describe("resources", () => {
       });
   });
 
-  test("resolves element_name via element_names lookup table", () => {
+  test("resolves element_name via elements lookup table", () => {
     // The FAKE_SAVE fixture uses string element_ids ("Algae", "Water").
     // Real saves use SimHash integers. Build a DB with a numeric element_id
-    // that matches a known entry in element_names so the JOIN fires.
+    // that matches a known entry in elements so the JOIN fires.
     const tables = buildFakeTables();
     tables.world_objects.push({
       game_object_id: 9999,
@@ -599,8 +599,8 @@ describe("schema", () => {
       // Views show up too.
       assert.match(out, /view v_buildings_by_prefab:/);
       // Lookup tables (Feature 6).
-      assert.match(out, /table element_names:/);
-      assert.match(out, /table food_meta:/);
+      assert.match(out, /table elements:/);
+      assert.match(out, /table foods:/);
       });
   });
 

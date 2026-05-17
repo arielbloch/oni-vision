@@ -18,7 +18,7 @@
 //                Used by the FE to render focus chips left→right matching
 //                the game.
 //
-// Projected into `chore_group_names` in current.sqlite during buildOutputs()
+// Projected into `chore_groups` in current.sqlite during buildOutputs()
 // so both web and MCP consumers can JOIN against it without hardcoded copies.
 // Also imported by extractors.js to decode hashes at parse time.
 //

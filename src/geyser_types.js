@@ -2,7 +2,7 @@
 //
 // SimHash is computed with ONI's SDBM algorithm applied to the lowercase
 // internal type name. These values are stable across game versions.
-// Written into `geyser_type_names` in current.sqlite during buildOutputs().
+// Written into `geyser_types` in current.sqlite during buildOutputs().
 
 /** @type {Array<{type_id: number, name: string}>} */
 export const GEYSER_TYPE_NAMES = [

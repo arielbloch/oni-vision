@@ -123,7 +123,7 @@ const TOOLS = [
   },
   {
     name: "oni_food",
-    description: "Food items currently in colony storage, with display name, kcal per item, morale bonus, and stack count. JOINs the food_meta lookup table so results are human-readable. Unknown food items (new DLC) appear with null name/kcal/morale.",
+    description: "Food items currently in colony storage, with display name, kcal per item, morale bonus, and stack count. JOINs the foods lookup table so results are human-readable. Unknown food items (new DLC) appear with null name/kcal/morale.",
     inputSchema: {
       type: "object",
       properties: {

@@ -28,12 +28,12 @@ Each module is a plain JS file that exports structured data. `pipeline.js` proje
 
 | Module | SQLite table | What it contains |
 |--------|-------------|-----------------|
-| `src/elements.js` | `element_names(element_id, name)` | SimHash integer → element display name (Water, Algae, …) |
-| `src/geyser_types.js` | `geyser_type_names(type_id, name)` | SimHash integer → geyser display name (Steam Vent, Volcano, …) |
-| `src/food.js` | `food_meta(prefab_id, name, kcal, morale)` | Food item metadata — name, kcal per unit, morale bonus |
-| `src/effects.js` | `effect_labels(effect, label, severity)` | Status effect string → display label + severity tier |
-| `src/skills.js` | `skill_labels(branch, label)` | Skill branch prefix → display name (mining → Miner) |
-| `src/chore_groups.js` | `chore_group_names(hash, name, label)` | Chore-group SimHash → internal name + UI label |
+| `src/elements.js` | `elements(element_id, name)` | SimHash integer → element display name (Water, Algae, …) |
+| `src/geyser_types.js` | `geyser_types(type_id, name)` | SimHash integer → geyser display name (Steam Vent, Volcano, …) |
+| `src/food.js` | `foods(prefab_id, name, kcal, morale)` | Food item metadata — name, kcal per unit, morale bonus |
+| `src/effects.js` | `effects(effect, label, severity)` | Status effect string → display label + severity tier |
+| `src/skills.js` | `skills(branch, label)` | Skill branch prefix → display name (mining → Miner) |
+| `src/chore_groups.js` | `chore_groups(hash, name, label, domain, abbr, sort_order)` | Chore-group SimHash → name, UI label, and FE display metadata (colour domain, abbreviation, column order) |
 
 **Game rules that also live in `src/skills.js`:**
 - `moraleCostOf(skillsCsv)` — sums the tier digits of mastered skills; result stored as `duplicants.morale_cost` (computed once by the extractor, not re-derived client-side).
@@ -69,13 +69,13 @@ Without a JOIN, `element_id` columns return raw SimHash integers like `183667138
 -- Element names
 SELECT en.name, ROUND(SUM(sc.units), 0) AS kg
 FROM storage_contents sc
-JOIN element_names en ON en.element_id = sc.element_id
+JOIN elements en ON en.element_id = sc.element_id
 GROUP BY sc.element_id ORDER BY kg DESC;
 
 -- Geyser names
-SELECT gtn.name, rate_roll, year_percent_roll
+SELECT gt.name, rate_roll, year_percent_roll
 FROM geysers g
-JOIN geyser_type_names gtn ON gtn.type_id = g.type_id;
+JOIN geyser_types gt ON gt.type_id = g.type_id;
 ```
 
 ---

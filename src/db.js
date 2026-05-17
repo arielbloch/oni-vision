@@ -169,30 +169,30 @@ const SCHEMA = [
   // Written here so both the web frontend and MCP plugin can JOIN against them
   // without maintaining separate hardcoded copies.
 
-  `CREATE TABLE element_names (
+  `CREATE TABLE elements (
      element_id INTEGER PRIMARY KEY,
      name       TEXT NOT NULL
    )`,
-  `CREATE TABLE geyser_type_names (
+  `CREATE TABLE geyser_types (
      type_id INTEGER PRIMARY KEY,
      name    TEXT NOT NULL
    )`,
-  `CREATE TABLE food_meta (
+  `CREATE TABLE foods (
      prefab_id TEXT PRIMARY KEY,
      name      TEXT NOT NULL,
      kcal      REAL NOT NULL,
      morale    INTEGER NOT NULL
    )`,
-  `CREATE TABLE effect_labels (
+  `CREATE TABLE effects (
      effect   TEXT PRIMARY KEY,
      label    TEXT NOT NULL,
      severity TEXT NOT NULL
    )`,
-  `CREATE TABLE skill_labels (
+  `CREATE TABLE skills (
      branch TEXT PRIMARY KEY,
      label  TEXT NOT NULL
    )`,
-  `CREATE TABLE chore_group_names (
+  `CREATE TABLE chore_groups (
      hash       INTEGER PRIMARY KEY,
      name       TEXT NOT NULL,
      label      TEXT NOT NULL,
@@ -276,13 +276,13 @@ export const TABLE_COLUMNS = {
     "age", "calories", "hp", "happiness", "temperature",
   ],
   // Lookup tables (static, populated from JS source files during build).
-  element_names:    ["element_id", "name"],
-  geyser_type_names: ["type_id", "name"],
-  food_meta:        ["prefab_id", "name", "kcal", "morale"],
-  effect_labels:    ["effect", "label", "severity"],
-  skill_labels:     ["branch", "label"],
-  chore_group_names:     ["hash", "name", "label", "domain", "abbr", "sort_order"],
-  duplicant_priorities:  ["duplicant_id", "chore_group", "priority"],
+  elements:     ["element_id", "name"],
+  geyser_types: ["type_id", "name"],
+  foods:        ["prefab_id", "name", "kcal", "morale"],
+  effects:      ["effect", "label", "severity"],
+  skills:       ["branch", "label"],
+  chore_groups: ["hash", "name", "label", "domain", "abbr", "sort_order"],
+  duplicant_priorities: ["duplicant_id", "chore_group", "priority"],
 };
 
 function buildInsertSql(tableName, cols) {
@@ -295,12 +295,12 @@ function buildInsertSql(tableName, cols) {
 // An empty row set means the source JS module was accidentally cleared —
 // fail loudly rather than silently writing a DB where every JOIN returns NULL.
 const REQUIRED_LOOKUP_TABLES = [
-  "element_names",
-  "geyser_type_names",
-  "food_meta",
-  "effect_labels",
-  "skill_labels",
-  "chore_group_names",
+  "elements",
+  "geyser_types",
+  "foods",
+  "effects",
+  "skills",
+  "chore_groups",
 ];
 
 /**

@@ -4,7 +4,7 @@
 // kcal is per item (not per serving) in the game's internal unit — 1000 kcal
 // is roughly 1 meal for one dupe.
 //
-// This array is written into the `food_meta` table in current.sqlite during
+// This array is written into the `foods` table in current.sqlite during
 // buildOutputs(), making it available to both the web frontend and MCP plugin
 // via SQL without any hardcoded JS on the consumer side.
 

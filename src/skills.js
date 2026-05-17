@@ -1,5 +1,5 @@
 // Skill branch knowledge: labels and morale-cost rule.
-// Single source of truth consumed by pipeline.js (to write skill_labels into
+// Single source of truth consumed by pipeline.js (to write skills into
 // current.sqlite), src/ui.js (CLI renderer), and src/extractors.js (morale_cost).
 
 /** @type {Array<{branch: string, label: string}>} */

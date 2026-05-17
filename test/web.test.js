@@ -97,36 +97,40 @@ describe("GET /api/status", () => {
     // Top sections populated from FAKE_SAVE.
     assert.ok(Array.isArray(body.top_dupes));
     assert.equal(body.top_dupes[0].name, "Meep");
-    assert.ok(Array.isArray(body.geyser_types));
+    assert.ok(Array.isArray(body.geysers), "per-geyser detail should be an array under `geysers`");
     // type_id is now a SimHash integer (-899515856 = "steam")
-    assert.ok(body.geyser_types.find((g) => g.type_id === -899515856));
+    assert.ok(body.geysers.find((g) => g.type_id === -899515856));
     assert.ok(Array.isArray(body.top_resources));
 
     // Feature 6: lookup tables served from DB.
-    assert.ok(body.element_names && typeof body.element_names === "object",
-      "element_names should be a non-null object");
-    assert.equal(body.element_names[String(1836671383)], "Water",
-      "element_names should resolve Water's SimHash");
-    assert.ok(body.geyser_type_names && typeof body.geyser_type_names === "object",
-      "geyser_type_names should be a non-null object");
-    assert.equal(body.geyser_type_names[String(-899515856)], "Steam Vent",
-      "geyser_type_names should resolve the steam vent hash");
-    assert.ok(body.food_meta && typeof body.food_meta === "object",
-      "food_meta should be a non-null object");
-    assert.ok(body.food_meta["SurfAndTurf"],
-      "food_meta should include SurfAndTurf");
-    assert.equal(body.food_meta["SurfAndTurf"].morale, 8,
+    assert.ok(body.elements && typeof body.elements === "object",
+      "elements should be a non-null object");
+    assert.equal(body.elements[String(1836671383)], "Water",
+      "elements should resolve Water's SimHash");
+    // body.geyser_types is the lookup map (type_id → name); per-geyser detail
+    // lives under body.geysers. Both must be present.
+    assert.equal(typeof body.geyser_types, "object",
+      "geyser_types should be a non-null lookup map");
+    assert.ok(!Array.isArray(body.geyser_types),
+      "geyser_types must be a map, not an array (per-geyser detail moved to body.geysers)");
+    assert.equal(body.geyser_types[String(-899515856)], "Steam Vent",
+      "geyser_types should resolve the steam vent hash");
+    assert.ok(body.foods && typeof body.foods === "object",
+      "foods should be a non-null object");
+    assert.ok(body.foods["SurfAndTurf"],
+      "foods should include SurfAndTurf");
+    assert.equal(body.foods["SurfAndTurf"].morale, 8,
       "SurfAndTurf should have morale +8");
-    assert.ok(body.effect_labels && typeof body.effect_labels === "object",
-      "effect_labels should be a non-null object");
-    assert.ok(body.effect_labels["SlimeLung"],
-      "effect_labels should include SlimeLung");
-    assert.equal(body.effect_labels["SlimeLung"].cls, "bad",
+    assert.ok(body.effects && typeof body.effects === "object",
+      "effects should be a non-null object");
+    assert.ok(body.effects["SlimeLung"],
+      "effects should include SlimeLung");
+    assert.equal(body.effects["SlimeLung"].cls, "bad",
       "SlimeLung severity should map to cls='bad'");
-    assert.ok(body.skill_labels && typeof body.skill_labels === "object",
-      "skill_labels should be a non-null object");
-    assert.equal(body.skill_labels["mining"], "Miner",
-      "skill_labels should resolve mining branch");
+    assert.ok(body.skills && typeof body.skills === "object",
+      "skills should be a non-null object");
+    assert.equal(body.skills["mining"], "Miner",
+      "skills should resolve mining branch");
     assert.ok(body.chore_groups && typeof body.chore_groups === "object",
       "chore_groups should be a non-null object");
     assert.ok(body.chore_groups["Combat"],
@@ -171,14 +175,14 @@ describe("GET /api/status", () => {
       // Empty arrays must be arrays, not nulls — the FE iterates them.
       assert.ok(Array.isArray(body.top_dupes), "top_dupes must be an array");
       assert.equal(body.top_dupes.length, 0);
-      assert.ok(Array.isArray(body.geyser_types));
-      assert.equal(body.geyser_types.length, 0);
+      assert.ok(Array.isArray(body.geysers), "per-geyser detail should be empty array");
+      assert.equal(body.geysers.length, 0);
       assert.ok(Array.isArray(body.food));
       assert.equal(body.food.length, 0);
       assert.ok(Array.isArray(body.all_resources));
       assert.equal(body.all_resources.length, 0);
       // Lookup tables and thresholds still come through even with no save data.
-      assert.ok(body.element_names && Object.keys(body.element_names).length > 0,
+      assert.ok(body.elements && Object.keys(body.elements).length > 0,
         "lookup tables must populate even for empty colonies");
       assert.ok(body.thresholds);
     } finally {

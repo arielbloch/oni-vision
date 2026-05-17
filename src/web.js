@@ -193,10 +193,10 @@ function enrichDupes(db, dupes) {
 
   const focusByName = new Map();
   for (const row of db.prepare(
-    `SELECT d.name, dp.chore_group, COALESCE(cgn.label, dp.chore_group) AS label, dp.priority
+    `SELECT d.name, dp.chore_group, COALESCE(cg.label, dp.chore_group) AS label, dp.priority
      FROM duplicant_priorities dp
      JOIN duplicants d ON d.game_object_id = dp.duplicant_id
-     LEFT JOIN chore_group_names cgn ON cgn.name = dp.chore_group
+     LEFT JOIN chore_groups cg ON cg.name = dp.chore_group
      WHERE dp.priority > 3
      ORDER BY dp.priority DESC, dp.chore_group`
   ).all()) {
@@ -241,30 +241,30 @@ function serveLookups(db) {
     Object.fromEntries(rows.map((r) => [String(r[keyCol]), r[valCol]]));
 
   return {
-    element_names: toMap(
-      db.prepare("SELECT element_id, name FROM element_names").all(),
+    elements: toMap(
+      db.prepare("SELECT element_id, name FROM elements").all(),
       "element_id", "name"
     ),
-    geyser_type_names: toMap(
-      db.prepare("SELECT type_id, name FROM geyser_type_names").all(),
+    geyser_types: toMap(
+      db.prepare("SELECT type_id, name FROM geyser_types").all(),
       "type_id", "name"
     ),
-    food_meta: Object.fromEntries(
-      db.prepare("SELECT prefab_id, name, kcal, morale FROM food_meta").all()
+    foods: Object.fromEntries(
+      db.prepare("SELECT prefab_id, name, kcal, morale FROM foods").all()
         .map((r) => [r.prefab_id, { name: r.name, kcal: r.kcal, morale: r.morale }])
     ),
-    effect_labels: Object.fromEntries(
-      db.prepare("SELECT effect, label, severity FROM effect_labels").all()
+    effects: Object.fromEntries(
+      db.prepare("SELECT effect, label, severity FROM effects").all()
         .map((r) => [r.effect, { label: r.label, cls: r.severity }])
     ),
-    skill_labels: toMap(
-      db.prepare("SELECT branch, label FROM skill_labels").all(),
+    skills: toMap(
+      db.prepare("SELECT branch, label FROM skills").all(),
       "branch", "label"
     ),
     // Chore groups indexed by `name` since duplicant_priorities joins on the
     // internal string. Carries full display metadata for the FE focus chips.
     chore_groups: Object.fromEntries(
-      db.prepare("SELECT hash, name, label, domain, abbr, sort_order FROM chore_group_names").all()
+      db.prepare("SELECT hash, name, label, domain, abbr, sort_order FROM chore_groups").all()
         .map((r) => [r.name, { hash: r.hash, label: r.label, domain: r.domain, abbr: r.abbr, sort_order: r.sort_order }])
     ),
   };
@@ -294,14 +294,16 @@ function serveStatus(res, outputDir) {
 
     enrichDupes(db, payload.top_dupes);
 
-    // Per-geyser quality rolls replace statusObject's grouped geyser_types.
-    payload.geyser_types = db.prepare(
+    // Per-geyser quality rolls. statusObject's grouped `geyser_types` is
+    // discarded — the FE wants per-instance detail, not by-type counts.
+    delete payload.geyser_types;
+    payload.geysers = db.prepare(
       `SELECT type_id, rate_roll, year_percent_roll
        FROM geysers
        ORDER BY type_id, rate_roll DESC`
     ).all();
 
-    // Food stack counts; client joins prefab_id → display via food_meta.
+    // Food stack counts; client joins prefab_id → display via the foods lookup.
     payload.food = db.prepare(
       `SELECT item_prefab_id, COUNT(*) AS qty
        FROM storage_contents

@@ -16,7 +16,7 @@ import { FAKE_SAVE } from "./fixture.js";
  *
  * @param {object} [opts]
  * @param {boolean} [opts.includeParsedAt=true]  push parsed_at / source_file rows
- * @param {boolean} [opts.includeLookupTables=true] populate element_names, geyser_type_names, food_meta, effect_labels, skill_labels
+ * @param {boolean} [opts.includeLookupTables=true] populate elements, geyser_types, foods, effects, skills, chore_groups
  * @returns {object} tables object suitable for writeDatabase()
  */
 export function buildFakeTables({ includeParsedAt = true, includeLookupTables = true } = {}) {
@@ -71,10 +71,10 @@ export function buildEmptyTables() {
 }
 
 function addLookupTables(tables) {
-  tables.element_names = [...ELEMENT_NAMES.entries()].map(([element_id, name]) => ({ element_id, name }));
-  tables.geyser_type_names = GEYSER_TYPE_NAMES;
-  tables.food_meta = FOOD_META;
-  tables.effect_labels = EFFECT_LABELS;
-  tables.skill_labels = SKILL_LABELS;
-  tables.chore_group_names = CHORE_GROUP_NAMES;
+  tables.elements     = [...ELEMENT_NAMES.entries()].map(([element_id, name]) => ({ element_id, name }));
+  tables.geyser_types = GEYSER_TYPE_NAMES;
+  tables.foods        = FOOD_META;
+  tables.effects      = EFFECT_LABELS;
+  tables.skills       = SKILL_LABELS;
+  tables.chore_groups = CHORE_GROUP_NAMES;
 }

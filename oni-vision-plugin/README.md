@@ -223,7 +223,7 @@ Aggregate stored resources by element, across containers, the map floor, or both
 
 ### `oni_food`
 
-Food items currently in colony storage, joined with the `food_meta` lookup table for human-readable names, kcal values, and morale bonuses.
+Food items currently in colony storage, joined with the `foods` lookup table for human-readable names, kcal values, and morale bonuses.
 
 **Input:**
 | Field | Type | Default | Description |
@@ -233,7 +233,7 @@ Food items currently in colony storage, joined with the `food_meta` lookup table
 
 **Output columns:** `prefab_id`, `name`, `kcal`, `morale`, `qty` (stack count)
 
-Unknown food items (new DLC content not yet in `food_meta`) appear with `null` name/kcal/morale and their raw `prefab_id`.
+Unknown food items (new DLC content not yet in `foods`) appear with `null` name/kcal/morale and their raw `prefab_id`.
 
 ---
 
@@ -266,11 +266,12 @@ Run an arbitrary SELECT (or `WITH … SELECT`) against the full DB schema. **For
 | `geysers(game_object_id, prefab_id, type_id, rate_roll, year_percent_roll, position_x, position_y)` | |
 | `critters(game_object_id, prefab_id, age, calories, hp, happiness, temperature)` | |
 | `behaviors(game_object_id, name, template_data, extra_data)` | Generic fallback; template_data is JSON |
-| `element_names(element_id, name)` | SimHash → element name lookup |
-| `geyser_type_names(type_id, name)` | SimHash → geyser type name lookup |
-| `food_meta(prefab_id, name, kcal, morale)` | Food metadata |
-| `effect_labels(effect, label, severity)` | Status effect display labels |
-| `skill_labels(branch, label)` | Skill branch → display name |
+| `elements(element_id, name)` | SimHash → element name lookup |
+| `geyser_types(type_id, name)` | SimHash → geyser type name lookup |
+| `foods(prefab_id, name, kcal, morale)` | Food metadata |
+| `effects(effect, label, severity)` | Status effect display labels |
+| `skills(branch, label)` | Skill branch → display name |
+| `chore_groups(hash, name, label, domain, abbr, sort_order)` | Chore-group catalog with FE display metadata |
 
 Convenience views: `v_resources_in_storage`, `v_world_objects_by_element`, `v_geysers_summary`, `v_buildings_by_prefab`.
 

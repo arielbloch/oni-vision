@@ -243,9 +243,9 @@ export function dupeDetail(db, name) {
 
   const priorities = db
     .prepare(
-      `SELECT dp.chore_group, cgn.label, dp.priority
+      `SELECT dp.chore_group, cg.label, dp.priority
        FROM duplicant_priorities dp
-       LEFT JOIN chore_group_names cgn ON cgn.name = dp.chore_group
+       LEFT JOIN chore_groups cg ON cg.name = dp.chore_group
        WHERE dp.duplicant_id = ?
        ORDER BY dp.priority DESC, dp.chore_group`
     )
@@ -269,11 +269,11 @@ export function priorities(db) {
   return db
     .prepare(
       `SELECT d.name AS dupe_name,
-              dp.chore_group, cgn.label,
+              dp.chore_group, cg.label,
               dp.priority
        FROM duplicant_priorities dp
        JOIN duplicants d ON d.game_object_id = dp.duplicant_id
-       LEFT JOIN chore_group_names cgn ON cgn.name = dp.chore_group
+       LEFT JOIN chore_groups cg ON cg.name = dp.chore_group
        WHERE dp.priority != 3
        ORDER BY d.name, dp.priority DESC, dp.chore_group`
     )
@@ -287,7 +287,7 @@ export function priorities(db) {
 
 /** Geyser list. */
 export function geysers(db) {
-  // LEFT JOIN geyser_type_names (written by pipeline from src/geyser_types.js)
+  // LEFT JOIN geyser_types (written by pipeline from src/geyser_types.js)
   // so each row carries a human-readable type name alongside the numeric hash.
   const rows = db
     .prepare(
@@ -297,7 +297,7 @@ export function geysers(db) {
               ROUND(g.rate_roll, 3) AS rate_roll,
               ROUND(g.year_percent_roll, 3) AS year_percent_roll
        FROM geysers g
-       LEFT JOIN geyser_type_names gtn ON gtn.type_id = g.type_id
+       LEFT JOIN geyser_types gtn ON gtn.type_id = g.type_id
        ORDER BY g.type_id, g.prefab_id`
     )
     .all();
@@ -316,7 +316,7 @@ export function geysers(db) {
  * integers — the 2-decimal precision on bulk mass aggregates is noise.
  */
 export function resources(db, { location = "both", limit = 10 } = {}) {
-  // Each branch wraps an aggregation and LEFT JOINs element_names so Claude
+  // Each branch wraps an aggregation and LEFT JOINs elements so Claude
   // gets human-readable names alongside the raw SimHash IDs.
   let sql;
   if (location === "storage") {
@@ -324,7 +324,7 @@ export function resources(db, { location = "both", limit = 10 } = {}) {
       SELECT agg.element_id, en.name AS element_name,
              SUM(agg.units) AS raw_units, COUNT(*) AS items
       FROM storage_contents agg
-      LEFT JOIN element_names en ON en.element_id = agg.element_id
+      LEFT JOIN elements en ON en.element_id = agg.element_id
       WHERE agg.element_id IS NOT NULL
       GROUP BY agg.element_id
       ORDER BY raw_units DESC LIMIT ?`;
@@ -333,7 +333,7 @@ export function resources(db, { location = "both", limit = 10 } = {}) {
       SELECT agg.element_id, en.name AS element_name,
              SUM(agg.units) AS raw_units, COUNT(*) AS items
       FROM world_objects agg
-      LEFT JOIN element_names en ON en.element_id = agg.element_id
+      LEFT JOIN elements en ON en.element_id = agg.element_id
       WHERE agg.element_id IS NOT NULL
       GROUP BY agg.element_id
       ORDER BY raw_units DESC LIMIT ?`;
@@ -349,14 +349,14 @@ export function resources(db, { location = "both", limit = 10 } = {}) {
         SELECT element_id, SUM(units) AS raw_units, COUNT(*) AS items
         FROM storage_contents WHERE element_id IS NOT NULL GROUP BY element_id
       ) sub
-      LEFT JOIN element_names en ON en.element_id = sub.element_id
+      LEFT JOIN elements en ON en.element_id = sub.element_id
       GROUP BY sub.element_id
       ORDER BY raw_units DESC LIMIT ?`;
   }
   return db.prepare(sql).all(limit).map((r) => ({
     element_id: r.element_id,
     // Resolve element_id to a human-readable name via the lookup table written
-    // by the pipeline (src/elements.js → element_names). Falls back to the raw
+    // by the pipeline (src/elements.js → elements). Falls back to the raw
     // hash if the element isn't in the table (e.g. unknown DLC element).
     element_name: r.element_name ?? `id:${r.element_id}`,
     total_units: r.raw_units >= 100 ? Math.round(r.raw_units) : Number(r.raw_units.toFixed(2)),
@@ -369,10 +369,10 @@ export function resources(db, { location = "both", limit = 10 } = {}) {
 // ---------------------------------------------------------------------------
 
 /**
- * Food items currently in storage, joined with food_meta for display names,
+ * Food items currently in storage, joined with foods for display names,
  * kcal values, and morale bonus. Grouped by prefab_id, sorted by stack count.
  *
- * Items whose prefab_id isn't in food_meta (e.g. new DLC food) still appear;
+ * Items whose prefab_id isn't in foods (e.g. new DLC food) still appear;
  * name/kcal/morale are null for those rows so callers can handle gracefully.
  *
  * @param {object} opts
@@ -386,7 +386,7 @@ export function food(db, { limit = 20 } = {}) {
             fm.morale,
             COUNT(*) AS qty
      FROM storage_contents sc
-     LEFT JOIN food_meta fm ON fm.prefab_id = sc.item_prefab_id
+     LEFT JOIN foods fm ON fm.prefab_id = sc.item_prefab_id
      WHERE sc.item_prefab_id IS NOT NULL
        AND sc.element_id IS NULL
      GROUP BY sc.item_prefab_id
@@ -473,14 +473,14 @@ export function statusObject(db, { dupeLimit = 5, geyserLimit = 10, resourceLimi
   };
 
   const top_dupes = dupes(db, { sort: "name", fields: ["name", "stress", "current_role"], limit: dupeLimit });
-  // LEFT JOIN geyser_type_names so the MCP oni_status response includes
+  // LEFT JOIN geyser_types so the MCP oni_status response includes
   // human-readable geyser names alongside the raw SimHash type_id.
   const geyser_types = db
     .prepare(
       `SELECT g.type_id, COALESCE(gtn.name, 'hash:' || g.type_id) AS type_name,
               COUNT(*) AS count
        FROM geysers g
-       LEFT JOIN geyser_type_names gtn ON gtn.type_id = g.type_id
+       LEFT JOIN geyser_types gtn ON gtn.type_id = g.type_id
        GROUP BY g.type_id
        ORDER BY count DESC, g.type_id
        LIMIT ?`

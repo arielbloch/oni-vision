@@ -94,18 +94,19 @@ Five static tables written once per parse let you resolve SimHash integers to hu
 
 | Table | Key column | Name column | Use for |
 |-------|-----------|-------------|---------|
-| `element_names(element_id, name)` | `element_id` (INTEGER) | `name` | elements in `world_objects`, `storage_contents`, `buildings` |
-| `geyser_type_names(type_id, name)` | `type_id` (INTEGER) | `name` | geysers |
-| `food_meta(prefab_id, name, kcal, morale)` | `prefab_id` (TEXT) | `name` | food in `storage_contents` |
-| `effect_labels(effect, label, severity)` | `effect` (TEXT) | `label` | dupe status effects |
-| `skill_labels(branch, label)` | `branch` (TEXT) | `label` | skill branches |
+| `elements(element_id, name)` | `element_id` (INTEGER) | `name` | elements in `world_objects`, `storage_contents`, `buildings` |
+| `geyser_types(type_id, name)` | `type_id` (INTEGER) | `name` | geysers |
+| `foods(prefab_id, name, kcal, morale)` | `prefab_id` (TEXT) | `name` | food in `storage_contents` |
+| `effects(effect, label, severity)` | `effect` (TEXT) | `label` | dupe status effects |
+| `skills(branch, label)` | `branch` (TEXT) | `label` | skill branches |
+| `chore_groups(hash, name, label, domain, abbr, sort_order)` | `name` (TEXT) | `label` | chore priorities |
 
 **Example — elements by mass with human-readable names:**
 
 ```sql
 SELECT en.name, ROUND(SUM(sc.units), 0) AS total_kg
 FROM storage_contents sc
-JOIN element_names en ON en.element_id = sc.element_id
+JOIN elements en ON en.element_id = sc.element_id
 GROUP BY sc.element_id
 ORDER BY total_kg DESC
 LIMIT 10;

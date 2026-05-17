@@ -4,7 +4,7 @@
 // positive, cosmetic, or routine effects are omitted. `severity` drives
 // badge styling: "bad" = red, "warn" = yellow.
 //
-// Written into `effect_labels` in current.sqlite during buildOutputs()
+// Written into `effects` in current.sqlite during buildOutputs()
 // so both the web frontend and MCP plugin can query it without hardcoded JS.
 
 /** @type {Array<{effect: string, label: string, severity: string}>} */

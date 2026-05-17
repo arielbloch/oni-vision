@@ -68,7 +68,7 @@ Element totals across containers, the floor, or both:
 Totals ≥100 kg are reported as integers (rounding noise stripped). Default limit is 10.
 
 ### `oni_food({ limit?, format? })`
-Food items currently in colony storage, with display name, kcal per item, morale bonus, and stack count. Joins the `food_meta` lookup table so results are human-readable. Unknown food items (new DLC) appear with null name/kcal/morale. Default limit is 20.
+Food items currently in colony storage, with display name, kcal per item, morale bonus, and stack count. Joins the `foods` lookup table so results are human-readable. Unknown food items (new DLC) appear with null name/kcal/morale. Default limit is 20.
 
 ### `oni_priorities()`
 One row per (dupe, chore_group) pair where priority differs from the default (3). Returns `dupe_name`, `chore_group` (internal string), `label` (display name from the game UI), and `priority` (1-5). Use this for "which dupes are specialising in what" questions — much cheaper than chaining `oni_dupe` for every dupe. A missing `(dupe, group)` row means priority is at the default 3.
@@ -78,22 +78,23 @@ SELECT-only escape hatch over the whole DB schema. Reject any non-SELECT stateme
 
 ### Lookup tables
 
-Five static tables resolve SimHash integers to human-readable strings. Always JOIN against them when querying element IDs or geyser type IDs:
+Six static tables resolve SimHash integers and short strings to human-readable values. Always JOIN against them when querying ID columns:
 
 | Table | Key → value |
 |-------|------------|
-| `element_names(element_id, name)` | SimHash → element name (Water, Algae, …) |
-| `geyser_type_names(type_id, name)` | SimHash → geyser name (Steam Vent, Volcano, …) |
-| `food_meta(prefab_id, name, kcal, morale)` | prefab → food display name + nutrition |
-| `effect_labels(effect, label, severity)` | effect string → readable label + severity |
-| `skill_labels(branch, label)` | branch prefix → display name |
+| `elements(element_id, name)` | SimHash → element name (Water, Algae, …) |
+| `geyser_types(type_id, name)` | SimHash → geyser name (Steam Vent, Volcano, …) |
+| `foods(prefab_id, name, kcal, morale)` | prefab → food display name + nutrition |
+| `effects(effect, label, severity)` | effect string → readable label + severity |
+| `skills(branch, label)` | branch prefix → display name |
+| `chore_groups(hash, name, label, domain, abbr, sort_order)` | chore group → display label + FE styling metadata |
 
 **Example — stored resources with readable names:**
 
 ```sql
 SELECT en.name, ROUND(SUM(sc.units), 0) AS kg
 FROM storage_contents sc
-JOIN element_names en ON en.element_id = sc.element_id
+JOIN elements en ON en.element_id = sc.element_id
 GROUP BY sc.element_id ORDER BY kg DESC LIMIT 10;
 ```
 

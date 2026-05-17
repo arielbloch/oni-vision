@@ -241,20 +241,20 @@ describe("assertLookupTablesPopulated", () => {
 
   test("throws when a required lookup table is absent", () => {
     const tables = buildFakeTables({ includeLookupTables: true });
-    delete tables.element_names;
+    delete tables.elements;
     assert.throws(
       () => assertLookupTablesPopulated(tables),
-      /element_names/,
+      /elements/,
       "should name the missing table in the error"
     );
   });
 
   test("throws when a required lookup table is empty", () => {
     const tables = buildFakeTables({ includeLookupTables: true });
-    tables.skill_labels = [];
+    tables.skills = [];
     assert.throws(
       () => assertLookupTablesPopulated(tables),
-      /skill_labels/
+      /skills/
     );
   });
 
@@ -265,7 +265,7 @@ describe("assertLookupTablesPopulated", () => {
     const tables = extractAll(FAKE_SAVE);
     assert.throws(
       () => assertLookupTablesPopulated(tables),
-      /element_names/
+      /elements/
     );
   });
 });
@@ -284,28 +284,28 @@ describe("lookup-table round-trips", () => {
     try { return fn(db); } finally { db.close(); }
   }
 
-  test("element_names resolves Water SimHash (1836671383) to 'Water'", () => {
+  test("elements resolves Water SimHash (1836671383) to 'Water'", () => {
     withLookupDb((db) => {
-      const row = db.prepare("SELECT name FROM element_names WHERE element_id = 1836671383").get();
-      assert.ok(row, "element_names should contain Water's SimHash");
+      const row = db.prepare("SELECT name FROM elements WHERE element_id = 1836671383").get();
+      assert.ok(row, "elements should contain Water's SimHash");
       assert.equal(row.name, "Water");
     });
   });
 
-  test("geyser_type_names resolves Steam Vent hash (-899515856) to 'Steam Vent'", () => {
+  test("geyser_types resolves Steam Vent hash (-899515856) to 'Steam Vent'", () => {
     withLookupDb((db) => {
-      const row = db.prepare("SELECT name FROM geyser_type_names WHERE type_id = -899515856").get();
-      assert.ok(row, "geyser_type_names should contain Steam Vent hash");
+      const row = db.prepare("SELECT name FROM geyser_types WHERE type_id = -899515856").get();
+      assert.ok(row, "geyser_types should contain Steam Vent hash");
       assert.equal(row.name, "Steam Vent");
     });
   });
 
-  test("JOIN geyser_type_names against geysers resolves geyser names", () => {
+  test("JOIN geyser_types against geysers resolves geyser names", () => {
     withLookupDb((db) => {
       const rows = db.prepare(
         `SELECT g.type_id, gtn.name
          FROM geysers g
-         JOIN geyser_type_names gtn ON gtn.type_id = g.type_id
+         JOIN geyser_types gtn ON gtn.type_id = g.type_id
          ORDER BY g.type_id`
       ).all();
       assert.ok(rows.length > 0, "JOIN should return at least one geyser row");
@@ -319,10 +319,10 @@ describe("lookup-table round-trips", () => {
     });
   });
 
-  test("skill_labels covers the 'mining' branch", () => {
+  test("skills covers the 'mining' branch", () => {
     withLookupDb((db) => {
-      const row = db.prepare("SELECT label FROM skill_labels WHERE branch = 'mining'").get();
-      assert.ok(row, "skill_labels should include 'mining'");
+      const row = db.prepare("SELECT label FROM skills WHERE branch = 'mining'").get();
+      assert.ok(row, "skills should include 'mining'");
       assert.equal(row.label, "Miner");
     });
   });

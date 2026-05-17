@@ -5,9 +5,9 @@
 //
 // Expected /api/status shape:
 //   base_name, cycle, age_seconds, source_file, counts, top_dupes,
-//   geyser_types, food, all_resources, stockpile_filters,
-//   element_names, geyser_type_names, food_meta, effect_labels,
-//   skill_labels, thresholds
+//   geysers (per-instance), food, all_resources, stockpile_filters,
+//   elements, geyser_types, foods, effects, skills, chore_groups
+//   (all six lookup tables), thresholds
 
 // ── Name lookup tables ───────────────────────────────────────────────────────
 // Populated from the API (/api/status) on each refresh. The server queries
@@ -339,17 +339,17 @@ async function refresh() {
     }
 
     // Populate lookup tables and thresholds from the DB-backed API response.
-    if (data.element_names)     ELEMENT_NAMES = data.element_names;
-    if (data.geyser_type_names) GEYSER_NAMES  = data.geyser_type_names;
-    if (data.food_meta)         FOOD          = data.food_meta;
-    if (data.effect_labels)     BAD_EFFECTS   = data.effect_labels;
-    if (data.skill_labels)      SKILL_LABELS  = data.skill_labels;
-    if (data.chore_groups)      CHORE_GROUPS  = data.chore_groups;
-    if (data.thresholds)        T             = { ...T, ...data.thresholds };
+    if (data.elements)     ELEMENT_NAMES = data.elements;
+    if (data.geyser_types) GEYSER_NAMES  = data.geyser_types;
+    if (data.foods)        FOOD          = data.foods;
+    if (data.effects)      BAD_EFFECTS   = data.effects;
+    if (data.skills)       SKILL_LABELS  = data.skills;
+    if (data.chore_groups) CHORE_GROUPS  = data.chore_groups;
+    if (data.thresholds)   T             = { ...T, ...data.thresholds };
 
     renderCounts(data.counts || {});
     renderDupes(data.top_dupes || []);
-    renderGeysers(data.geyser_types || []);
+    renderGeysers(data.geysers || []);
     renderFood(data.food || []);
 
     // Update in-game filter defaults before rendering resources.

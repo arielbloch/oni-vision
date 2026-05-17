@@ -76,12 +76,12 @@ export async function buildOutputs({ savePath, outputDir }) {
 
   // Populate static lookup tables so both web and MCP consumers can JOIN
   // against human-readable names without any hardcoded JS on their side.
-  tables.element_names = [...ELEMENT_NAMES.entries()].map(([element_id, name]) => ({ element_id, name }));
-  tables.geyser_type_names = GEYSER_TYPE_NAMES;
-  tables.food_meta = FOOD_META;
-  tables.effect_labels = EFFECT_LABELS;
-  tables.skill_labels = SKILL_LABELS;
-  tables.chore_group_names = CHORE_GROUP_NAMES;
+  tables.elements     = [...ELEMENT_NAMES.entries()].map(([element_id, name]) => ({ element_id, name }));
+  tables.geyser_types = GEYSER_TYPE_NAMES;
+  tables.foods        = FOOD_META;
+  tables.effects      = EFFECT_LABELS;
+  tables.skills       = SKILL_LABELS;
+  tables.chore_groups = CHORE_GROUP_NAMES;
   assertLookupTablesPopulated(tables);
   const tExtracted = Date.now();
   console.log(
