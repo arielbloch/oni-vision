@@ -5,15 +5,14 @@
 // Color is opt-in via { color: true } and uses ANSI escapes directly so
 // we don't pull in chalk / picocolors. The CLI in cli/status.js decides
 // whether to enable color based on stdout.isTTY and NO_COLOR.
+//
+// Layout mirrors the web dashboard (src/web/): Dupes table (name · roles ·
+// morale · stress), Geysers grouped by type with quality bar, Food section,
+// Stockpile. All name resolution is done via SQL JOINs against the lookup
+// tables written by the pipeline — no in-process JS maps needed.
 
-import { elementName } from "./elements.js";
-import { SKILL_LABELS as SKILL_LABELS_ARRAY, ROMAN_NUMERALS } from "./skills.js";
-import { GEYSER_TYPE_NAMES } from "./geyser_types.js";
-import { ANSI, paint, bar, pad, fit, lpad, formatMass, formatAge, stressColor } from "./format.js";
-
-// Build Maps once for O(1) lookup.
-const SKILL_LABEL_MAP = new Map(SKILL_LABELS_ARRAY.map(({ branch, label }) => [branch, label]));
-const GEYSER_NAMES    = new Map(GEYSER_TYPE_NAMES.map(({ type_id, name }) => [type_id, name]));
+import { THRESHOLDS } from "./thresholds.js";
+import { ANSI, paint, bar, pad, fit, lpad, formatMass, formatKcal, formatAge, stressColor } from "./format.js";
 
 /**
  * Pull the headline facts out of save_meta. Returns a plain object;
@@ -43,7 +42,7 @@ export function renderBanner(db, { color = false, width = 80 } = {}) {
   return `═══ ${paint(line, ANSI.bold + ANSI.cyan, color)} ${paint(trail, ANSI.dim, color)}═══`;
 }
 
-/** "12 duplicants · 4 critters · 7 geysers". */
+/** "12 duplicants · 4 critters · 7 geysers · 184 buildings". */
 export function renderHeadCounts(db, { color = false } = {}) {
   const dupes     = db.prepare("SELECT COUNT(*) AS n FROM duplicants").get().n;
   const critters  = db.prepare("SELECT COUNT(*) AS n FROM critters").get().n;
@@ -58,116 +57,179 @@ export function renderHeadCounts(db, { color = false } = {}) {
   ].join(sep);
 }
 
-function geyserName(typeId) {
-  if (typeId == null) return "(unknown)";
-  const key = Math.trunc(Number(typeId));
-  return GEYSER_NAMES.get(key) ?? `hash:${key}`;
+/**
+ * Duplicants table: name + active status effects | focus (priority-boosted
+ * chore groups) | morale bar | stress bar + %.
+ *
+ * Column layout (80-col safe):
+ *   2 indent  22 name+effects  2  12 roles  2  10 morale bar  2  10 stress bar  1  6 stress%
+ */
+export function renderDupes(db, { color = false, limit = 12 } = {}) {
+  // Main dupe rows: join effects for negative-status labels.
+  const rows = db.prepare(`
+    SELECT d.game_object_id, d.name,
+           ROUND(d.stress, 1) AS stress,
+           d.morale_cost,
+           GROUP_CONCAT(eff.label, ', ') AS effect_labels
+    FROM duplicants d
+    LEFT JOIN duplicant_effects de ON de.duplicant_id = d.game_object_id
+    LEFT JOIN effects eff ON eff.effect = de.effect
+    GROUP BY d.game_object_id
+    ORDER BY d.stress IS NULL, d.stress DESC
+    LIMIT ?
+  `).all(limit);
+
+  if (rows.length === 0) return paint("Dupes: none", ANSI.dim, color);
+
+  // Focus chips: chore groups where dupe has priority ≥ priority_boost (5),
+  // sorted by the game's column order so they read left→right as in the UI.
+  const focusByDupe = new Map();
+  for (const { duplicant_id, abbr } of db.prepare(`
+    SELECT dp.duplicant_id, cg.abbr
+    FROM duplicant_priorities dp
+    JOIN chore_groups cg ON cg.name = dp.chore_group
+    WHERE dp.priority >= ?
+    ORDER BY dp.duplicant_id, cg.sort_order
+  `).all(THRESHOLDS.priority_boost)) {
+    if (!focusByDupe.has(duplicant_id)) focusByDupe.set(duplicant_id, []);
+    focusByDupe.get(duplicant_id).push(abbr);
+  }
+
+  const sectionLabel = paint("Dupes (sorted by stress)", ANSI.bold + ANSI.yellow, color);
+  const colHeader = paint(
+    `  ${"".padEnd(22)}  ${"Roles".padEnd(12)}  ${"Morale".padEnd(10)}  Stress`,
+    ANSI.dim, color
+  );
+
+  const lines = rows.map((r) => {
+    const effects   = r.effect_labels || "";
+    const nameStr   = effects ? `${r.name ?? "(unnamed)"} (${effects})` : (r.name ?? "(unnamed)");
+    const nameCol   = fit(nameStr, 22);
+
+    const focusStr  = (focusByDupe.get(r.game_object_id) ?? []).join(" ");
+    const focusCol  = pad(focusStr, 12);
+
+    const moralePct = Math.min(1, (r.morale_cost ?? 0) / THRESHOLDS.morale_bar_max);
+    const moraleBar = color
+      ? `${ANSI.green}${bar(moralePct)}${ANSI.reset}`
+      : bar(moralePct);
+
+    const hasStress  = r.stress != null;
+    const c          = stressColor(r.stress ?? 0, color);
+    const reset      = color ? ANSI.reset : "";
+    const stressBar  = hasStress
+      ? `${c}${bar(r.stress / 100)}${reset}`
+      : paint("──────────", ANSI.dim, color);
+    const stressLabel = hasStress ? `${lpad(r.stress.toFixed(1), 5)}%` : `   — `;
+
+    return `  ${nameCol}  ${focusCol}  ${moraleBar}  ${stressBar} ${stressLabel}`;
+  });
+
+  return [sectionLabel, colHeader, ...lines].join("\n");
 }
 
-/** Geyser types grouped by count. */
+/**
+ * Geysers grouped by type: type name × count | quality bar | quality%.
+ * Quality = average of rate_roll and year_percent_roll (0–1 each), matching
+ * the web dashboard formula. Color: green ≥ 70%, yellow ≥ 40%, red below.
+ */
 export function renderGeysers(db, { color = false } = {}) {
-  const rows = db
-    .prepare("SELECT type_id, COUNT(*) AS n FROM geysers GROUP BY type_id ORDER BY n DESC, type_id")
-    .all();
+  const rows = db.prepare(`
+    SELECT g.type_id,
+           COALESCE(gtn.name, 'hash:' || g.type_id) AS type_name,
+           COUNT(*) AS n,
+           ROUND(AVG((g.rate_roll + g.year_percent_roll) / 2.0) * 100) AS quality
+    FROM geysers g
+    LEFT JOIN geyser_types gtn ON gtn.type_id = g.type_id
+    GROUP BY g.type_id
+    ORDER BY n DESC, g.type_id
+  `).all();
+
   if (rows.length === 0) return paint("Geysers: none", ANSI.dim, color);
 
   const header = paint("Geysers", ANSI.bold + ANSI.magenta, color);
-  const items  = rows.map((r) => `${pad(geyserName(r.type_id), 24)} ×${r.n}`).join("  ");
-  return `${header}\n  ${items}`;
+  const lines  = rows.map((r) => {
+    const quality = r.quality ?? 0;
+    let qc = "";
+    let qr = "";
+    if (color) {
+      qc = quality >= THRESHOLDS.geyser_quality_good ? ANSI.green
+         : quality >= THRESHOLDS.geyser_quality_warn ? ANSI.yellow
+         : ANSI.red;
+      qr = ANSI.reset;
+    }
+    const nameAndCount = fit(`${r.type_name} ×${r.n}`, 28);
+    const qualBar      = `${qc}${bar(quality / 100)}${qr}`;
+    const qualPct      = `${lpad(String(quality), 3)}%`;
+    return `  ${nameAndCount}  ${qualBar}  ${qualPct}`;
+  });
+
+  return [header, ...lines].join("\n");
+}
+
+/**
+ * Food in storage: display name | total kcal | morale bonus.
+ * Joins the foods lookup table; unknown items (DLC) are skipped.
+ */
+export function renderFood(db, { color = false, limit = 8 } = {}) {
+  const rows = db.prepare(`
+    SELECT COALESCE(fm.name, sc.item_prefab_id) AS name,
+           fm.kcal,
+           fm.morale,
+           COUNT(*) AS qty
+    FROM storage_contents sc
+    LEFT JOIN foods fm ON fm.prefab_id = sc.item_prefab_id
+    WHERE sc.item_prefab_id IS NOT NULL AND sc.element_id IS NULL
+      AND fm.kcal IS NOT NULL
+    GROUP BY sc.item_prefab_id
+    ORDER BY (fm.kcal * COUNT(*)) DESC, qty DESC
+    LIMIT ?
+  `).all(limit);
+
+  if (rows.length === 0) return paint("Food: none in storage", ANSI.dim, color);
+
+  const header = paint("Food", ANSI.bold + ANSI.cyan, color);
+  const lines  = rows.map((r) => {
+    const kcalStr = formatKcal(r.qty * r.kcal);
+    const m       = r.morale ?? 0;
+    const mLabel  = m > 0 ? `+${m}` : String(m);
+    const mColor  = !color ? "" : m > 0 ? ANSI.green : m < 0 ? ANSI.red : ANSI.dim;
+    const mReset  = color ? ANSI.reset : "";
+    return `  ${fit(r.name, 22)}  ${lpad(kcalStr, 10)}   ${mColor}${mLabel}${mReset}`;
+  });
+
+  return [header, ...lines].join("\n");
 }
 
 /** Top elements by mass across loose piles + storage_contents. */
 export function renderStockpile(db, { color = false, limit = 8 } = {}) {
-  const sql = `
-    SELECT element_id,
-           SUM(units) AS total_units,
-           SUM(items) AS items
+  const rows = db.prepare(`
+    SELECT COALESCE(en.name, sub.element_id) AS name,
+           SUM(sub.units) AS total_units, SUM(sub.items) AS items
     FROM (
       SELECT element_id, SUM(units) AS units, COUNT(*) AS items
-      FROM world_objects
-      WHERE element_id IS NOT NULL
-      GROUP BY element_id
+      FROM world_objects WHERE element_id IS NOT NULL GROUP BY element_id
       UNION ALL
       SELECT element_id, SUM(units) AS units, COUNT(*) AS items
-      FROM storage_contents
-      WHERE element_id IS NOT NULL
-      GROUP BY element_id
-    )
-    GROUP BY element_id
+      FROM storage_contents WHERE element_id IS NOT NULL GROUP BY element_id
+    ) sub
+    LEFT JOIN elements en ON en.element_id = sub.element_id
+    GROUP BY sub.element_id
     ORDER BY total_units DESC
-    LIMIT ?`;
-  const rows = db.prepare(sql).all(limit);
+    LIMIT ?
+  `).all(limit);
+
   if (rows.length === 0) return paint("Stockpile: empty", ANSI.dim, color);
 
   const header = paint("Stockpile (top elements by mass)", ANSI.bold + ANSI.green, color);
   const lines  = rows.map((r) => {
-    const name = elementName(r.element_id);
     const mass = formatMass(r.total_units);
-    return `  ${pad(name, 20)} ${lpad(mass, 12)}   in ${r.items} place${r.items === 1 ? "" : "s"}`;
+    return `  ${pad(r.name, 20)} ${lpad(mass, 12)}   in ${r.items} place${r.items === 1 ? "" : "s"}`;
   });
   return [header, ...lines].join("\n");
 }
 
-/** Dupes with stress bars and mastered skills. */
-export function renderDupes(db, { color = false, limit = 12 } = {}) {
-  const rows = db
-    .prepare(
-      `SELECT d.game_object_id, d.name, d.stress,
-              GROUP_CONCAT(ds.skill, ',') AS skills
-       FROM duplicants d
-       LEFT JOIN duplicant_skills ds ON ds.duplicant_id = d.game_object_id
-       GROUP BY d.game_object_id
-       ORDER BY d.stress IS NULL, d.stress DESC
-       LIMIT ?`
-    )
-    .all(limit);
-  if (rows.length === 0) return paint("Dupes: none", ANSI.dim, color);
-
-  const header = paint("Dupes (sorted by stress)", ANSI.bold + ANSI.yellow, color);
-  const lines  = rows.map((r) => {
-    const hasStress = r.stress != null;
-    const stress    = hasStress ? r.stress : 0;
-    const c         = stressColor(stress, color);
-    const reset     = color ? ANSI.reset : "";
-    const bar10     = hasStress
-      ? `${c}${bar(stress / 100)}${reset}`
-      : paint("──────────", ANSI.dim, color);
-    const pct      = hasStress ? `${lpad(stress.toFixed(1), 5)}%` : `   — `;
-    const skillsStr = formatSkills(r.skills);
-    const skillCol  = skillsStr ? paint(skillsStr, ANSI.dim, color) : paint("no skills", ANSI.dim, color);
-    return `  ${fit(r.name ?? "(unnamed)", 24)} ${bar10} ${pct}   ${skillCol}`;
-  });
-  return [header, ...lines].join("\n");
-}
-
-
-/**
- * Convert a comma-separated skills string from GROUP_CONCAT into a compact
- * human-readable label. Groups skills by branch and keeps only the highest
- * level per branch. E.g. "Building1,Building2,Mining1" → "Builder II, Miner I".
- */
-function formatSkills(raw) {
-  if (!raw) return "";
-  const bestLevel = new Map(); // branch key → highest level
-  for (const skill of raw.split(",")) {
-    const m = skill.match(/^([A-Za-z]+?)(\d+)?$/);
-    if (!m) continue;
-    const branch = m[1].toLowerCase();
-    const level  = m[2] ? Number(m[2]) : 1;
-    if (!bestLevel.has(branch) || level > bestLevel.get(branch)) {
-      bestLevel.set(branch, level);
-    }
-  }
-  const parts = [];
-  for (const [branch, level] of bestLevel) {
-    const label = SKILL_LABEL_MAP.get(branch) ?? (branch.charAt(0).toUpperCase() + branch.slice(1));
-    const roman = ROMAN_NUMERALS[level] ?? String(level);
-    parts.push(roman ? `${label} ${roman}` : label);
-  }
-  return parts.join(", ");
-}
-
-/** Top-of-mind alerts: parsed_at staleness, missing data, etc. */
+/** Top-of-mind alerts: parsed_at staleness. */
 export function renderFreshness(db, { color = false } = {}) {
   const meta = readMeta(db);
   if (!meta.parsedAt) return paint("(no parsed_at stamp — older watcher version?)", ANSI.dim, color);
@@ -185,10 +247,12 @@ export function render(db, opts = {}) {
     renderHeadCounts(db, opts),
     renderFreshness(db, opts),
     "",
+    renderDupes(db, opts),
+    "",
     renderGeysers(db, opts),
     "",
-    renderStockpile(db, opts),
+    renderFood(db, opts),
     "",
-    renderDupes(db, opts),
+    renderStockpile(db, opts),
   ].join("\n");
 }

@@ -435,10 +435,13 @@ describe("real ONI save end-to-end", { skip: skipReason }, () => {
 
   test("ui.render(): dupe names appear in full (no truncation ellipsis)", () => {
     const out = render(db, { color: false });
-    // Dupes section should contain real names, not '…' from truncation.
-    // The 24-col fit() still clips very long names, but our test names
-    // (e.g. '11. Researcher - Ren') are ≤24 chars.
-    const dupeRows = out.split("\n").filter((l) => /░|█|─/.test(l));
+    // Extract only lines from the Dupes section (geysers also now show bars).
+    const lines = out.split("\n");
+    const dupeStart = lines.findIndex((l) => /^Dupes/.test(l));
+    const dupeEnd   = lines.findIndex((l, i) => i > dupeStart && /^[A-Z]/.test(l));
+    const dupeSection = lines.slice(dupeStart, dupeEnd > dupeStart ? dupeEnd : undefined);
+    // Skip the header and column-label rows; data rows contain bar characters.
+    const dupeRows = dupeSection.filter((l) => /░|█|─/.test(l));
     assert.ok(dupeRows.length > 0, "no dupe rows found in render output");
     for (const row of dupeRows) {
       // Each dupe row must contain the stress bar and a percentage

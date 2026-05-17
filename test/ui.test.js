@@ -9,10 +9,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { extractAll } from "../src/extractors.js";
 import { writeDatabase } from "../src/db.js";
-import { FAKE_SAVE } from "./fixture.js";
 import { GEYSER_TYPE_NAMES } from "../src/geyser_types.js";
+import { buildFakeTables } from "./helpers.js";
 import {
   render,
   renderBanner,
@@ -20,14 +19,12 @@ import {
   renderGeysers,
   renderStockpile,
   renderDupes,
+  renderFood,
   readMeta,
 } from "../src/ui.js";
 
 function buildDb() {
-  const tables = extractAll(FAKE_SAVE);
-  tables.save_meta.push({ key: "parsed_at", value: new Date().toISOString() });
-  tables.save_meta.push({ key: "source_file", value: "/tmp/fake.sav" });
-
+  const tables = buildFakeTables();
   const dir = mkdtempSync(join(tmpdir(), "oni-ui-test-"));
   const dbPath = join(dir, "test.sqlite");
   writeDatabase(dbPath, tables);
@@ -119,14 +116,15 @@ describe("renderStockpile", () => {
 });
 
 describe("renderDupes", () => {
-  test("includes Meep with stress percentage", () => {
+  test("includes Meep with stress percentage and column headers", () => {
     withDb((db) => {
       const out = renderDupes(db);
       assert.match(out, /Meep/);
       // Meep's stress is 12.5 in the fixture; should appear with 1 decimal.
       assert.match(out, /12\.5/);
-      // Meep has Mining1 mastered in the fixture → rendered as "Miner I"
-      assert.match(out, /Miner I/);
+      // New layout: column headers for Roles / Morale / Stress.
+      assert.match(out, /Roles/);
+      assert.match(out, /Morale/);
     });
   });
 
@@ -162,11 +160,15 @@ describe("renderDupes", () => {
       duplicant_attributes: [],
       duplicant_effects: [],
       duplicant_amounts: [],
+      duplicant_priorities: [],
       buildings: [],
       world_objects: [],
       storage_contents: [],
       geysers: [],
       critters: [],
+      // renderDupes JOINs against these; empty tables → no rows matched, not an error.
+      chore_groups: [],
+      effects: [],
     };
     writeDatabase(dbPath, tables);
     const db = new DatabaseSync(dbPath);
@@ -182,6 +184,16 @@ describe("renderDupes", () => {
   });
 });
 
+describe("renderFood", () => {
+  test("returns dim 'none' line when storage is empty", () => {
+    withDb((db) => {
+      // FAKE_SAVE has no food items (only element-based storage contents).
+      const out = renderFood(db, { color: false });
+      assert.match(out, /none in storage/);
+    });
+  });
+});
+
 describe("render", () => {
   test("composes all sections without throwing", () => {
     withDb((db) => {
@@ -192,6 +204,8 @@ describe("render", () => {
       assert.match(out, /duplicants/);
       // Geysers
       assert.match(out, /Geysers/);
+      // Food section
+      assert.match(out, /Food/);
       // Stockpile
       assert.match(out, /Stockpile/);
       // Dupes section
@@ -211,7 +225,10 @@ describe("geyser name consistency", () => {
       object_groups: [], game_objects: [], behaviors: [],
       duplicants: [], duplicant_traits: [], duplicant_skills: [],
       duplicant_attributes: [], duplicant_effects: [], duplicant_amounts: [],
+      duplicant_priorities: [],
       buildings: [], world_objects: [], storage_contents: [], critters: [],
+      // The lookup table must be present so the JOIN can resolve type names.
+      geyser_types: GEYSER_TYPE_NAMES,
       geysers: GEYSER_TYPE_NAMES.map(({ type_id }, i) => ({
         game_object_id: i + 1,
         prefab_id: `geyser_${i}`,

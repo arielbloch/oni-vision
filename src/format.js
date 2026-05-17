@@ -82,3 +82,15 @@ export function stressColor(stress, enabled) {
   if (stress >= 30) return ANSI.yellow;
   return ANSI.green;
 }
+
+/**
+ * Format a kcal value into a compact string matching the web dashboard.
+ * Tiers: kcal → kkcal (1 000 kcal) → Mkcal (1 000 000 kcal).
+ */
+export function formatKcal(kcal) {
+  if (kcal == null || !Number.isFinite(Number(kcal))) return "?";
+  const k = Number(kcal);
+  if (k >= 1_000_000) return `${(k / 1_000_000).toFixed(1)} Mkcal`;
+  if (k >= 1_000)     return `${(k / 1_000).toFixed(0)} kkcal`;
+  return `${k.toFixed(0)} kcal`;
+}
