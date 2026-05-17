@@ -20,6 +20,7 @@ import { GEYSER_TYPE_NAMES } from "./geyser_types.js";
 import { FOOD_META } from "./food.js";
 import { EFFECT_LABELS } from "./effects.js";
 import { CHORE_GROUP_NAMES } from "./chore_groups.js";
+import { DISEASE_NAMES } from "./diseases.js";
 
 /**
  * Best-effort removal of a stale tmp file. Swallows errors because the
@@ -82,6 +83,7 @@ export async function buildOutputs({ savePath, outputDir }) {
   tables.effects      = EFFECT_LABELS;
   tables.skills       = SKILL_LABELS;
   tables.chore_groups = CHORE_GROUP_NAMES;
+  tables.diseases     = DISEASE_NAMES;
   assertLookupTablesPopulated(tables);
   const tExtracted = Date.now();
   console.log(

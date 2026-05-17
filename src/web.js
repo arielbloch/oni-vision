@@ -261,6 +261,10 @@ function serveLookups(db) {
       db.prepare("SELECT branch, label FROM skills").all(),
       "branch", "label"
     ),
+    diseases: toMap(
+      db.prepare("SELECT disease_id, name FROM diseases").all(),
+      "disease_id", "name"
+    ),
     // Chore groups indexed by `name` since duplicant_priorities joins on the
     // internal string. Carries full display metadata for the FE focus chips.
     chore_groups: Object.fromEntries(

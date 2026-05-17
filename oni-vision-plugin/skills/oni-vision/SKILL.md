@@ -70,6 +70,9 @@ Totals ≥100 kg are reported as integers (rounding noise stripped). Default lim
 ### `oni_food({ limit?, format? })`
 Food items currently in colony storage, with display name, kcal per item, morale bonus, and stack count. Joins the `foods` lookup table so results are human-readable. Unknown food items (new DLC) appear with null name/kcal/morale. Default limit is 20.
 
+### `oni_germs({ minCount?, limit? })`
+Objects with germ contamination (Slimelung, Food Poisoning, etc.). Unions across `buildings`, `world_objects`, and `storage_contents`, joined against the `diseases` lookup so the disease name is human-readable. Use for "where's my Slimelung?" and "what's contaminated?" questions. Default `minCount` is 1000 (below that germs are usually noise — bump down to surface low-level contamination).
+
 ### `oni_priorities()`
 One row per (dupe, chore_group) pair where priority differs from the default (3). Returns `dupe_name`, `chore_group` (internal string), `label` (display name from the game UI), and `priority` (1-5). Use this for "which dupes are specialising in what" questions — much cheaper than chaining `oni_dupe` for every dupe. A missing `(dupe, group)` row means priority is at the default 3.
 
@@ -88,6 +91,7 @@ Six static tables resolve SimHash integers and short strings to human-readable v
 | `effects(effect, label, severity)` | effect string → readable label + severity |
 | `skills(branch, label)` | branch prefix → display name |
 | `chore_groups(hash, name, label, domain, abbr, sort_order)` | chore group → display label + FE styling metadata |
+| `diseases(disease_id, name)` | SimHash → disease name (Slimelung, Food Poisoning, …) |
 
 **Example — stored resources with readable names:**
 

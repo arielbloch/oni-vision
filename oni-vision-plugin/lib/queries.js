@@ -396,6 +396,47 @@ export function food(db, { limit = 20 } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Germ contamination
+// ---------------------------------------------------------------------------
+
+/**
+ * Objects carrying germ contamination, sorted by germ count. Unions across
+ * buildings, world_objects, and storage_contents (the three tables that
+ * carry disease_id/disease_count columns). JOINs against `diseases` for
+ * a human-readable disease name; unknown disease_ids fall back to `hash:N`.
+ *
+ * @param {object} opts
+ * @param {number} [opts.minCount=1000]  ignore rows below this germ count
+ *                                       (1000 is the rough threshold below
+ *                                       which germs don't really matter)
+ * @param {number} [opts.limit=20]
+ */
+export function germs(db, { minCount = 1000, limit = 20 } = {}) {
+  return db.prepare(
+    `WITH germy AS (
+       SELECT 'building' AS source, prefab_id, disease_id, disease_count, position_x, position_y
+         FROM buildings WHERE disease_id IS NOT NULL AND disease_count >= ?
+       UNION ALL
+       SELECT 'world_object' AS source, prefab_id, disease_id, disease_count, position_x, position_y
+         FROM world_objects WHERE disease_id IS NOT NULL AND disease_count >= ?
+       UNION ALL
+       SELECT 'storage' AS source, item_prefab_id AS prefab_id, disease_id, disease_count,
+              NULL AS position_x, NULL AS position_y
+         FROM storage_contents WHERE disease_id IS NOT NULL AND disease_count >= ?
+     )
+     SELECT g.source, g.prefab_id,
+            g.disease_id,
+            COALESCE(d.name, 'hash:' || g.disease_id) AS disease_name,
+            g.disease_count,
+            g.position_x, g.position_y
+     FROM germy g
+     LEFT JOIN diseases d ON d.disease_id = g.disease_id
+     ORDER BY g.disease_count DESC
+     LIMIT ?`
+  ).all(minCount, minCount, minCount, limit).map((r) => ({ ...r }));
+}
+
+// ---------------------------------------------------------------------------
 // Free-form SELECT
 // ---------------------------------------------------------------------------
 

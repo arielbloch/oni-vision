@@ -9,6 +9,7 @@ import { FOOD_META } from "../src/food.js";
 import { EFFECT_LABELS } from "../src/effects.js";
 import { SKILL_LABELS } from "../src/skills.js";
 import { CHORE_GROUP_NAMES } from "../src/chore_groups.js";
+import { DISEASE_NAMES } from "../src/diseases.js";
 import { FAKE_SAVE } from "./fixture.js";
 
 /**
@@ -77,4 +78,5 @@ function addLookupTables(tables) {
   tables.effects      = EFFECT_LABELS;
   tables.skills       = SKILL_LABELS;
   tables.chore_groups = CHORE_GROUP_NAMES;
+  tables.diseases     = DISEASE_NAMES;
 }

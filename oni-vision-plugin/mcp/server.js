@@ -33,6 +33,7 @@ import {
   geysers,
   resources,
   food,
+  germs,
   query,
   status,
   schema,
@@ -143,6 +144,18 @@ const TOOLS = [
     },
   },
   {
+    name: "oni_germs",
+    description: "Objects with germ contamination (Slimelung, Food Poisoning, etc.). Unions across buildings, world_objects, and storage_contents. JOINs the diseases lookup so the disease name is human-readable. Use for 'where's my Slimelung?' / 'what's contaminated?' questions. Default minCount=1000 (below that germs are usually noise).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        minCount: { type: "integer", description: "Ignore rows below this germ count. Default: 1000." },
+        limit: { type: "integer", description: "Max rows to return. Default: 20." },
+        format: { type: "string", enum: ["json", "tsv"], description: "Output format. Default: json." },
+      },
+    },
+  },
+  {
     name: "oni_query",
     description: "Run an arbitrary SELECT (or WITH … SELECT) against the SQLite DB. Multiple statements and any non-SELECT statement are rejected. Note: semicolons anywhere in the SQL (even inside string literals) are rejected — avoid `WHERE name = ';'`. Use the typed tools above when they cover the question — they're cheaper to compose and they pre-round numeric noise.",
     inputSchema: {
@@ -245,6 +258,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         break;
       case "oni_priorities":
         payload = withDb((db) => priorities(db));
+        break;
+      case "oni_germs":
+        payload = withDb((db) => germs(db, args));
         break;
       case "oni_query":
         payload = withDb((db) => query(db, args.sql, args.params ?? []));

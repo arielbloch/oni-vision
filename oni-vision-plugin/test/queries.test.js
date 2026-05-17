@@ -19,6 +19,7 @@ import {
   geysers,
   resources,
   food,
+  germs,
   query,
   status,
   statusObject,
@@ -510,6 +511,54 @@ describe("statusObject", () => {
       assert.match(block, new RegExp(`duplicants=${o.counts.duplicants}`));
       if (o.top_dupes[0]) assert.match(block, new RegExp(o.top_dupes[0].name));
       });
+  });
+});
+
+describe("germs", () => {
+  test("returns germy storage_contents rows joined to a known disease name", () => {
+    withDb((db) => {
+      // FAKE_SAVE has one storage_contents row with diseaseID hash 1918712348
+      // (Food Poisoning) and diseaseCount 10 — set minCount=1 to surface it.
+      const rows = germs(db, { minCount: 1 });
+      assert.ok(rows.length >= 1, "should surface the fixture's germy storage row");
+      const foodPoisoning = rows.find(r => r.disease_id === 1918712348);
+      assert.ok(foodPoisoning, "Food Poisoning row should be present");
+      assert.equal(foodPoisoning.disease_name, "Food Poisoning");
+      assert.equal(foodPoisoning.disease_count, 10);
+      assert.equal(foodPoisoning.source, "storage");
+    });
+  });
+
+  test("minCount filter discards rows below the threshold", () => {
+    withDb((db) => {
+      // Default minCount=1000 — fixture's count of 10 is far below, so no rows.
+      assert.equal(germs(db).length, 0,
+        "default minCount=1000 should hide the count-10 fixture row");
+    });
+  });
+
+  test("unknown disease_ids fall back to 'hash:<id>' label", () => {
+    const tables = buildFakeTables();
+    tables.buildings.push({
+      game_object_id: 999_001,
+      prefab_id: "PollutedDirtVessel",
+      position_x: 5, position_y: 5,
+      element_id: null, units: null, temperature: 300,
+      disease_id: 1234567890,   // not in DISEASE_NAMES
+      disease_count: 5000,
+    });
+    const dir = mkdtempSync(join(tmpdir(), "oni-mcp-germs-unknown-"));
+    const dbPath = join(dir, "test.sqlite");
+    writeDatabase(dbPath, tables);
+    const db = new DatabaseSync(dbPath);
+    try {
+      const rows = germs(db);
+      const unknown = rows.find(r => r.disease_id === 1234567890);
+      assert.ok(unknown, "unknown disease should still appear");
+      assert.equal(unknown.disease_name, "hash:1234567890");
+    } finally {
+      db.close();
+    }
   });
 });
 

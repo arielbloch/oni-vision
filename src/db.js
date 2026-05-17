@@ -200,6 +200,10 @@ const SCHEMA = [
      abbr       TEXT NOT NULL,
      sort_order INTEGER NOT NULL
    )`,
+  `CREATE TABLE diseases (
+     disease_id INTEGER PRIMARY KEY,
+     name       TEXT NOT NULL
+   )`,
   `CREATE TABLE duplicant_priorities (
      duplicant_id INTEGER NOT NULL,
      chore_group  TEXT NOT NULL,
@@ -282,6 +286,7 @@ export const TABLE_COLUMNS = {
   effects:      ["effect", "label", "severity"],
   skills:       ["branch", "label"],
   chore_groups: ["hash", "name", "label", "domain", "abbr", "sort_order"],
+  diseases:     ["disease_id", "name"],
   duplicant_priorities: ["duplicant_id", "chore_group", "priority"],
 };
 
@@ -301,6 +306,7 @@ const REQUIRED_LOOKUP_TABLES = [
   "effects",
   "skills",
   "chore_groups",
+  "diseases",
 ];
 
 /**
