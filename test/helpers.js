@@ -28,13 +28,53 @@ export function buildFakeTables({ includeParsedAt = true, includeLookupTables = 
   }
 
   if (includeLookupTables) {
-    tables.element_names = [...ELEMENT_NAMES.entries()].map(([element_id, name]) => ({ element_id, name }));
-    tables.geyser_type_names = GEYSER_TYPE_NAMES;
-    tables.food_meta = FOOD_META;
-    tables.effect_labels = EFFECT_LABELS;
-    tables.skill_labels = SKILL_LABELS;
-    tables.chore_group_names = CHORE_GROUP_NAMES;
+    addLookupTables(tables);
   }
 
   return tables;
+}
+
+/**
+ * Build an empty-colony `tables` object: zero dupes / buildings / geysers /
+ * critters / storage, but with parse metadata and lookup tables populated
+ * (which the pipeline always writes). Used to verify the API and CLI
+ * handle zero-row paths without 500s or NPEs.
+ */
+export function buildEmptyTables() {
+  const tables = {
+    save_meta: [
+      { key: "baseName",          value: "Empty Colony" },
+      { key: "numberOfCycles",    value: "1" },
+      { key: "numberOfDuplicants", value: "0" },
+      { key: "saveVersion",       value: "7.26" },
+      { key: "parsed_at",         value: new Date().toISOString() },
+      { key: "source_file",       value: "/tmp/empty.sav" },
+    ],
+    object_groups: [],
+    game_objects: [],
+    behaviors: [],
+    duplicants: [],
+    duplicant_traits: [],
+    duplicant_skills: [],
+    duplicant_attributes: [],
+    duplicant_effects: [],
+    duplicant_amounts: [],
+    duplicant_priorities: [],
+    buildings: [],
+    world_objects: [],
+    storage_contents: [],
+    geysers: [],
+    critters: [],
+  };
+  addLookupTables(tables);
+  return tables;
+}
+
+function addLookupTables(tables) {
+  tables.element_names = [...ELEMENT_NAMES.entries()].map(([element_id, name]) => ({ element_id, name }));
+  tables.geyser_type_names = GEYSER_TYPE_NAMES;
+  tables.food_meta = FOOD_META;
+  tables.effect_labels = EFFECT_LABELS;
+  tables.skill_labels = SKILL_LABELS;
+  tables.chore_group_names = CHORE_GROUP_NAMES;
 }

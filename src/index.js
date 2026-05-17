@@ -12,7 +12,7 @@ import chokidar from "chokidar";
 import { resolveConfig } from "./paths.js";
 import { ensureConfig } from "./config-writer.js";
 import { findLatestSave } from "./find-latest.js";
-import { buildOutputs } from "./pipeline.js";
+import { safeBuildOutputs } from "./pipeline.js";
 import { startWeb, notifyClients } from "./web.js";
 import { openBrowser } from "./browser.js";
 
@@ -67,11 +67,14 @@ async function runOnce(reason) {
     console.log(
       `[vision] (${reason}) latest save: ${latest.path} (${(latest.size / 1024 / 1024).toFixed(2)} MB)`
     );
-    await buildOutputs({ savePath: latest.path, outputDir: config.outputDir });
+    const result = await safeBuildOutputs({
+      savePath: latest.path,
+      outputDir: config.outputDir,
+    });
     // Push a "parse" event to any open browser tabs so they refresh instantly.
-    notifyClients();
-  } catch (err) {
-    console.error(`[vision] parse failed: ${err.stack || err.message}`);
+    // Only on success — a failed parse leaves the previous current.sqlite intact
+    // and pushing would make tabs re-fetch unchanged data.
+    if (result.ok) notifyClients();
   } finally {
     busy = false;
     if (queued) {

@@ -148,6 +148,24 @@ export async function buildOutputs({ savePath, outputDir }) {
   return { tables, outputDir, savePath };
 }
 
+/**
+ * Run `buildOutputs` with parse-failure isolation. A corrupt save file, a
+ * disk-full error, or a bug in the extractor must not crash the daemon —
+ * we log and return so the watcher can retry on the next file event.
+ *
+ * Returns `{ ok: true, savePath, outputDir }` on success or
+ * `{ ok: false, error }` on failure. Never throws.
+ */
+export async function safeBuildOutputs({ savePath, outputDir }) {
+  try {
+    await buildOutputs({ savePath, outputDir });
+    return { ok: true, savePath, outputDir };
+  } catch (err) {
+    console.error(`[pipeline] parse failed: ${err.stack || err.message}`);
+    return { ok: false, error: err };
+  }
+}
+
 function countRows(tables) {
   let n = 0;
   for (const rows of Object.values(tables)) n += rows.length;

@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { writeDatabase } from "../src/db.js";
-import { buildFakeTables } from "./helpers.js";
+import { buildFakeTables, buildEmptyTables } from "./helpers.js";
 import { startWeb, notifyClients } from "../src/web.js";
 
 let server;
@@ -155,6 +155,37 @@ describe("GET /api/status", () => {
       "Meep has Mining1 mastered → morale_cost = 1");
   });
 
+  test("empty colony (0 dupes, 0 geysers, 0 storage) returns valid shape, not 500", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "oni-web-empty-colony-"));
+    writeDatabase(join(dir, "current.sqlite"), buildEmptyTables());
+    const s = await startWeb({ port: 0, host: "127.0.0.1", outputDir: dir });
+    try {
+      const res = await fetch(`http://127.0.0.1:${s.address().port}/api/status`);
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.base_name, "Empty Colony");
+      assert.equal(body.cycle, 1);
+      assert.equal(body.counts.duplicants, 0);
+      assert.equal(body.counts.geysers, 0);
+      assert.equal(body.counts.buildings, 0);
+      // Empty arrays must be arrays, not nulls — the FE iterates them.
+      assert.ok(Array.isArray(body.top_dupes), "top_dupes must be an array");
+      assert.equal(body.top_dupes.length, 0);
+      assert.ok(Array.isArray(body.geyser_types));
+      assert.equal(body.geyser_types.length, 0);
+      assert.ok(Array.isArray(body.food));
+      assert.equal(body.food.length, 0);
+      assert.ok(Array.isArray(body.all_resources));
+      assert.equal(body.all_resources.length, 0);
+      // Lookup tables and thresholds still come through even with no save data.
+      assert.ok(body.element_names && Object.keys(body.element_names).length > 0,
+        "lookup tables must populate even for empty colonies");
+      assert.ok(body.thresholds);
+    } finally {
+      s.close();
+    }
+  });
+
   test("returns 503 with a structured error when current.sqlite is missing", async () => {
     // Spin up a SECOND server pointing at an empty dir.
     const emptyDir = mkdtempSync(join(tmpdir(), "oni-web-empty-"));
@@ -225,6 +256,32 @@ describe("GET /api/events (SSE)", () => {
 
     // notifyClients should not throw even with one connected client.
     assert.doesNotThrow(() => notifyClients());
+
+    ac.abort();
+  });
+
+  test("connected client actually receives the parse event", async () => {
+    const ac = new AbortController();
+    const res = await fetch(`${baseUrl}/api/events`, { signal: ac.signal });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+
+    // Drain the initial ": connected" comment.
+    await reader.read();
+
+    // Trigger a push after the client is registered.
+    await new Promise((r) => setTimeout(r, 20));
+    notifyClients();
+
+    // Read until we either see the parse event or hit a 1s deadline.
+    const deadline = Date.now() + 1000;
+    let buffer = "";
+    while (!buffer.includes("event: parse") && Date.now() < deadline) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+    }
+    assert.match(buffer, /event: parse/, "client should receive the parse event");
 
     ac.abort();
   });
