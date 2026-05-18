@@ -66,7 +66,7 @@ th { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacin
    p4 = outline only; p5 = solid deep fill. */
 .ft {
   display: inline-flex; align-items: center;
-  height: 20px; padding: 0 7px; margin: 0 2px 0 0;
+  height: 16px; padding: 0 7px; margin: 0 2px 0 0;
   border-radius: 4px; background: transparent;
   font-size: 11px; font-weight: 500; line-height: 1; white-space: nowrap; vertical-align: middle;
 }
@@ -102,14 +102,14 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
 .badge.bad  { background: #ef4444; color: #fff; }
 .badge.warn { background: #f59e0b; color: #1a0e00; }
 .o2-row { display: flex; align-items: center; gap: 8px; }
-.o2-label { font-family: var(--mono); font-size: 13px; color: var(--fg-dim); width: 100px; flex-shrink: 0; }
+.o2-label { font-family: var(--mono); font-size: 13px; color: var(--fg-dim); width: 110px; flex-shrink: 0; white-space: nowrap; }
 .o2-value { font-family: var(--mono); font-size: 13px; color: var(--fg-dim); width: 52px; text-align: right; flex-shrink: 0; }
 .o2-gap { width: 14px; flex-shrink: 0; }
 .o2-breath-bar {
   width: 178px; flex-shrink: 0; height: 16px; border-radius: 2px;
-  background: #221414; border: 1px solid var(--border); overflow: hidden;
+  background: #221414; overflow: hidden; display: flex;
 }
-.o2-breath-red { height: 100%; background: #ff2222; }
+.o2-breath-red { height: 100%; background: #ff2222; margin-left: auto; }
 /* Legacy gen-bar classes kept for any future reference */
 .o2-gen-bar {
   width: 178px; flex-shrink: 0; height: 16px; border-radius: 2px;
@@ -123,27 +123,30 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
 /* Balance bar — centre-zero fill (Option A) */
 .o2-balance-bar {
   width: 178px; flex-shrink: 0; height: 16px; border-radius: 2px;
-  border: 1px solid var(--border); display: flex; overflow: hidden;
+  display: flex; overflow: hidden;
 }
 .o2-balance-left  { flex: 1; background: #221414; display: flex; align-items: stretch; overflow: hidden; }
-.o2-balance-red   { height: 100%; background: #f87171; margin-left: auto; }
+.o2-balance-red   { height: 100%; background: #ff2222; margin-left: auto; }
 .o2-balance-hair  { width: 2px; background: #454560; flex-shrink: 0; }
 .o2-balance-right { flex: 1; background: #0d2b1a; display: flex; align-items: stretch; overflow: hidden; }
 .o2-balance-green { height: 100%; background: var(--good); }
 .two-up   { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .three-up { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 @media (max-width: 600px) {
-  .counts   { grid-template-columns: repeat(2, 1fr); }
-  .two-up   { grid-template-columns: 1fr; }
-  .three-up { grid-template-columns: 1fr; }
+  .counts      { grid-template-columns: repeat(2, 1fr); }
+  .two-up      { grid-template-columns: 1fr; }
+  .three-up    { grid-template-columns: 1fr; }
+  .food-layout { flex-direction: column; }
 }
-/* Food — total days bar */
-.food-days-row { display: flex; gap: 2px; align-items: center; margin-bottom: 10px; }
+/* Food — layout: days bar left, chips right */
+.food-layout { display: flex; gap: 12px; align-items: flex-start; }
+.food-days-row { display: flex; gap: 2px; align-items: center; flex-shrink: 0; }
 .day-seg { width: 16px; height: 16px; border-radius: 2px; flex-shrink: 0; }
 .day-seg-over { flex-shrink: 0; padding: 0 3px; font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--good); line-height: 1; display: flex; align-items: center; }
 .food-days-label { margin-left: 8px; font-size: 12px; color: var(--fg); font-family: var(--mono); }
+.food-runway-label { font-family: var(--mono); font-size: 13px; color: var(--good); margin-right: 8px; flex-shrink: 0; white-space: nowrap; }
 /* Runway gauge — per-food day-segment chips */
-.food-chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.food-chip-row { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; align-content: flex-start; }
 .runway-chip { display: flex; flex-direction: column; gap: 3px; background: #0a0a14; border: 1px solid var(--border); border-radius: 5px; padding: 5px 8px; }
 .runway-chip-name { font-size: 12px; white-space: nowrap; }
 .runway-segs { display: flex; gap: 2px; align-items: center; }

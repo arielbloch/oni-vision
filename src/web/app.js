@@ -241,7 +241,7 @@ function renderOxygen(oxygen) {
   const { avg_breath_pct, report } = oxygen;
   const breathPct = Math.max(0, Math.min(100, avg_breath_pct ?? 100));
 
-  // Breathability: bad% fills from left (red = depleted breath)
+  // Breathability: bad% fills from RIGHT (red grows leftward as breath depletes)
   const badPct = (100 - breathPct).toFixed(1);
 
   // Balance bar: centre-zero, calibrated to max(produced, consumed).
@@ -277,7 +277,7 @@ function renderOxygen(oxygen) {
   <div class="o2-breath-bar"><div class="o2-breath-red" style="width:${badPct}%"></div></div>
   <span class="o2-value">${Math.round(breathPct)}%</span>
   <div class="o2-gap"></div>
-  <span class="o2-label">Balance</span>
+  <span class="o2-label">O2 Production</span>
   ${balanceHTML}
 </div>`);
 }
@@ -349,7 +349,7 @@ function renderFood(rows, dupeCount) {
   }
   if (over10) segs.push(`<div class="day-seg-over">∞</div>`);
   const daysLabel = `${totalDays.toFixed(1)} days`;
-  const daysBar = `<div class="food-days-row">${segs.join('')}<span class="food-days-label">${escapeHtml(daysLabel)}</span></div>`;
+  const daysBar = `<div class="food-days-row"><span class="food-runway-label">Runway</span>${segs.join('')}<span class="food-days-label">${escapeHtml(daysLabel)}</span></div>`;
 
   // ── Runway chips ───────────────────────────────────────────────────────────
   const chips = known.map((r, i) => {
@@ -361,7 +361,7 @@ function renderFood(rows, dupeCount) {
 </div>`;
   }).join('');
 
-  setHTML("food-card", `${daysBar}<div class="food-chip-row">${chips}</div>`);
+  setHTML("food-card", `<div class="food-layout">${daysBar}<div class="food-chip-row">${chips}</div></div>`);
 }
 
 function renderResources(rows) {
