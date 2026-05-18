@@ -160,6 +160,81 @@ Convenience views: `v_resources_in_storage`, `v_world_objects_by_element`, `v_ge
 **"What's my cycle?"**
 1. `oni_save_meta()` — return cycle and base_name; that's a one-shot answer.
 
+## Daily report — the authoritative per-cycle accounting
+
+The game stores its own end-of-cycle report directly in the save file inside the `ReportManager` behavior. This is the **ground truth for per-cycle stats** — far more reliable than anything derived from building uptime data.
+
+```sql
+SELECT json_extract(template_data, '$.dailyReports[#-1]') AS last_report
+FROM behaviors WHERE name = 'ReportManager' LIMIT 1
+```
+
+The report is a JSON object with `day` (cycle number) and `reportEntries` — an array of typed entries. Each entry has:
+- `reportType` — integer identifying the stat (see table below)
+- `accPositive` — total positive accumulation for the cycle (e.g. O₂ generated, kcal harvested)
+- `accNegative` — total negative accumulation (e.g. O₂ consumed, kcal eaten)
+- `accumulate` — net (`accPositive + accNegative`)
+- `contextEntries.elements` — optional per-source breakdown (e.g. per-dupe O₂ consumption)
+
+### Known reportType values
+
+| reportType | Stat | Units | Notes |
+|-----------|------|-------|-------|
+| 1 | Calories | kcal (×1000 internally) | accPositive = harvested, accNegative = eaten |
+| 2 | Stress | % | per-dupe in contextEntries |
+| 4 | Skill points | points | per-dupe in contextEntries |
+| 7 | Chore completions | count | broken down by chore type in contextEntries |
+| 10 | Distance traveled (tiles) | tiles | per-dupe |
+| 11 | Distance traveled (tiles) | tiles | per-dupe, second metric |
+| 12 | Calories burned | kcal | per-dupe |
+| 18 | **Oxygen** | **kg** | accPositive = generated, accNegative = consumed |
+| 19 | Power | Wh | accPositive = generated, accNegative = consumed |
+| 20 | Unknown loss | — | negative only |
+| 22 | Critter count | count | broken down by species |
+
+### Oxygen accounting (reportType 18) — key facts
+
+- `accPositive` = total O₂ produced by **buildings** that cycle (Algae Deoxidizers, Deodorizers, Electrolyzers, etc.)
+- `accNegative` = total O₂ consumed by dupes (per-dupe breakdown in `contextEntries`)
+- **Oxylite sublimating from storage or debris is NOT counted** — only building output registers. This is a known Klei quirk (reported on the forums) and means the game's own "insufficient oxygen" warning can fire even with tons of Oxylite in bins.
+- The production total has no per-building breakdown in the report — just one aggregate `accPositive`.
+
+### Querying oxygen for the previous cycle
+
+```sql
+SELECT
+  json_extract(e.value, '$.reportType')   AS report_type,
+  json_extract(e.value, '$.accPositive')  AS produced_kg,
+  json_extract(e.value, '$.accNegative')  AS consumed_kg,
+  json_extract(e.value, '$.accumulate')   AS net_kg
+FROM behaviors,
+  json_each(json_extract(template_data, '$.dailyReports[#-1].reportEntries')) AS e
+WHERE name = 'ReportManager'
+  AND json_extract(e.value, '$.reportType') = 18
+```
+
+### Why not use building uptime (Operational.uptimeData)?
+
+The `Operational` behavior on each building stores `uptimeData` — an array of 5 recent per-cycle uptime fractions (0..1). These can be used to estimate throughput: `uptime × rate_g_s × 600`. However, they significantly undercount actual production because:
+1. The fractions track time the machine was *able* to run, not actual element output ticks
+2. They misalign with cycle boundaries depending on when the save was written
+3. They have no equivalent for natural sources (tile outgassing, etc.)
+
+In practice, uptimeData estimates came in ~35–45% below the daily report figure. **Always prefer `ReportManager.dailyReports` for per-cycle production/consumption questions.**
+
+### "How much oxygen did my colony produce last cycle?"
+
+```sql
+SELECT
+  ROUND(json_extract(e.value, '$.accPositive'), 1) AS produced_kg,
+  ROUND(ABS(json_extract(e.value, '$.accNegative')), 1) AS consumed_kg,
+  ROUND(json_extract(e.value, '$.accumulate'), 1) AS net_kg
+FROM behaviors,
+  json_each(json_extract(template_data, '$.dailyReports[#-1].reportEntries')) AS e
+WHERE name = 'ReportManager'
+  AND json_extract(e.value, '$.reportType') = 18
+```
+
 ## Error handling
 
 If a tool returns `Error: oni-vision database not found...`, oni-vision hasn't run yet. Tell the user:
