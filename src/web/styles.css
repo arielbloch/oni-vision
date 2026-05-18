@@ -128,7 +128,7 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
 .food-days-label { margin-left: 8px; font-size: 12px; color: var(--fg); font-family: var(--mono); }
 /* Runway gauge — per-food day-segment chips */
 .food-chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
-.runway-chip { display: flex; flex-direction: column; gap: 3px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 5px; padding: 5px 8px; }
+.runway-chip { display: flex; flex-direction: column; gap: 3px; background: #0a0a14; border: 1px solid var(--border); border-radius: 5px; padding: 5px 8px; }
 .runway-chip-name { font-size: 12px; white-space: nowrap; }
 .runway-segs { display: flex; gap: 2px; align-items: center; }
 .runway-seg { width: 16px; height: 16px; border-radius: 2px; flex-shrink: 0; }
