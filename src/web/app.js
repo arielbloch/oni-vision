@@ -179,7 +179,7 @@ function renderGeysers(rows) {
           <div class="bar-fill ${cls}" style="width:${quality}%"></div>
         </div>
       </td>
-      <td class="pct">${quality}%</td>
+      <td class="metric">${quality}%</td>
     </tr>`;
   }).join("");
   setHTML("geysers-card", `<table><tbody>${html}</tbody></table>`);

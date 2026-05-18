@@ -97,7 +97,7 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
 .badge.bad  { background: #ef4444; color: #fff; }
 .badge.warn { background: #f59e0b; color: #1a0e00; }
 .o2-row { display: flex; align-items: center; gap: 8px; }
-.o2-label { font-size: 11px; color: var(--fg-dim); width: 82px; flex-shrink: 0; }
+.o2-label { font-family: var(--mono); font-size: 11px; color: var(--fg-dim); width: 82px; flex-shrink: 0; }
 .o2-value { font-family: var(--mono); font-size: 11px; color: var(--fg-dim); width: 44px; text-align: right; flex-shrink: 0; }
 .o2-gap { width: 14px; flex-shrink: 0; }
 .o2-breath-bar {
