@@ -13,6 +13,7 @@
 
 import { THRESHOLDS } from "./thresholds.js";
 import { ANSI, paint, bar, pad, fit, lpad, formatMass, formatKcal, formatAge, stressColor } from "./format.js";
+import { oxygenStats } from "./oxygen.js";
 
 /**
  * Pull the headline facts out of save_meta. Returns a plain object;
@@ -221,6 +222,58 @@ export function renderFood(db, { color = false, limit = 8 } = {}) {
   return [barLine, ...lines].join("\n");
 }
 
+/**
+ * Single-line O₂ monitor:
+ *   Breathability: 10-char bar, red fills from LEFT as breath drops.
+ *   O₂ Gen: 10│10 zero-centered bar — dark-red left, dark-green right,
+ *           bright fills grow from the hairline outward.
+ */
+export function renderOxygen(db, { color = false } = {}) {
+  const { avg_breath_pct, production_gps, consumption_gps } = oxygenStats(db);
+
+  // ── Breathability: 10 chars, red from LEFT ────────────────────────────────
+  const BBAR = 10;
+  const redB = Math.min(BBAR, Math.round((1 - avg_breath_pct / 100) * BBAR));
+  const dimB = BBAR - redB;
+  const breathBar = color
+    ? `${ANSI.red}${"█".repeat(redB)}${ANSI.reset}${ANSI.dim}${"░".repeat(dimB)}${ANSI.reset}`
+    : `${"█".repeat(redB)}${"░".repeat(dimB)}`;
+
+  // ── Gen bar: 10 │ 10, zero-centered ──────────────────────────────────────
+  const HALF = 10;
+  let leftRed = 0, rightGreen = 0, genLabel;
+
+  if (consumption_gps === 0 && production_gps === 0) {
+    genLabel = "—";
+  } else if (production_gps === 0) {
+    leftRed  = HALF;
+    genLabel = "no gen";
+  } else {
+    const ratio = consumption_gps > 0 ? production_gps / consumption_gps : Infinity;
+    if (ratio >= 1) {
+      rightGreen = Math.min(HALF, Math.round((ratio - 1) * HALF));
+      genLabel   = ratio >= 10 ? ">10×" : `${ratio.toFixed(1)}×`;
+    } else {
+      leftRed  = Math.min(HALF, Math.round((1 - ratio) * HALF));
+      genLabel = `${Math.round(ratio * 100)}%`;
+    }
+  }
+
+  const leftDim  = HALF - leftRed;
+  const rightDim = HALF - rightGreen;
+  const hair = color ? `${ANSI.dim}│${ANSI.reset}` : "│";
+
+  const leftHalf  = color
+    ? `${ANSI.dim}${ANSI.red}${"░".repeat(leftDim)}${ANSI.reset}${ANSI.red}${"█".repeat(leftRed)}${ANSI.reset}`
+    : `${"░".repeat(leftDim)}${"█".repeat(leftRed)}`;
+  const rightHalf = color
+    ? `${ANSI.green}${"█".repeat(rightGreen)}${ANSI.reset}${ANSI.dim}${ANSI.green}${"░".repeat(rightDim)}${ANSI.reset}`
+    : `${"█".repeat(rightGreen)}${"░".repeat(rightDim)}`;
+
+  const header = paint("O₂", ANSI.bold + ANSI.green, color);
+  return `${header}  Breathability ${breathBar}  ${Math.round(avg_breath_pct)}%   O₂ Gen  ${leftHalf}${hair}${rightHalf}  ${genLabel}`;
+}
+
 /** Top elements by mass across loose piles + storage_contents. */
 export function renderStockpile(db, { color = false, limit = 8 } = {}) {
   const rows = db.prepare(`
@@ -268,6 +321,8 @@ export function render(db, opts = {}) {
     renderFreshness(db, opts),
     "",
     renderDupes(db, opts),
+    "",
+    renderOxygen(db, opts),
     "",
     renderGeysers(db, opts),
     "",

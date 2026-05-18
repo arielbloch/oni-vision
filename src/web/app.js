@@ -237,6 +237,48 @@ function onPickerChange() {
 
 // ── Renderers ─────────────────────────────────────────────────────────────────
 
+function renderOxygen(oxygen) {
+  if (!oxygen) { setHTML("oxygen-card", `<div class="empty">no data</div>`); return; }
+  const { avg_breath_pct, production_gps, consumption_gps } = oxygen;
+  const breathPct = Math.max(0, Math.min(100, avg_breath_pct ?? 100));
+
+  // Breathability: red fills from LEFT
+  const badPct = (100 - breathPct).toFixed(1);
+
+  // O₂ Gen: zero-centered, fills grow from hairline outward
+  let leftRedPct = 0, rightGreenPct = 0, genLabel = "—";
+  if (production_gps === 0 && consumption_gps === 0) {
+    genLabel = "—";
+  } else if (production_gps === 0) {
+    leftRedPct = 100;
+    genLabel = "no gen";
+  } else {
+    const ratio = consumption_gps > 0 ? production_gps / consumption_gps : Infinity;
+    if (ratio >= 1) {
+      rightGreenPct = Math.min(100, (ratio - 1) * 100);
+      genLabel = ratio >= 10 ? ">10×" : `${ratio.toFixed(1)}×`;
+    } else {
+      leftRedPct = Math.min(100, (1 - ratio) * 100);
+      genLabel = `${Math.round(ratio * 100)}%`;
+    }
+  }
+
+  setHTML("oxygen-card", `
+<div class="o2-row">
+  <span class="o2-label">Breathability</span>
+  <div class="o2-breath-bar"><div class="o2-breath-red" style="width:${badPct}%"></div></div>
+  <span class="o2-value">${Math.round(breathPct)}%</span>
+  <div class="o2-gap"></div>
+  <span class="o2-label">O₂ Generation</span>
+  <div class="o2-gen-bar">
+    <div class="o2-gen-left"><div class="o2-gen-red" style="width:${leftRedPct.toFixed(1)}%"></div></div>
+    <div class="o2-gen-hair"></div>
+    <div class="o2-gen-right"><div class="o2-gen-green" style="width:${rightGreenPct.toFixed(1)}%"></div></div>
+  </div>
+  <span class="o2-value">${escapeHtml(genLabel)}</span>
+</div>`);
+}
+
 function renderFood(rows, dupeCount) {
   const known = (rows ?? []).filter(r => r.kcal != null);
 
@@ -372,6 +414,7 @@ async function refresh() {
 
     renderCounts(data.counts || {});
     renderDupes(data.top_dupes || []);
+    renderOxygen(data.oxygen || null);
     renderGeysers(data.geysers || []);
     renderFood(data.food || [], data.counts?.duplicants ?? 0);
 

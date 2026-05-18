@@ -96,6 +96,24 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
 .badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 99px; margin-left: 5px; vertical-align: middle; }
 .badge.bad  { background: #ef4444; color: #fff; }
 .badge.warn { background: #f59e0b; color: #1a0e00; }
+.o2-row { display: flex; align-items: center; gap: 8px; }
+.o2-label { font-size: 11px; color: var(--fg-dim); width: 82px; flex-shrink: 0; }
+.o2-value { font-family: var(--mono); font-size: 11px; color: var(--fg-dim); width: 44px; text-align: right; flex-shrink: 0; }
+.o2-gap { width: 14px; flex-shrink: 0; }
+.o2-breath-bar {
+  flex: 1.1; height: 10px; border-radius: 3px;
+  background: var(--bg-elev); border: 1px solid var(--border); overflow: hidden;
+}
+.o2-breath-red { height: 100%; background: var(--bad); }
+.o2-gen-bar {
+  flex: 1.4; height: 10px; border-radius: 3px;
+  border: 1px solid var(--border); display: flex; overflow: hidden;
+}
+.o2-gen-left { flex: 1; background: #2b0d0d; display: flex; align-items: stretch; overflow: hidden; }
+.o2-gen-red  { height: 100%; background: var(--bad); margin-left: auto; }
+.o2-gen-hair { width: 2px; background: #454560; flex-shrink: 0; }
+.o2-gen-right { flex: 1; background: #0d2b1a; display: flex; align-items: stretch; overflow: hidden; }
+.o2-gen-green { height: 100%; background: var(--good); }
 .three-up { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 @media (max-width: 600px) {
   .counts   { grid-template-columns: repeat(2, 1fr); }

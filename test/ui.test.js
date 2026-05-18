@@ -20,6 +20,7 @@ import {
   renderStockpile,
   renderDupes,
   renderFood,
+  renderOxygen,
   readMeta,
 } from "../src/ui.js";
 
@@ -184,6 +185,32 @@ describe("renderDupes", () => {
   });
 });
 
+describe("renderOxygen", () => {
+  test("renders breathability bar and balance bar", () => {
+    withDb((db) => {
+      const out = renderOxygen(db, { color: false });
+      // Should have section header and two lines
+      assert.match(out, /O₂/);
+      assert.match(out, /Breathability/);
+      assert.match(out, /O₂ Gen/);
+    });
+  });
+
+  test("color=false produces no ANSI escapes", () => {
+    withDb((db) => {
+      const out = renderOxygen(db, { color: false });
+      assert.doesNotMatch(out, /\x1b\[/);
+    });
+  });
+
+  test("color=true produces ANSI escapes", () => {
+    withDb((db) => {
+      const out = renderOxygen(db, { color: true });
+      assert.match(out, /\x1b\[/);
+    });
+  });
+});
+
 describe("renderFood", () => {
   test("returns dim 'none' line when storage is empty", () => {
     withDb((db) => {
@@ -210,6 +237,8 @@ describe("render", () => {
       assert.match(out, /Stockpile/);
       // Dupes section
       assert.match(out, /Dupes/);
+      // Oxygen section
+      assert.match(out, /O₂/);
     });
   });
 });
