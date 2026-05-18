@@ -110,6 +110,7 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   background: #221414; border: 1px solid var(--border); overflow: hidden;
 }
 .o2-breath-red { height: 100%; background: #ff2222; }
+/* Legacy gen-bar classes kept for any future reference */
 .o2-gen-bar {
   width: 178px; flex-shrink: 0; height: 16px; border-radius: 2px;
   border: 1px solid var(--border); display: flex; overflow: hidden;
@@ -119,6 +120,16 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
 .o2-gen-hair { width: 2px; background: #454560; flex-shrink: 0; }
 .o2-gen-right { flex: 1; background: #0d2b1a; display: flex; align-items: stretch; overflow: hidden; }
 .o2-gen-green { height: 100%; background: var(--good); }
+/* Balance bar — centre-zero fill (Option A) */
+.o2-balance-bar {
+  width: 178px; flex-shrink: 0; height: 16px; border-radius: 2px;
+  border: 1px solid var(--border); display: flex; overflow: hidden;
+}
+.o2-balance-left  { flex: 1; background: #221414; display: flex; align-items: stretch; overflow: hidden; }
+.o2-balance-red   { height: 100%; background: #f87171; margin-left: auto; }
+.o2-balance-hair  { width: 2px; background: #454560; flex-shrink: 0; }
+.o2-balance-right { flex: 1; background: #0d2b1a; display: flex; align-items: stretch; overflow: hidden; }
+.o2-balance-green { height: 100%; background: var(--good); }
 .two-up   { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .three-up { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 @media (max-width: 600px) {

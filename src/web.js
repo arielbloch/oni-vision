@@ -19,7 +19,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import { statusObject } from "../oni-vision-plugin/lib/queries.js";
 import { THRESHOLDS } from "./thresholds.js";
-import { oxygenStats } from "./oxygen.js";
+import { oxygenStats, reportOxygenKg } from "./oxygen.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(HERE, "web");
@@ -343,6 +343,7 @@ function serveStatus(res, outputDir) {
     Object.assign(payload, serveLookups(db));
     payload.thresholds = THRESHOLDS;
     payload.oxygen = oxygenStats(db);
+    payload.oxygen.report = reportOxygenKg(db);
 
     res.writeHead(200, {
       "Content-Type": "application/json",
