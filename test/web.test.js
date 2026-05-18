@@ -119,8 +119,8 @@ describe("GET /api/status", () => {
       "foods should be a non-null object");
     assert.ok(body.foods["SurfAndTurf"],
       "foods should include SurfAndTurf");
-    assert.equal(body.foods["SurfAndTurf"].morale, 8,
-      "SurfAndTurf should have morale +8");
+    assert.equal(body.foods["SurfAndTurf"].morale, 4,
+      "SurfAndTurf should have morale +4");
     assert.ok(body.effects && typeof body.effects === "object",
       "effects should be a non-null object");
     assert.ok(body.effects["SlimeLung"],

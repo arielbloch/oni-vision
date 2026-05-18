@@ -7,6 +7,7 @@
 /** @type {Array<{type_id: number, name: string}>} */
 export const GEYSER_TYPE_NAMES = [
   { type_id:  -899515856, name: "Steam Vent"              },
+  { type_id:   811188634, name: "Cool Steam Vent"         },
   { type_id: -2022709954, name: "Hot Steam Vent"          },
   { type_id:   713477285, name: "Hot Water Geyser"        },
   { type_id:  1280790313, name: "Cool Slush Geyser"       },

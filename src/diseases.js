@@ -21,5 +21,6 @@ export const DISEASE_NAMES = [
   { disease_id:  1918712348, name: "Food Poisoning" },
   { disease_id: -2135408972, name: "Zombie Spores"  },
   { disease_id:  1468040844, name: "Floral Scents"  },
-  { disease_id: -1884831694, name: "Pollen Germs"   },
+  { disease_id: -1884831694, name: "Pollen Germs"            },
+  { disease_id: -1868256669, name: "Radioactive Contaminant" },
 ];

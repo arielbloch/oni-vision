@@ -37,7 +37,7 @@ export const ELEMENT_NAMES = new Map([
   [-1736594426, "Cuprite"],
   [-1870043872, "Algae"],
   [-1153056158, "Slime Mold"],
-  [707722079,   "Slime"],
+  [1479554344,  "Slime"],
   [1624244999,  "Dirt"],
   [381796644,   "Sand"],
   [493438017,   "Sandstone"],
