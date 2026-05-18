@@ -269,7 +269,7 @@ function renderOxygen(oxygen) {
   <div class="o2-breath-bar"><div class="o2-breath-red" style="width:${badPct}%"></div></div>
   <span class="o2-value">${Math.round(breathPct)}%</span>
   <div class="o2-gap"></div>
-  <span class="o2-label">O₂ Generation</span>
+  <span class="o2-label">Generation</span>
   <div class="o2-gen-bar">
     <div class="o2-gen-left"><div class="o2-gen-red" style="width:${leftRedPct.toFixed(1)}%"></div></div>
     <div class="o2-gen-hair"></div>
