@@ -68,7 +68,7 @@ th { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacin
   display: inline-flex; align-items: center;
   height: 20px; padding: 0 7px; margin: 0 2px 0 0;
   border-radius: 4px; background: transparent;
-  font-size: 11px; font-weight: 500; white-space: nowrap; vertical-align: middle;
+  font-size: 11px; font-weight: 500; line-height: 1; white-space: nowrap; vertical-align: middle;
 }
 .ft.p4.ft-cyan      { border: 1.5px solid #22D3EE; color: #22D3EE; }
 .ft.p4.ft-lavender  { border: 1.5px solid #A78BFA; color: #A78BFA; }
@@ -121,19 +121,18 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   .two-up   { grid-template-columns: 1fr; }
   .three-up { grid-template-columns: 1fr; }
 }
-/* Food chip row */
+/* Food — total days bar */
 .food-days-row { display: flex; gap: 3px; align-items: center; margin-bottom: 10px; }
 .day-seg { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
 .day-seg-over { height: 12px; padding: 0 6px; border-radius: 2px; flex-shrink: 0; background: var(--good); color: #000; font-family: var(--mono); font-size: 9px; font-weight: 700; display: flex; align-items: center; }
 .food-days-label { margin-left: 8px; font-size: 12px; color: var(--fg); font-family: var(--mono); }
+/* Runway gauge — per-food day-segment chips */
 .food-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.food-chip { display: flex; align-items: stretch; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; background: var(--bg-elev); }
-.food-chip-accent { width: 3px; flex-shrink: 0; }
-.food-chip-body { padding: 5px 9px; display: flex; flex-direction: column; gap: 2px; }
-.food-chip-name { font-size: 12px; color: var(--fg); white-space: nowrap; }
-.food-chip-meta { font-family: var(--mono); font-size: 10px; display: flex; gap: 6px; align-items: center; }
-.food-chip-days { color: var(--fg-dim); }
-.food-chip-morale { /* color set inline per morale tier */ }
+.runway-chip { display: flex; flex-direction: column; gap: 5px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 5px; padding: 6px 8px; }
+.runway-chip-name { font-size: 11px; white-space: nowrap; }
+.runway-segs { display: flex; gap: 2px; align-items: center; }
+.runway-seg { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.runway-seg-over { height: 10px; padding: 0 5px; border-radius: 2px; flex-shrink: 0; font-family: var(--mono); font-size: 8px; font-weight: 700; color: #000; display: flex; align-items: center; }
 :root { --logo: #fb923c; }
 @media (prefers-color-scheme: light) { :root { --logo: #854F0B; } }
 .app-header {

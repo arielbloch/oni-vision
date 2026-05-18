@@ -279,14 +279,31 @@ function renderOxygen(oxygen) {
 </div>`);
 }
 
-function moraleAccentColor(m) {
-  if (m >= 6) return '#a78bfa';
-  if (m >= 5) return '#22d3ee';
-  if (m >= 3) return 'var(--good)';
-  if (m >= 2) return 'var(--warn)';
-  if (m >= 1) return '#a0a0c0';
-  if (m >= 0) return 'var(--fg-muted)';
-  return 'var(--bad)';
+// ── Runway gauge ─────────────────────────────────────────────────────────────
+
+const RUNWAY_PALETTE  = ['#fb923c','#4ade80','#22d3ee','#a78bfa','#f472b6','#facc15','#34d399','#818cf8','#f87171','#67e8f9'];
+const RUNWAY_SEGS     = 5;
+const RUNWAY_BG_EMPTY = '#1a1a2e';
+
+function runwaySegs(days, color) {
+  const capped = Math.min(days, RUNWAY_SEGS);
+  const whole  = Math.floor(capped);
+  const frac   = capped - whole;
+  const parts  = [];
+  for (let i = 0; i < RUNWAY_SEGS; i++) {
+    if (i < whole) {
+      parts.push(`<div class="runway-seg" style="background:${color}"></div>`);
+    } else if (i === whole && frac > 0.04) {
+      const pct = (frac * 100).toFixed(1);
+      parts.push(`<div class="runway-seg" style="background:linear-gradient(to right,${color} ${pct}%,${RUNWAY_BG_EMPTY} ${pct}%)"></div>`);
+    } else {
+      parts.push(`<div class="runway-seg" style="background:${RUNWAY_BG_EMPTY}"></div>`);
+    }
+  }
+  if (days > RUNWAY_SEGS) {
+    parts.push(`<div class="runway-seg-over" style="background:${color}">&gt;${RUNWAY_SEGS}</div>`);
+  }
+  return `<div class="runway-segs">${parts.join('')}</div>`;
 }
 
 function renderFood(rows, dupeCount) {
@@ -300,14 +317,14 @@ function renderFood(rows, dupeCount) {
   }
 
   const n = Math.max(1, dupeCount);
-  const totalKcal  = known.reduce((s, r) => s + r.kcal * r.qty, 0);
-  const totalDays  = totalKcal / 3000 / n;
-  const over10     = totalDays > 10;
-  const wholeDays  = Math.min(10, Math.floor(totalDays));
-  const frac       = over10 ? 0 : totalDays - wholeDays;
-  const BG_EMPTY   = '#0d2b1a';
+  const totalKcal = known.reduce((s, r) => s + r.kcal * r.qty, 0);
+  const totalDays = totalKcal / 3000 / n;
+  const over10    = totalDays > 10;
+  const wholeDays = Math.min(10, Math.floor(totalDays));
+  const frac      = over10 ? 0 : totalDays - wholeDays;
+  const BG_EMPTY  = '#0d2b1a';
 
-  // ── Day segment bar ────────────────────────────────────────────────────────
+  // ── Total days bar ────────────────────────────────────────────────────────
   const segs = [];
   for (let i = 0; i < 10; i++) {
     if (i < wholeDays) {
@@ -320,23 +337,15 @@ function renderFood(rows, dupeCount) {
     }
   }
   if (over10) segs.push(`<div class="day-seg-over">&gt;10</div>`);
-
   const daysBar = `<div class="food-days-row">${segs.join('')}<span class="food-days-label">${escapeHtml(over10 ? '>10 d' : fmtDays(totalDays))}</span></div>`;
 
-  // ── Chips ──────────────────────────────────────────────────────────────────
-  const chips = known.map(r => {
-    const days   = (r.qty * r.kcal) / 3000 / n;
-    const accent = moraleAccentColor(r.morale);
-    const sign   = r.morale > 0 ? `+${r.morale}` : `${r.morale}`;
-    return `<div class="food-chip">
-  <div class="food-chip-accent" style="background:${accent}"></div>
-  <div class="food-chip-body">
-    <div class="food-chip-name">${escapeHtml(r.name ?? r.prefab_id)}</div>
-    <div class="food-chip-meta">
-      <span class="food-chip-days">${fmtDays(days)}</span>
-      <span class="food-chip-morale" style="color:${accent}">${sign}</span>
-    </div>
-  </div>
+  // ── Runway chips ───────────────────────────────────────────────────────────
+  const chips = known.map((r, i) => {
+    const days  = (r.qty * r.kcal) / 3000 / n;
+    const color = RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
+    return `<div class="runway-chip">
+  <div class="runway-chip-name" style="color:${color}">${escapeHtml(r.name ?? r.prefab_id)}</div>
+  ${runwaySegs(days, color)}
 </div>`;
   }).join('');
 
