@@ -124,7 +124,7 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
 /* Food — total days bar */
 .food-days-row { display: flex; gap: 2px; align-items: center; margin-bottom: 10px; }
 .day-seg { width: 16px; height: 16px; border-radius: 2px; flex-shrink: 0; }
-.day-seg-over { height: 16px; padding: 0 6px; border-radius: 2px; flex-shrink: 0; background: var(--good); color: #000; font-family: var(--mono); font-size: 10px; font-weight: 700; display: flex; align-items: center; }
+.day-seg-over { flex-shrink: 0; padding: 0 3px; font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--good); line-height: 1; display: flex; align-items: center; }
 .food-days-label { margin-left: 8px; font-size: 12px; color: var(--fg); font-family: var(--mono); }
 /* Runway gauge — per-food day-segment chips */
 .food-chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -132,7 +132,7 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
 .runway-chip-name { font-size: 12px; white-space: nowrap; }
 .runway-segs { display: flex; gap: 2px; align-items: center; }
 .runway-seg { width: 16px; height: 16px; border-radius: 2px; flex-shrink: 0; }
-.runway-seg-over { height: 16px; padding: 0 6px; border-radius: 2px; flex-shrink: 0; font-family: var(--mono); font-size: 10px; font-weight: 700; color: #000; display: flex; align-items: center; }
+.runway-seg-over { flex-shrink: 0; padding: 0 3px; font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--good); line-height: 1; display: flex; align-items: center; }
 :root { --logo: #fb923c; }
 @media (prefers-color-scheme: light) { :root { --logo: #854F0B; } }
 .app-header {

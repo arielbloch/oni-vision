@@ -281,27 +281,35 @@ function renderOxygen(oxygen) {
 
 // ── Runway gauge ─────────────────────────────────────────────────────────────
 
-const RUNWAY_PALETTE  = ['#fb923c','#4ade80','#22d3ee','#a78bfa','#f472b6','#facc15','#34d399','#818cf8','#f87171','#67e8f9'];
-const RUNWAY_SEGS     = 5;
-const RUNWAY_BG_EMPTY = '#1a1a2e';
+const RUNWAY_PALETTE = ['#fb923c','#4ade80','#22d3ee','#a78bfa','#f472b6','#facc15','#34d399','#818cf8','#f87171','#67e8f9'];
+const RUNWAY_SEGS    = 5;
+
+function darkTint(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const f = 0.20;
+  return `rgb(${Math.round(r*f)},${Math.round(g*f)},${Math.round(b*f)})`;
+}
 
 function runwaySegs(days, color) {
-  const capped = Math.min(days, RUNWAY_SEGS);
-  const whole  = Math.floor(capped);
-  const frac   = capped - whole;
-  const parts  = [];
+  const emptyBg = darkTint(color);
+  const capped  = Math.min(days, RUNWAY_SEGS);
+  const whole   = Math.floor(capped);
+  const frac    = capped - whole;
+  const parts   = [];
   for (let i = 0; i < RUNWAY_SEGS; i++) {
     if (i < whole) {
       parts.push(`<div class="runway-seg" style="background:${color}"></div>`);
     } else if (i === whole && frac > 0.04) {
       const pct = (frac * 100).toFixed(1);
-      parts.push(`<div class="runway-seg" style="background:linear-gradient(to right,${color} ${pct}%,${RUNWAY_BG_EMPTY} ${pct}%)"></div>`);
+      parts.push(`<div class="runway-seg" style="background:linear-gradient(to right,${color} ${pct}%,${emptyBg} ${pct}%)"></div>`);
     } else {
-      parts.push(`<div class="runway-seg" style="background:${RUNWAY_BG_EMPTY}"></div>`);
+      parts.push(`<div class="runway-seg" style="background:${emptyBg}"></div>`);
     }
   }
   if (days > RUNWAY_SEGS) {
-    parts.push(`<div class="runway-seg-over" style="background:${color}">∞</div>`);
+    parts.push(`<div class="runway-seg-over" style="color:${color}">∞</div>`);
   }
   return `<div class="runway-segs">${parts.join('')}</div>`;
 }
@@ -337,7 +345,7 @@ function renderFood(rows, dupeCount) {
     }
   }
   if (over10) segs.push(`<div class="day-seg-over">∞</div>`);
-  const daysLabel = over10 ? '∞ days' : `${totalDays.toFixed(1)} days`;
+  const daysLabel = `${totalDays.toFixed(1)} days`;
   const daysBar = `<div class="food-days-row">${segs.join('')}<span class="food-days-label">${escapeHtml(daysLabel)}</span></div>`;
 
   // ── Runway chips ───────────────────────────────────────────────────────────
