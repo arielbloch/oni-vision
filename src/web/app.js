@@ -279,46 +279,68 @@ function renderOxygen(oxygen) {
 </div>`);
 }
 
+function moraleAccentColor(m) {
+  if (m >= 6) return '#a78bfa';
+  if (m >= 5) return '#22d3ee';
+  if (m >= 3) return 'var(--good)';
+  if (m >= 2) return 'var(--warn)';
+  if (m >= 1) return '#a0a0c0';
+  if (m >= 0) return 'var(--fg-muted)';
+  return 'var(--bad)';
+}
+
 function renderFood(rows, dupeCount) {
-  const known = (rows ?? []).filter(r => r.kcal != null);
+  const known = (rows ?? [])
+    .filter(r => r.kcal != null)
+    .sort((a, b) => b.morale - a.morale || (b.kcal * b.qty) - (a.kcal * a.qty));
 
   if (known.length === 0) {
     setHTML("food-card", `<div class="empty">no food</div>`);
     return;
   }
 
-  const n = dupeCount > 0 ? dupeCount : 1;
+  const n = Math.max(1, dupeCount);
+  const totalKcal  = known.reduce((s, r) => s + r.kcal * r.qty, 0);
+  const totalDays  = totalKcal / 3000 / n;
+  const over10     = totalDays > 10;
+  const wholeDays  = Math.min(10, Math.floor(totalDays));
+  const frac       = over10 ? 0 : totalDays - wholeDays;
+  const BG_EMPTY   = '#0d2b1a';
 
-  // Total days bar
-  const totalKcal = known.reduce((s, r) => s + r.kcal * r.qty, 0);
-  const totalDays = totalKcal / 3000 / n;
-  const filled    = Math.min(10, Math.floor(totalDays));
-  const over      = totalDays > 10;
+  // ── Day segment bar ────────────────────────────────────────────────────────
+  const segs = [];
+  for (let i = 0; i < 10; i++) {
+    if (i < wholeDays) {
+      segs.push(`<div class="day-seg" style="background:var(--good)"></div>`);
+    } else if (i === wholeDays && frac > 0) {
+      const pct = (frac * 100).toFixed(1);
+      segs.push(`<div class="day-seg" style="background:linear-gradient(to right,var(--good) ${pct}%,${BG_EMPTY} ${pct}%)"></div>`);
+    } else {
+      segs.push(`<div class="day-seg" style="background:${BG_EMPTY}"></div>`);
+    }
+  }
+  if (over10) segs.push(`<div class="day-seg-over">&gt;10</div>`);
 
-  const SEG  = `width:13px;height:13px;flex-shrink:0`;
-  const FULL = `${SEG};background:var(--good)`;
-  const EMPTY= `${SEG};background:#501414`;
-  const segs = [
-    ...Array.from({ length: filled },    () => `<div style="${FULL}"></div>`),
-    ...Array.from({ length: 10-filled }, () => `<div style="${EMPTY}"></div>`),
-    over
-      ? `<div style="${SEG};width:26px;background:var(--good);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#000">&gt;10</div>`
-      : `<div style="${SEG};width:26px;background:#501414;display:flex;align-items:center;justify-content:center;font-size:9px;color:#7a3030">&gt;10</div>`,
-  ].join("");
+  const daysBar = `<div class="food-days-row">${segs.join('')}<span class="food-days-label">${escapeHtml(over10 ? '>10 d' : fmtDays(totalDays))}</span></div>`;
 
-  const totalStr = fmtDays(totalDays);
-  const bar = `<div style="display:flex;gap:2px;align-items:center;margin:6px 0 10px">${segs}<span style="margin-left:8px;font-size:12px;color:var(--fg)">${escapeHtml(totalStr)}</span></div>`;
+  // ── Chips ──────────────────────────────────────────────────────────────────
+  const chips = known.map(r => {
+    const days   = (r.qty * r.kcal) / 3000 / n;
+    const accent = moraleAccentColor(r.morale);
+    const sign   = r.morale > 0 ? `+${r.morale}` : `${r.morale}`;
+    return `<div class="food-chip">
+  <div class="food-chip-accent" style="background:${accent}"></div>
+  <div class="food-chip-body">
+    <div class="food-chip-name">${escapeHtml(r.name ?? r.prefab_id)}</div>
+    <div class="food-chip-meta">
+      <span class="food-chip-days">${fmtDays(days)}</span>
+      <span class="food-chip-morale" style="color:${accent}">${sign}</span>
+    </div>
+  </div>
+</div>`;
+  }).join('');
 
-  // Per-type list: days right-aligned, name left-aligned
-  const rows_html = known.map(r => {
-    const days = (r.qty * r.kcal) / 3000 / n;
-    return `<tr>
-      <td class="metric" style="text-align:right;padding-right:10px;width:1%;white-space:nowrap">${fmtDays(days)}</td>
-      <td style="font-size:12px">${escapeHtml(r.name ?? r.item_prefab_id)}</td>
-    </tr>`;
-  }).join("");
-
-  setHTML("food-card", `${bar}<table style="width:100%"><tbody>${rows_html}</tbody></table>`);
+  setHTML("food-card", `${daysBar}<div class="food-chip-row">${chips}</div>`);
 }
 
 function renderResources(rows) {
