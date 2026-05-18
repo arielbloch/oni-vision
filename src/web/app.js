@@ -129,9 +129,8 @@ function renderDupes(rows) {
     return;
   }
   const html = rows.map(r => {
-    const stressBar = r.stress == null
-      ? `<div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--bg-elev)"></div></div>`
-      : bar(r.stress);
+    const stressVal = r.stress == null ? 0 : Math.max(0, Math.min(100, r.stress));
+    const stressBar = `<div class="stress-wrap"><div class="stress-track"><div class="stress-fill" style="width:${stressVal}%"></div></div><span class="stress-val">${r.stress == null ? "—" : Math.round(stressVal) + "%"}</span></div>`;
     const moralePct = Math.min(100, Math.round((r.morale_cost ?? 0) / T.morale_bar_max * 100));
     const moraleBar = `<div class="bar-track"><div class="bar-fill" style="width:${moralePct}%;background:var(--good)"></div></div>`;
     const badges = (r.effects ?? [])
