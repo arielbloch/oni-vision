@@ -301,7 +301,7 @@ function runwaySegs(days, color) {
     }
   }
   if (days > RUNWAY_SEGS) {
-    parts.push(`<div class="runway-seg-over" style="background:${color}">&gt;${RUNWAY_SEGS}</div>`);
+    parts.push(`<div class="runway-seg-over" style="background:${color}">∞</div>`);
   }
   return `<div class="runway-segs">${parts.join('')}</div>`;
 }
@@ -336,8 +336,9 @@ function renderFood(rows, dupeCount) {
       segs.push(`<div class="day-seg" style="background:${BG_EMPTY}"></div>`);
     }
   }
-  if (over10) segs.push(`<div class="day-seg-over">&gt;10</div>`);
-  const daysBar = `<div class="food-days-row">${segs.join('')}<span class="food-days-label">${escapeHtml(over10 ? '>10 d' : fmtDays(totalDays))}</span></div>`;
+  if (over10) segs.push(`<div class="day-seg-over">∞</div>`);
+  const daysLabel = over10 ? '∞ days' : `${totalDays.toFixed(1)} days`;
+  const daysBar = `<div class="food-days-row">${segs.join('')}<span class="food-days-label">${escapeHtml(daysLabel)}</span></div>`;
 
   // ── Runway chips ───────────────────────────────────────────────────────────
   const chips = known.map((r, i) => {
