@@ -413,9 +413,16 @@ function renderFood(rows, dupeCount, foodReport) {
   }
   if (over10) segs.push(`<div class="day-seg-over">∞</div>`);
   const daysLabel = `${totalDays.toFixed(1)} days`;
+  // Title row (Runway ← → 1.2 days) + segs row wrapped in an inline-flex column
+  // so the container width = segs width, making the days label right-align to the last rect.
   const runwayBlock = `<div style="flex:1;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:4px">
-    <span class="gauge-sublabel">Runway</span>
-    <div class="food-days-row">${segs.join('')}<span class="food-days-label">${escapeHtml(daysLabel)}</span></div>
+    <div style="display:inline-flex;flex-direction:column;gap:3px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span class="gauge-sublabel">Runway</span>
+        <span class="food-days-label">${escapeHtml(daysLabel)}</span>
+      </div>
+      <div class="food-days-row">${segs.join('')}</div>
+    </div>
   </div>`;
 
   // ── Generation balance + runway side by side ──────────────────────────────
