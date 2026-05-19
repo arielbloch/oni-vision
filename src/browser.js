@@ -25,50 +25,47 @@ import { spawn, spawnSync } from "node:child_process";
 function tryFocusExistingTabMac(url) {
   // Strip trailing slash for a stable prefix match inside the script.
   const base = url.replace(/\/$/, "");
-  const script = [
-    `set u to "${base}"`,
-    // Standard Chromium browsers (Chrome tab activation API)
-    `set browsers to {"Google Chrome", "Brave Browser", "Microsoft Edge", "Chromium"}`,
-    `repeat with b in browsers`,
-    `  try`,
-    `    tell application b`,
-    `      repeat with w in windows`,
-    `        repeat with t in tabs of w`,
-    `          if URL of t starts with u then`,
-    `            set active tab index of w to index of t`,
-    `            set index of w to 1`,
-    `            activate`,
-    `            return "ok"`,
-    `          end if`,
-    `        end repeat`,
-    `      end repeat`,
-    `    end tell`,
-    `  end try`,
-    `end repeat`,
-    // Arc uses a different tab activation API
-    `try`,
-    `  tell application "Arc"`,
-    `    repeat with w in windows`,
-    `      repeat with t in tabs of w`,
-    `        if URL of t starts with u then`,
-    `          tell w to set active tab to t`,
-    `          activate`,
-    `          return "ok"`,
-    `        end if`,
-    `      end repeat`,
-    `    end repeat`,
-    `  end tell`,
-    `end try`,
-    `return "none"`,
-  ].join("\n");
+
+  // JXA (JavaScript for Automation) — more portable than AppleScript across
+  // browsers; handles Arc's different tab API gracefully via try/catch.
+  // Must be wrapped in an IIFE because JXA disallows top-level return.
+  const script = `(function() {
+    var u = ${JSON.stringify(base)};
+    var browsers = ["Google Chrome", "Brave Browser", "Microsoft Edge", "Chromium", "Arc"];
+    for (var bi = 0; bi < browsers.length; bi++) {
+      try {
+        var app = Application(browsers[bi]);
+        if (!app.running()) continue;
+        var wins = app.windows();
+        for (var wi = 0; wi < wins.length; wi++) {
+          try {
+            var tabs = wins[wi].tabs();
+            for (var ti = 0; ti < tabs.length; ti++) {
+              try {
+                var tabUrl = tabs[ti].url();
+                if (tabUrl && tabUrl.indexOf(u) === 0) {
+                  wins[wi].activeTabIndex = ti + 1;
+                  app.activate();
+                  return "ok";
+                }
+              } catch(e) {}
+            }
+          } catch(e) {}
+        }
+      } catch(e) {}
+    }
+    return "none";
+  })()`;
 
   try {
-    const result = spawnSync("osascript", ["-e", script], {
+    const result = spawnSync("osascript", ["-l", "JavaScript", "-e", script], {
       encoding: "utf8",
-      timeout: 3000,
+      timeout: 5000,
     });
+    console.log(`[browser] JXA stdout="${result.stdout?.trim()}" stderr="${result.stderr?.trim()}" status=${result.status}`);
     return result.stdout?.trim() === "ok";
-  } catch {
+  } catch (err) {
+    console.log(`[browser] JXA exception: ${err.message}`);
     return false;
   }
 }
