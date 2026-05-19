@@ -171,8 +171,8 @@ export function renderGeysers(db, { color = false } = {}) {
 /**
  * Food in storage: display name | days remaining | morale bonus.
  * Sorted by morale DESC (best food first) to mirror the web dashboard.
- * Days = (qty × kcal) / 3000 / dupe_count — "how long does this food
- * last at full colony consumption?"
+ * Days = (qty × kcal) / THRESHOLDS.kcal_per_dupe_per_cycle / dupe_count —
+ * "how long does this food last at full colony consumption?"
  */
 export function renderFood(db, { color = false, limit = 8 } = {}) {
   const dupeCount = db.prepare("SELECT COUNT(*) AS n FROM duplicants").get().n || 1;
@@ -196,7 +196,7 @@ export function renderFood(db, { color = false, limit = 8 } = {}) {
 
   // Total days bar
   const totalKcal = rows.reduce((s, r) => s + r.kcal * r.qty, 0);
-  const totalDays = totalKcal / 3000 / dupeCount;
+  const totalDays = totalKcal / THRESHOLDS.kcal_per_dupe_per_cycle / dupeCount;
   const filled    = Math.min(10, Math.floor(totalDays));
   const over      = totalDays > 10;
 
@@ -214,7 +214,7 @@ export function renderFood(db, { color = false, limit = 8 } = {}) {
 
   // Per-type list: days right-aligned in 6-char column, then name
   const lines = rows.map((r) => {
-    const days    = (r.qty * r.kcal) / 3000 / dupeCount;
+    const days    = (r.qty * r.kcal) / THRESHOLDS.kcal_per_dupe_per_cycle / dupeCount;
     const daysStr = days > 999 ? ">999 d" : `${days.toFixed(1)} d`;
     return `  ${lpad(daysStr, 6)}  ${r.name}`;
   });

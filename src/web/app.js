@@ -370,7 +370,7 @@ function renderFood(rows, dupeCount, foodReport) {
 
   const n = Math.max(1, dupeCount);
   const totalKcal = known.reduce((s, r) => s + r.kcal * r.qty, 0);
-  const totalDays = totalKcal / 3000 / n;
+  const totalDays = totalKcal / T.kcal_per_dupe_per_cycle / n;
   const over10    = totalDays > 10;
   const wholeDays = Math.min(10, Math.floor(totalDays));
   const frac      = over10 ? 0 : totalDays - wholeDays;
@@ -402,7 +402,7 @@ function renderFood(rows, dupeCount, foodReport) {
 
   // ── Per-food runway chips — same row as donut+runway, to the right of segs ──
   const chips = known.map((r, i) => {
-    const days  = (r.qty * r.kcal) / 3000 / n;
+    const days  = (r.qty * r.kcal) / T.kcal_per_dupe_per_cycle / n;
     const color = RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
     return `<div class="runway-chip">
   <div class="runway-chip-name" style="color:${color}">${escapeHtml(r.name ?? r.prefab_id)}</div>

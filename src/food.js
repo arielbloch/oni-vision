@@ -21,11 +21,11 @@ export const FOOD_META = [
   { prefab_id: "PrickleFruit",        name: "Bristle Berry",         kcal:  1600, morale:  0 },
   { prefab_id: "SwampFruit",          name: "Bog Jelly",             kcal:  1840, morale:  0 },
   { prefab_id: "WormBasicFruit",      name: "Spindly Grubfruit",     kcal:   800, morale:  0 },
-  { prefab_id: "WormSuperFruit",      name: "Grubfruit",             kcal:  2000, morale:  1 },
+  { prefab_id: "WormSuperFruit",      name: "Grubfruit",             kcal:   250, morale:  1 },
   { prefab_id: "PickledMeal",         name: "Pickled Meal",          kcal:  1800, morale: -1 },
   { prefab_id: "RawEgg",              name: "Raw Egg",               kcal:  1600, morale: -1 },
   { prefab_id: "Meat",                name: "Raw Meat",              kcal:  1600, morale: -1 },
-  { prefab_id: "PlantMeat",           name: "Plant Meat",            kcal: 12000, morale:  1 },
+  { prefab_id: "PlantMeat",           name: "Plant Meat",            kcal:  1200, morale:  1 },
   { prefab_id: "PacuFillet",          name: "Pacu Fillet",           kcal:  1000, morale:  2 },
   // ── Cooked (grill / pot) ─────────────────────────────────────────────────
   { prefab_id: "FriedMushroom",       name: "Fried Mushroom",        kcal:  2800, morale:  1 },
@@ -40,7 +40,7 @@ export const FOOD_META = [
   { prefab_id: "Burger",              name: "Barbecue",              kcal:  4000, morale:  3 },
   // ── Processed / recipes ──────────────────────────────────────────────────
   { prefab_id: "MeatPlanks",          name: "Jerky",                 kcal:  4800, morale:  4 },
-  { prefab_id: "ColdWheatBread",      name: "Cold Wheat Bread",      kcal:  1600, morale:  2 },
+  { prefab_id: "ColdWheatBread",      name: "Cold Wheat Bread",      kcal:  1200, morale:  2 },
   { prefab_id: "PrickleFig",          name: "Prickle Muffin",        kcal:  1200, morale:  2 },
   { prefab_id: "SpiceBread",          name: "Spice Bread",           kcal:  2400, morale:  4 },
   { prefab_id: "PepperbreadMeal",     name: "Pepper Bread",          kcal:  4000, morale:  5 },
