@@ -135,10 +135,9 @@ function stressDeltaTri(name) {
   return `<span class="stress-delta-tri" style="color:rgb(${v},${v},${v})">${dir}</span>`;
 }
 
-function moraleDonut(avgPct, S = 50) {
+function simpleDonut(pct, col, S = 50) {
   const cx = S / 2, cy = S / 2, r = S * 0.36, sw = S * 0.155;
-  const span = Math.min(319.9, avgPct / 100 * 320);
-  const col = avgPct >= 66 ? '#4ade80' : avgPct >= 33 ? '#facc15' : '#ff2222';
+  const span = Math.min(319.9, pct / 100 * 320);
   function ptd(deg) {
     const a = deg * Math.PI / 180;
     return [+(cx + r * Math.sin(a)).toFixed(2), +(cy - r * Math.cos(a)).toFixed(2)];
@@ -162,13 +161,14 @@ function renderDupes(rows) {
     return;
   }
 
-  const moralePcts = rows.map(r => Math.min(100, Math.round((r.morale_cost ?? 0) / T.morale_bar_max * 100)));
-  const avgMorale  = moralePcts.length ? Math.round(moralePcts.reduce((s, v) => s + v, 0) / moralePcts.length) : 0;
+  const stressVals  = rows.map(r => Math.max(0, Math.min(100, r.stress ?? 0)));
+  const avgStress   = stressVals.length ? Math.round(stressVals.reduce((s, v) => s + v, 0) / stressVals.length) : 0;
+  const stressCol   = avgStress >= T.stress_bad ? '#ff2222' : avgStress >= T.stress_warn ? '#facc15' : '#4ade80';
   const moraleSummary = `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
-    <div class="gauge-title">Avg Morale</div>
+    <div class="gauge-title">Avg Stress</div>
     <div style="display:flex;align-items:center;gap:16px">
-      ${moraleDonut(avgMorale)}
-      <div style="font-size:15px;font-weight:600;color:var(--fg)">${avgMorale}%</div>
+      ${simpleDonut(avgStress, stressCol)}
+      <div style="font-size:15px;font-weight:600;color:${stressCol}">${avgStress}%</div>
     </div>
   </div>`;
 
@@ -323,7 +323,7 @@ function renderOxygen(oxygen) {
 
   setHTML("oxygen-card", `
 <div>
-  <div class="gauge-title">O2 Production</div>
+  <div class="gauge-title">O2 Gen</div>
   <div class="o2-row">
     ${percentageDonut(report?.produced_kg, report?.consumed_kg)}
     <div style="flex:1;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:3px">
@@ -342,7 +342,7 @@ function renderPower(report) {
   const { produced_wh, consumed_wh } = report.power;
   setHTML("power-card", `
 <div>
-  <div class="gauge-title">Power Generation</div>
+  <div class="gauge-title">Power Gen</div>
   <div class="o2-row">
     ${percentageDonut(produced_wh, consumed_wh)}
   </div>
@@ -424,7 +424,7 @@ function renderFood(rows, dupeCount, foodReport) {
   // ── Generation balance + runway side by side ──────────────────────────────
   const genHTML = `
 <div>
-  <div class="gauge-title">Food Generation</div>
+  <div class="gauge-title">Food Gen</div>
   <div class="o2-row">
     ${percentageDonut(foodReport?.produced_kcal, foodReport?.consumed_kcal)}
     ${runwayBlock}
