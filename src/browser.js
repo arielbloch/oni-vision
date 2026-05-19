@@ -27,7 +27,8 @@ function tryFocusExistingTabMac(url) {
   const base = url.replace(/\/$/, "");
   const script = [
     `set u to "${base}"`,
-    `set browsers to {"Google Chrome", "Brave Browser", "Microsoft Edge", "Chromium", "Arc"}`,
+    // Standard Chromium browsers (Chrome tab activation API)
+    `set browsers to {"Google Chrome", "Brave Browser", "Microsoft Edge", "Chromium"}`,
     `repeat with b in browsers`,
     `  try`,
     `    tell application b`,
@@ -44,6 +45,20 @@ function tryFocusExistingTabMac(url) {
     `    end tell`,
     `  end try`,
     `end repeat`,
+    // Arc uses a different tab activation API
+    `try`,
+    `  tell application "Arc"`,
+    `    repeat with w in windows`,
+    `      repeat with t in tabs of w`,
+    `        if URL of t starts with u then`,
+    `          tell w to set active tab to t`,
+    `          activate`,
+    `          return "ok"`,
+    `        end if`,
+    `      end repeat`,
+    `    end repeat`,
+    `  end tell`,
+    `end try`,
     `return "none"`,
   ].join("\n");
 
