@@ -124,12 +124,7 @@ export async function buildOutputs({ savePath, outputDir }) {
     renderDb = new DatabaseSync(dbFinal, { readOnly: true });
     const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
     const width = process.stdout.columns ?? 80;
-    const ms = tDone - t0;
-    const dupes = save.header?.gameInfo?.numberOfDuplicants ?? "?";
-    const rendered = render(renderDb, { color: useColor, width });
-    // Append timing to the first line (the ═══ header)
-    const withTiming = rendered.replace(/^(═+[^\n]+)/, `$1  (${dupes} dupes · ${ms} ms)`);
-    console.log("\n" + withTiming + "\n");
+    console.log("\n" + render(renderDb, { color: useColor, width }) + "\n");
   } catch (err) {
     // Render errors are non-fatal; the parse itself succeeded.
   } finally {
