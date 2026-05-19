@@ -61,26 +61,3 @@ export function oxygenStats(db) {
   return { avg_breath_pct, production_gps, consumption_gps };
 }
 
-/**
- * Pull last-cycle O₂ accounting from the game's own ReportManager.
- * reportType 18: accPositive = kg produced by buildings, accNegative = kg consumed by dupes.
- * Returns null if the behavior or report is absent (brand-new save).
- * @returns {{ produced_kg: number, consumed_kg: number } | null}
- */
-export function reportOxygenKg(db) {
-  const row = db.prepare(`
-    SELECT
-      json_extract(e.value, '$.accPositive') AS produced,
-      json_extract(e.value, '$.accNegative') AS consumed
-    FROM behaviors,
-      json_each(json_extract(template_data, '$.dailyReports[#-1].reportEntries')) AS e
-    WHERE name = 'ReportManager'
-      AND json_extract(e.value, '$.reportType') = 18
-    LIMIT 1
-  `).get();
-  if (!row || row.produced == null) return null;
-  return {
-    produced_kg: row.produced,
-    consumed_kg: Math.abs(row.consumed ?? 0),
-  };
-}

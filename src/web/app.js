@@ -23,6 +23,8 @@ let SKILL_LABELS     = {};  // branch → label (kept for potential future use)
 let CHORE_GROUPS     = {};  // chore_group internal name → { label, domain, abbr, sort_order }
                             // Populated from /api/status; source of truth is src/chore_groups.js.
                             // docs/frontend-design.md documents the colour/abbr design exploration.
+let STRESS_DELTA     = {};  // dupe name → net stress %-pts last cycle (from ReportManager type 2)
+let DISTANCE         = {};  // dupe name → tiles walked last cycle (from ReportManager type 10)
 
 /** Resolve a numeric element_id to a display name. */
 function elementName(id) {
@@ -123,14 +125,25 @@ function renderCounts(c) {
   ).join(""));
 }
 
+/** Grey triangle indicating stress trend. Brightness: 0%→50%grey, +50→white, -50→black. */
+function stressDeltaTri(name) {
+  const delta = STRESS_DELTA[name];
+  if (delta == null) return '';
+  const b = Math.max(0, Math.min(1, 0.5 + delta / 100));
+  const v = Math.round(b * 255);
+  const dir = delta >= 0 ? '▲' : '▼';
+  return `<span class="stress-delta-tri" style="color:rgb(${v},${v},${v})">${dir}</span>`;
+}
+
 function renderDupes(rows) {
   if (!rows || rows.length === 0) {
     setHTML("dupes-card", `<div class="empty">no duplicants in this save</div>`);
     return;
   }
   const html = rows.map(r => {
+    const name = r.name ?? "(unnamed)";
     const stressVal = r.stress == null ? 0 : Math.max(0, Math.min(100, r.stress));
-    const stressBar = `<div class="stress-wrap"><div class="stress-track"><div class="stress-fill" style="width:${stressVal}%"></div></div><span class="stress-val">${r.stress == null ? "—" : Math.round(stressVal) + "%"}</span></div>`;
+    const stressBar = `<div class="stress-wrap">${stressDeltaTri(name)}<div class="stress-track"><div class="stress-fill" style="width:${stressVal}%"></div></div><span class="stress-val">${r.stress == null ? "—" : Math.round(stressVal) + "%"}</span></div>`;
     const moralePct = Math.min(100, Math.round((r.morale_cost ?? 0) / T.morale_bar_max * 100));
     const moraleBar = `<div class="bar-track"><div class="bar-fill" style="width:${moralePct}%;background:var(--good)"></div></div>`;
     const badges = (r.effects ?? [])
@@ -138,27 +151,21 @@ function renderDupes(rows) {
       .filter(Boolean)
       .map(e => `<span class="badge ${e.cls}">${escapeHtml(e.label)}</span>`)
       .join("");
-    const chips = (r.focus ?? [])
-      .slice()
-      .sort((a, b) => (CHORE_GROUPS[a.group]?.sort_order ?? 99) - (CHORE_GROUPS[b.group]?.sort_order ?? 99))
-      .map(f => {
-        const meta = CHORE_GROUPS[f.group] ?? { domain: "tangerine", abbr: "?" };
-        const pri  = f.priority >= T.priority_boost ? "p5" : "p4";
-        return `<span class="ft ${pri} ft-${meta.domain}">${meta.abbr}</span>`;
-      })
-      .join("");
+    const commuteTiles = DISTANCE[name] ?? 0;
+    const commutePct = Math.min(100, (commuteTiles / 1000) * 100).toFixed(1);
+    const commuteBar = `<div class="commute-wrap"><div class="commute-track"><div class="commute-fill" style="width:${commutePct}%"></div></div></div>`;
     return `<tr>
-      <td class="name">${escapeHtml(r.name ?? "(unnamed)")}${badges}</td>
-      <td class="focus">${chips || '<span style="color:var(--fg-muted)">—</span>'}</td>
-      <td class="skills">${moraleBar}</td>
+      <td class="name">${escapeHtml(name)}${badges}</td>
       <td class="bar">${stressBar}</td>
+      <td class="skills">${moraleBar}</td>
+      <td class="focus">${commuteBar}</td>
     </tr>`;
   }).join("");
   const thead = `<thead><tr>
     <th></th>
-    <th>Roles</th>
-    <th>Morale</th>
     <th>Stress</th>
+    <th>Morale</th>
+    <th>Commute</th>
   </tr></thead>`;
   setHTML("dupes-card", `<table>${thead}<tbody>${html}</tbody></table>`);
 }
@@ -236,49 +243,47 @@ function onPickerChange() {
 
 // ── Renderers ─────────────────────────────────────────────────────────────────
 
+/**
+ * Centre-zero balance bar. Surplus → green right; deficit → red left.
+ * Calibrated to max(produced, consumed).
+ */
+function balanceBar(produced, consumed) {
+  const empty = `<div class="o2-balance-bar"><div class="o2-balance-left"></div><div class="o2-balance-hair"></div><div class="o2-balance-right"></div></div>`;
+  if (produced == null || consumed == null) return empty;
+  const scale = Math.max(produced, consumed, 1);
+  const delta = produced - consumed;
+  const halfPct = Math.min(100, (Math.abs(delta) / scale) * 100).toFixed(1);
+  if (delta >= 0) {
+    return `<div class="o2-balance-bar"><div class="o2-balance-left"></div><div class="o2-balance-hair"></div><div class="o2-balance-right"><div class="o2-balance-green" style="width:${halfPct}%"></div></div></div>`;
+  }
+  return `<div class="o2-balance-bar"><div class="o2-balance-left"><div class="o2-balance-red" style="width:${halfPct}%"></div></div><div class="o2-balance-hair"></div><div class="o2-balance-right"></div></div>`;
+}
+
 function renderOxygen(oxygen) {
   if (!oxygen) { setHTML("oxygen-card", `<div class="empty">no data</div>`); return; }
   const { avg_breath_pct, report } = oxygen;
   const breathPct = Math.max(0, Math.min(100, avg_breath_pct ?? 100));
-
-  // Breathability: bad% fills from RIGHT (red grows leftward as breath depletes)
   const badPct = (100 - breathPct).toFixed(1);
-
-  // Balance bar: centre-zero, calibrated to max(produced, consumed).
-  // Positive delta → green fill extends right. Negative → red fill extends left.
-  let balanceHTML = `<div class="o2-balance-bar"><div class="o2-balance-left"></div><div class="o2-balance-hair"></div><div class="o2-balance-right"></div></div>`;
-  if (report) {
-    const { produced_kg, consumed_kg } = report;
-    const scale = Math.max(produced_kg, consumed_kg, 1);
-    const delta = produced_kg - consumed_kg;
-    const halfPct = Math.min(100, (Math.abs(delta) / scale) * 100);
-    if (delta >= 0) {
-      // Surplus: green fills from centre rightward
-      balanceHTML = `
-<div class="o2-balance-bar">
-  <div class="o2-balance-left"></div>
-  <div class="o2-balance-hair"></div>
-  <div class="o2-balance-right"><div class="o2-balance-green" style="width:${halfPct.toFixed(1)}%"></div></div>
-</div>`;
-    } else {
-      // Deficit: red fills from centre leftward
-      balanceHTML = `
-<div class="o2-balance-bar">
-  <div class="o2-balance-left"><div class="o2-balance-red" style="width:${halfPct.toFixed(1)}%"></div></div>
-  <div class="o2-balance-hair"></div>
-  <div class="o2-balance-right"></div>
-</div>`;
-    }
-  }
 
   setHTML("oxygen-card", `
 <div class="o2-row">
+  <span class="o2-label" style="color:white">O2 Production</span>
+  ${balanceBar(report?.produced_kg, report?.consumed_kg)}
+</div>
+<div class="o2-row" style="margin-top:6px">
   <span class="o2-label" style="color:var(--bad)">Breathability</span>
   <div class="o2-breath-bar"><div class="o2-breath-red" style="width:${badPct}%"></div></div>
   <span class="o2-value">${Math.round(breathPct)}%</span>
-  <div class="o2-gap"></div>
-  <span class="o2-label">O2 Production</span>
-  ${balanceHTML}
+</div>`);
+}
+
+function renderPower(report) {
+  if (!report?.power) { setHTML("power-card", `<div class="empty">no data</div>`); return; }
+  const { produced_wh, consumed_wh } = report.power;
+  setHTML("power-card", `
+<div class="o2-row">
+  <span class="o2-label" style="color:white">Production</span>
+  ${balanceBar(produced_wh, consumed_wh)}
 </div>`);
 }
 
@@ -317,7 +322,7 @@ function runwaySegs(days, color) {
   return `<div class="runway-segs">${parts.join('')}</div>`;
 }
 
-function renderFood(rows, dupeCount) {
+function renderFood(rows, dupeCount, foodReport) {
   const known = (rows ?? [])
     .filter(r => r.kcal != null)
     .sort((a, b) => b.morale - a.morale || (b.kcal * b.qty) - (a.kcal * a.qty));
@@ -333,9 +338,16 @@ function renderFood(rows, dupeCount) {
   const over10    = totalDays > 10;
   const wholeDays = Math.min(10, Math.floor(totalDays));
   const frac      = over10 ? 0 : totalDays - wholeDays;
-  const BG_EMPTY  = '#0d2b1a';
+  const BG_EMPTY  = 'var(--bg-elev)';
 
-  // ── Total days bar ────────────────────────────────────────────────────────
+  // ── Generation balance bar (from ReportManager type 1) ───────────────────
+  const genHTML = `
+<div class="o2-row">
+  <span class="o2-label">Generation</span>
+  ${balanceBar(foodReport?.produced_kcal, foodReport?.consumed_kcal)}
+</div>`;
+
+  // ── Runway days bar ───────────────────────────────────────────────────────
   const segs = [];
   for (let i = 0; i < 10; i++) {
     if (i < wholeDays) {
@@ -349,9 +361,9 @@ function renderFood(rows, dupeCount) {
   }
   if (over10) segs.push(`<div class="day-seg-over">∞</div>`);
   const daysLabel = `${totalDays.toFixed(1)} days`;
-  const daysBar = `<div class="food-days-row"><span class="food-runway-label">Runway</span>${segs.join('')}<span class="food-days-label">${escapeHtml(daysLabel)}</span></div>`;
+  const daysBar = `<div class="food-days-row" style="margin-top:6px"><span class="food-runway-label">Runway</span>${segs.join('')}<span class="food-days-label">${escapeHtml(daysLabel)}</span></div>`;
 
-  // ── Runway chips ───────────────────────────────────────────────────────────
+  // ── Per-food runway chips (aligned right, below bars) ────────────────────
   const chips = known.map((r, i) => {
     const days  = (r.qty * r.kcal) / 3000 / n;
     const color = RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
@@ -361,7 +373,7 @@ function renderFood(rows, dupeCount) {
 </div>`;
   }).join('');
 
-  setHTML("food-card", `<div class="food-layout">${daysBar}<div class="food-chip-row">${chips}</div></div>`);
+  setHTML("food-card", `${genHTML}${daysBar}<div class="food-chip-row">${chips}</div>`);
 }
 
 function renderResources(rows) {
@@ -454,12 +466,17 @@ async function refresh() {
     if (data.skills)       SKILL_LABELS  = data.skills;
     if (data.chore_groups) CHORE_GROUPS  = data.chore_groups;
     if (data.thresholds)   T             = { ...T, ...data.thresholds };
+    if (data.report) {
+      STRESS_DELTA = data.report.stress_delta ?? {};
+      DISTANCE     = data.report.distance     ?? {};
+    }
 
     renderCounts(data.counts || {});
     renderDupes(data.top_dupes || []);
     renderOxygen(data.oxygen || null);
+    renderPower(data.report || null);
     renderGeysers(data.geysers || []);
-    renderFood(data.food || [], data.counts?.duplicants ?? 0);
+    renderFood(data.food || [], data.counts?.duplicants ?? 0, data.report?.food ?? null);
 
     // Update in-game filter defaults before rendering resources.
     if (data.stockpile_filters && data.stockpile_filters.length > 0) {
