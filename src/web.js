@@ -101,7 +101,7 @@ async function tryListen(server, host, port) {
       function onError(err) {
         server.removeListener("error", onError);
         if (err.code === "EADDRINUSE" && attempt < PORT_FALLBACK_LIMIT) {
-          console.warn(`[web] port ${p} in use, trying ${p + 1}…`);
+          /* port in use, try next */
           resolve(false);
         } else {
           reject(err);
@@ -116,9 +116,7 @@ async function tryListen(server, host, port) {
     if (bound) {
       const addr = server.address();
       const realPort = typeof addr === "object" && addr ? addr.port : p;
-      console.log(`[web] listening on http://${host}:${realPort}`);
-      // Permanent error logger so post-bind TCP faults don't crash the daemon.
-      server.on("error", (err) => console.error(`[web] server error: ${err.message}`));
+      server.on("error", (err) => console.error(`oni-vision: server error — ${err.message}`));
       return server;
     }
   }

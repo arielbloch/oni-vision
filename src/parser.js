@@ -57,9 +57,7 @@ export async function parseSaveFile(filePath, { versionStrictness = "major" } = 
     !CURRENT_VERSION_MINOR.includes(minor)
   ) {
     console.warn(
-      `[parser] save version ${major}.${minor} is newer than oni-save-parser's known ${CURRENT_VERSION_MAJOR}.${CURRENT_VERSION_MINOR.join("/")} ` +
-      `— parsed optimistically (versionStrictness="${versionStrictness}"). ` +
-      `Watch for downstream errors; bump oni-save-parser when an update lands.`
+      `oni-vision: save v${major}.${minor} is newer than parser's known v${CURRENT_VERSION_MAJOR}.${CURRENT_VERSION_MINOR.join("/")} — proceeding optimistically`
     );
   }
 

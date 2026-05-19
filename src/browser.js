@@ -62,10 +62,8 @@ function tryFocusExistingTabMac(url) {
       encoding: "utf8",
       timeout: 5000,
     });
-    console.log(`[browser] JXA stdout="${result.stdout?.trim()}" stderr="${result.stderr?.trim()}" status=${result.status}`);
     return result.stdout?.trim() === "ok";
-  } catch (err) {
-    console.log(`[browser] JXA exception: ${err.message}`);
+  } catch {
     return false;
   }
 }
@@ -107,7 +105,6 @@ export function openBrowser(url, {
   // On macOS, prefer reusing an existing tab over opening a new one.
   if (platform === "darwin" && tryFocusExistingTabMac(url)) {
     sessionOpened = true;
-    console.log(`[vision] focused existing dashboard tab: ${url}`);
     return true;
   }
 
@@ -128,10 +125,8 @@ export function openBrowser(url, {
     child.unref();
 
     sessionOpened = true;
-    console.log(`[vision] opened dashboard in browser: ${url}`);
     return true;
-  } catch (err) {
-    console.warn(`[vision] could not open browser: ${err.message}`);
+  } catch {
     return false;
   }
 }

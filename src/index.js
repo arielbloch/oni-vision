@@ -19,24 +19,14 @@ import { openBrowser } from "./browser.js";
 const config = await resolveConfig();
 ensureConfig({ config });
 
-if (config._autoDetected?.saveDir) {
-  console.log(`[vision] auto-detected save dir: ${config.saveDir}`);
-  console.log(
-    `[vision]   newest save: ${config._autoDetected.sourceFile}` +
-    ` (${new Date(config._autoDetected.mtimeMs).toISOString()})`
-  );
-} else if (config._autoDetected) {
-  // Discovery ran but found nothing.
+if (config._autoDetected && !config._autoDetected.saveDir) {
+  // Discovery ran but found nothing — this is worth surfacing.
   console.warn(
-    `[vision] no save folder auto-detected. Tried:\n` +
-    config._autoDetected.probed.map((p) => `  - ${p}`).join("\n") +
-    `\nFalling back to platform default: ${config.saveDir}`
+    `oni-vision: save folder not found. Tried:\n` +
+    config._autoDetected.probed.map((p) => `  ${p}`).join("\n") +
+    `\nAdd "saveDir" to ~/.oni-vision/config.json to set it manually.`
   );
 }
-console.log(`[vision] save dir:   ${config.saveDir}`);
-console.log(`[vision] output dir: ${config.outputDir}`);
-console.log(`[vision] include auto saves: ${config.includeAutoSaves}`);
-console.log(`[vision] debounce:   ${config.debounceMs} ms`);
 
 if (!existsSync(config.saveDir)) {
   console.error(
@@ -61,12 +51,9 @@ async function runOnce(reason) {
       includeAutoSaves: config.includeAutoSaves,
     });
     if (!latest) {
-      console.log(`[vision] no .sav files in ${config.saveDir} yet`);
+      console.warn(`oni-vision: no .sav files found in ${config.saveDir}`);
       return;
     }
-    console.log(
-      `[vision] (${reason}) latest save: ${latest.path} (${(latest.size / 1024 / 1024).toFixed(2)} MB)`
-    );
     const result = await safeBuildOutputs({
       savePath: latest.path,
       outputDir: config.outputDir,
@@ -126,13 +113,13 @@ if (config.web?.enabled !== false) {
     });
     const addr = webServer.address();
     const port = typeof addr === "object" && addr ? addr.port : (config.web?.port ?? 8080);
-    openBrowser(`http://127.0.0.1:${port}`);
+    const dashUrl = `http://127.0.0.1:${port}`;
+    openBrowser(dashUrl);
+    console.log(`\noni-vision  ·  ${dashUrl}  (Ctrl-C to stop)\n`);
   } catch (err) {
-    console.error(`[vision] web server failed to start: ${err.message}`);
+    console.error(`oni-vision: web server failed to start — ${err.message}`);
   }
 }
-
-console.log("[vision] running. Ctrl-C to stop.");
 
 // Tidy shutdown. close() on the HTTP server waits for in-flight requests
 // to drain — with HTTP/1.1 keep-alive that can hang on idle browser tabs.

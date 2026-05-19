@@ -63,12 +63,8 @@ export async function buildOutputs({ savePath, outputDir }) {
   await mkdir(outputDir, { recursive: true });
 
   const t0 = Date.now();
-  console.log(`[pipeline] parsing ${savePath}`);
   const save = await parseSaveFile(savePath);
   const tParsed = Date.now();
-  console.log(
-    `[pipeline]   parsed in ${tParsed - t0} ms (cycle ${save.header?.gameInfo?.numberOfCycles}, dupes ${save.header?.gameInfo?.numberOfDuplicants})`
-  );
 
   const tables = extractAll(save);
   // Stamp parsing metadata so Claude can detect stale data via SQL.
@@ -86,9 +82,6 @@ export async function buildOutputs({ savePath, outputDir }) {
   tables.diseases     = DISEASE_NAMES;
   assertLookupTablesPopulated(tables);
   const tExtracted = Date.now();
-  console.log(
-    `[pipeline]   extracted ${countRows(tables)} rows across ${Object.keys(tables).length} tables in ${tExtracted - tParsed} ms`
-  );
 
   // Write SQLite to a temp file, then rename. Pipeline atomicity matters:
   // readers (Claude, sqlite3 CLI) can fire at any moment, and we never want
@@ -124,23 +117,21 @@ export async function buildOutputs({ savePath, outputDir }) {
   }
 
   const tDone = Date.now();
-  console.log(`[pipeline]   wrote outputs to ${outputDir} in ${tDone - tExtracted} ms (total ${tDone - t0} ms)`);
 
   // Print a human-readable status block after each successful parse.
-  // Cheap: reads the DB we just wrote. Skipped on errors so a render
-  // bug never breaks the parse pipeline. Wrapped in try/finally so the
-  // DB handle is always released — a throw inside render() must not
-  // leak the handle.
   let renderDb = null;
   try {
     renderDb = new DatabaseSync(dbFinal, { readOnly: true });
     const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
     const width = process.stdout.columns ?? 80;
-    console.log("");
-    console.log(render(renderDb, { color: useColor, width }));
-    console.log("");
+    const ms = tDone - t0;
+    const dupes = save.header?.gameInfo?.numberOfDuplicants ?? "?";
+    const rendered = render(renderDb, { color: useColor, width });
+    // Append timing to the first line (the ═══ header)
+    const withTiming = rendered.replace(/^(═+[^\n]+)/, `$1  (${dupes} dupes · ${ms} ms)`);
+    console.log("\n" + withTiming + "\n");
   } catch (err) {
-    console.warn(`[pipeline]   render skipped: ${err.message}`);
+    // Render errors are non-fatal; the parse itself succeeded.
   } finally {
     if (renderDb) {
       try { renderDb.close(); } catch { /* ignore */ }
