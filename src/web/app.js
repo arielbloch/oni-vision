@@ -165,7 +165,7 @@ function renderDupes(rows) {
   const avgStress   = stressVals.length ? Math.round(stressVals.reduce((s, v) => s + v, 0) / stressVals.length) : 0;
   const stressCol   = avgStress >= T.stress_bad ? '#ff2222' : avgStress >= T.stress_warn ? '#facc15' : '#4ade80';
   const moraleSummary = `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
-    <div class="gauge-title">Avg Stress</div>
+    <div class="gauge-title">Stress</div>
     <div style="display:flex;align-items:center;gap:16px">
       ${simpleDonut(avgStress, stressCol)}
       <div style="font-size:15px;font-weight:600;color:${stressCol}">${avgStress}%</div>
@@ -326,12 +326,9 @@ function renderOxygen(oxygen) {
   <div class="gauge-title">O2 Gen</div>
   <div class="o2-row">
     ${percentageDonut(report?.produced_kg, report?.consumed_kg)}
-    <div style="flex:1;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:3px">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;margin-left:4px">
+      ${simpleDonut(parseFloat(badPct), '#ff2222')}
       <span class="gauge-sublabel">Breathability</span>
-      <div style="display:flex;align-items:center;gap:5px">
-        <div class="o2-breath-bar" style="flex:1"><div class="o2-breath-red" style="width:${badPct}%"></div></div>
-        <span class="o2-value">${Math.round(breathPct)}%</span>
-      </div>
     </div>
   </div>
 </div>`);
