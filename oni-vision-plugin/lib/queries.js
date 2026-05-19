@@ -386,10 +386,10 @@ export function food(db, { limit = 20 } = {}) {
             fm.morale,
             SUM(src.cnt) AS qty
      FROM (
-       SELECT item_prefab_id AS pid, COUNT(*) AS cnt
+       SELECT item_prefab_id AS pid, COALESCE(SUM(units), 0) AS cnt
        FROM storage_contents GROUP BY item_prefab_id
        UNION ALL
-       SELECT prefab_id AS pid, COUNT(*) AS cnt
+       SELECT prefab_id AS pid, COALESCE(SUM(units), 0) AS cnt
        FROM world_objects GROUP BY prefab_id
      ) src
      JOIN foods fm ON fm.prefab_id = src.pid

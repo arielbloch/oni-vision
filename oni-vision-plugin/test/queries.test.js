@@ -827,7 +827,7 @@ describe("food", () => {
       assert.equal(rows[0].name, "Cooked Meat");
       assert.equal(rows[0].kcal, 2400);
       assert.equal(rows[0].morale, 2);
-      assert.equal(rows[0].qty, 1); // one stack
+      assert.equal(rows[0].qty, 2); // sums units, not rows
     } finally {
       db.close();
     }
