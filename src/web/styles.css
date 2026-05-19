@@ -34,7 +34,7 @@ html, body {
 }
 body { padding: 16px; max-width: 1200px; margin: 0 auto; }
 h1 { font-size: 22px; margin: 0; font-weight: 600; }
-h2 { font-size: 13px; margin: 18px 0 8px; color: var(--fg-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+h2 { font-size: 13px; margin: 18px 0 8px; color: white; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .mono { font-family: var(--mono); }
 .row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 header { padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }

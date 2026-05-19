@@ -135,11 +135,44 @@ function stressDeltaTri(name) {
   return `<span class="stress-delta-tri" style="color:rgb(${v},${v},${v})">${dir}</span>`;
 }
 
+function moraleDonut(avgPct, S = 50) {
+  const cx = S / 2, cy = S / 2, r = S * 0.36, sw = S * 0.155;
+  const span = Math.min(319.9, avgPct / 100 * 320);
+  const col = avgPct >= 66 ? '#4ade80' : avgPct >= 33 ? '#facc15' : '#ff2222';
+  function ptd(deg) {
+    const a = deg * Math.PI / 180;
+    return [+(cx + r * Math.sin(a)).toFixed(2), +(cy - r * Math.cos(a)).toFixed(2)];
+  }
+  const [dotX, dotY] = ptd(0);
+  const [x1, y1] = ptd(0);
+  const [x2, y2] = ptd(span);
+  const large = span > 180 ? 1 : 0;
+  const arc = span > 0.3
+    ? `<path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`
+    : '';
+  return `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}" style="flex-shrink:0;display:block">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1c1c30" stroke-width="${sw}"/>
+    ${arc}
+    <circle cx="${dotX}" cy="${dotY}" r="${sw / 2}" fill="${col}"/>
+  </svg>`;
+}
+
 function renderDupes(rows) {
   if (!rows || rows.length === 0) {
     setHTML("dupes-card", `<div class="empty">no duplicants in this save</div>`);
     return;
   }
+
+  const moralePcts = rows.map(r => Math.min(100, Math.round((r.morale_cost ?? 0) / T.morale_bar_max * 100)));
+  const avgMorale  = moralePcts.length ? Math.round(moralePcts.reduce((s, v) => s + v, 0) / moralePcts.length) : 0;
+  const moraleSummary = `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#67e8f9;margin-bottom:4px">Avg Morale</div>
+    <div style="display:flex;align-items:center;gap:16px">
+      ${moraleDonut(avgMorale)}
+      <div style="font-size:15px;font-weight:600;color:var(--fg)">${avgMorale}%</div>
+    </div>
+  </div>`;
+
   const html = rows.map(r => {
     const name = r.name ?? "(unnamed)";
     const stressVal = r.stress == null ? 0 : Math.max(0, Math.min(100, r.stress));
@@ -167,7 +200,7 @@ function renderDupes(rows) {
     <th>Morale</th>
     <th>Commute</th>
   </tr></thead>`;
-  setHTML("dupes-card", `<table>${thead}<tbody>${html}</tbody></table>`);
+  setHTML("dupes-card", `${moraleSummary}<table>${thead}<tbody>${html}</tbody></table>`);
 }
 
 function renderGeysers(rows) {
@@ -244,19 +277,44 @@ function onPickerChange() {
 // ── Renderers ─────────────────────────────────────────────────────────────────
 
 /**
- * Centre-zero balance bar. Surplus → green right; deficit → red left.
- * Calibrated to max(produced, consumed).
+ * Percentage donut gauge. 12 o'clock = zero, fills CW (surplus/green) or
+ * CCW (deficit/red). A green dot always marks 12 o'clock so zero isn't empty.
  */
-function balanceBar(produced, consumed) {
-  const empty = `<div class="o2-balance-bar"><div class="o2-balance-left"></div><div class="o2-balance-hair"></div><div class="o2-balance-right"></div></div>`;
-  if (produced == null || consumed == null) return empty;
-  const scale = Math.max(produced, consumed, 1);
-  const delta = produced - consumed;
-  const halfPct = Math.min(100, (Math.abs(delta) / scale) * 100).toFixed(1);
-  if (delta >= 0) {
-    return `<div class="o2-balance-bar"><div class="o2-balance-left"></div><div class="o2-balance-hair"></div><div class="o2-balance-right"><div class="o2-balance-green" style="width:${halfPct}%"></div></div></div>`;
+function percentageDonut(produced, consumed, S = 50) {
+  const cx = S / 2, cy = S / 2, r = S * 0.36, sw = S * 0.155;
+
+  let pct = 0;
+  const valid = produced != null && consumed != null;
+  if (valid) {
+    const scale = Math.max(produced, consumed, 1);
+    pct = Math.max(-100, Math.min(100, ((produced - consumed) / scale) * 100));
   }
-  return `<div class="o2-balance-bar"><div class="o2-balance-left"><div class="o2-balance-red" style="width:${halfPct}%"></div></div><div class="o2-balance-hair"></div><div class="o2-balance-right"></div></div>`;
+
+  const isPos  = pct >= 0;
+  const color  = isPos ? '#4ade80' : '#ff2222';
+  const span   = Math.abs(pct) / 100 * 320;
+
+  function ptd(deg) {
+    const a = deg * Math.PI / 180;
+    return [+(cx + r * Math.sin(a)).toFixed(2), +(cy - r * Math.cos(a)).toFixed(2)];
+  }
+  function arcSeg(spanDeg, cw, col) {
+    if (spanDeg < 0.3) return '';
+    const [x1, y1] = ptd(0);
+    const [x2, y2] = ptd(cw ? spanDeg : -spanDeg);
+    const large = spanDeg > 180 ? 1 : 0;
+    return `<path d="M${x1},${y1} A${r},${r} 0 ${large},${cw ? 1 : 0} ${x2},${y2}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`;
+  }
+
+  const [dotX, dotY] = ptd(0);
+  const valText = valid ? `${isPos ? '+' : ''}${Math.round(pct)}%` : '—';
+  const dot = isPos ? `<circle cx="${dotX}" cy="${dotY}" r="${sw / 2}" fill="#4ade80"/>` : '';
+
+  return `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}" style="flex-shrink:0;display:block">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1c1c30" stroke-width="${sw}"/>
+    ${arcSeg(span, isPos, color)}
+    ${dot}
+  </svg>`;
 }
 
 function renderOxygen(oxygen) {
@@ -266,14 +324,18 @@ function renderOxygen(oxygen) {
   const badPct = (100 - breathPct).toFixed(1);
 
   setHTML("oxygen-card", `
-<div class="o2-row">
-  <span class="o2-label" style="color:white">O2 Production</span>
-  ${balanceBar(report?.produced_kg, report?.consumed_kg)}
-</div>
-<div class="o2-row" style="margin-top:6px">
-  <span class="o2-label" style="color:var(--bad)">Breathability</span>
-  <div class="o2-breath-bar"><div class="o2-breath-red" style="width:${badPct}%"></div></div>
-  <span class="o2-value">${Math.round(breathPct)}%</span>
+<div>
+  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#67e8f9;margin-bottom:4px">O2 Production</div>
+  <div class="o2-row" style="gap:16px">
+    ${percentageDonut(report?.produced_kg, report?.consumed_kg)}
+    <div style="flex:1;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:3px">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#67e8f9">Breathability</span>
+      <div style="display:flex;align-items:center;gap:5px">
+        <div class="o2-breath-bar" style="flex:1"><div class="o2-breath-red" style="width:${badPct}%"></div></div>
+        <span class="o2-value">${Math.round(breathPct)}%</span>
+      </div>
+    </div>
+  </div>
 </div>`);
 }
 
@@ -281,9 +343,11 @@ function renderPower(report) {
   if (!report?.power) { setHTML("power-card", `<div class="empty">no data</div>`); return; }
   const { produced_wh, consumed_wh } = report.power;
   setHTML("power-card", `
-<div class="o2-row">
-  <span class="o2-label" style="color:white">Production</span>
-  ${balanceBar(produced_wh, consumed_wh)}
+<div>
+  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#67e8f9;margin-bottom:4px">Power Generation</div>
+  <div class="o2-row" style="gap:16px">
+    ${percentageDonut(produced_wh, consumed_wh)}
+  </div>
 </div>`);
 }
 
@@ -340,13 +404,6 @@ function renderFood(rows, dupeCount, foodReport) {
   const frac      = over10 ? 0 : totalDays - wholeDays;
   const BG_EMPTY  = 'var(--bg-elev)';
 
-  // ── Generation balance bar (from ReportManager type 1) ───────────────────
-  const genHTML = `
-<div class="o2-row">
-  <span class="o2-label">Generation</span>
-  ${balanceBar(foodReport?.produced_kcal, foodReport?.consumed_kcal)}
-</div>`;
-
   // ── Runway days bar ───────────────────────────────────────────────────────
   const segs = [];
   for (let i = 0; i < 10; i++) {
@@ -361,7 +418,20 @@ function renderFood(rows, dupeCount, foodReport) {
   }
   if (over10) segs.push(`<div class="day-seg-over">∞</div>`);
   const daysLabel = `${totalDays.toFixed(1)} days`;
-  const daysBar = `<div class="food-days-row" style="margin-top:6px"><span class="food-runway-label">Runway</span>${segs.join('')}<span class="food-days-label">${escapeHtml(daysLabel)}</span></div>`;
+  const runwayBlock = `<div style="flex:1;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:4px">
+    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#67e8f9">Runway</span>
+    <div class="food-days-row" style="margin-top:0"><span style="display:none"></span>${segs.join('')}<span class="food-days-label">${escapeHtml(daysLabel)}</span></div>
+  </div>`;
+
+  // ── Generation balance + runway side by side ──────────────────────────────
+  const genHTML = `
+<div>
+  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#67e8f9;margin-bottom:4px">Food Generation</div>
+  <div class="o2-row" style="gap:16px">
+    ${percentageDonut(foodReport?.produced_kcal, foodReport?.consumed_kcal)}
+    ${runwayBlock}
+  </div>
+</div>`;
 
   // ── Per-food runway chips (aligned right, below bars) ────────────────────
   const chips = known.map((r, i) => {
@@ -373,7 +443,7 @@ function renderFood(rows, dupeCount, foodReport) {
 </div>`;
   }).join('');
 
-  setHTML("food-card", `${genHTML}${daysBar}<div class="food-chip-row">${chips}</div>`);
+  setHTML("food-card", `${genHTML}<div class="food-chip-row">${chips}</div>`);
 }
 
 function renderResources(rows) {
