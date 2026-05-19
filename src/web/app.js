@@ -143,7 +143,6 @@ function moraleDonut(avgPct, S = 50) {
     const a = deg * Math.PI / 180;
     return [+(cx + r * Math.sin(a)).toFixed(2), +(cy - r * Math.cos(a)).toFixed(2)];
   }
-  const [dotX, dotY] = ptd(0);
   const [x1, y1] = ptd(0);
   const [x2, y2] = ptd(span);
   const large = span > 180 ? 1 : 0;
@@ -153,7 +152,7 @@ function moraleDonut(avgPct, S = 50) {
   return `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}" style="flex-shrink:0;display:block">
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1c1c30" stroke-width="${sw}"/>
     ${arc}
-    <circle cx="${dotX}" cy="${dotY}" r="${sw / 2}" fill="${col}"/>
+    <circle cx="${x1}" cy="${y1}" r="${sw / 2}" fill="${col}"/>
   </svg>`;
 }
 
@@ -166,7 +165,7 @@ function renderDupes(rows) {
   const moralePcts = rows.map(r => Math.min(100, Math.round((r.morale_cost ?? 0) / T.morale_bar_max * 100)));
   const avgMorale  = moralePcts.length ? Math.round(moralePcts.reduce((s, v) => s + v, 0) / moralePcts.length) : 0;
   const moraleSummary = `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#67e8f9;margin-bottom:4px">Avg Morale</div>
+    <div class="gauge-title">Avg Morale</div>
     <div style="display:flex;align-items:center;gap:16px">
       ${moraleDonut(avgMorale)}
       <div style="font-size:15px;font-weight:600;color:var(--fg)">${avgMorale}%</div>
@@ -307,7 +306,6 @@ function percentageDonut(produced, consumed, S = 50) {
   }
 
   const [dotX, dotY] = ptd(0);
-  const valText = valid ? `${isPos ? '+' : ''}${Math.round(pct)}%` : '—';
   const dot = isPos ? `<circle cx="${dotX}" cy="${dotY}" r="${sw / 2}" fill="#4ade80"/>` : '';
 
   return `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}" style="flex-shrink:0;display:block">
@@ -325,11 +323,11 @@ function renderOxygen(oxygen) {
 
   setHTML("oxygen-card", `
 <div>
-  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#67e8f9;margin-bottom:4px">O2 Production</div>
-  <div class="o2-row" style="gap:16px">
+  <div class="gauge-title">O2 Production</div>
+  <div class="o2-row">
     ${percentageDonut(report?.produced_kg, report?.consumed_kg)}
     <div style="flex:1;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:3px">
-      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#67e8f9">Breathability</span>
+      <span class="gauge-sublabel">Breathability</span>
       <div style="display:flex;align-items:center;gap:5px">
         <div class="o2-breath-bar" style="flex:1"><div class="o2-breath-red" style="width:${badPct}%"></div></div>
         <span class="o2-value">${Math.round(breathPct)}%</span>
@@ -344,8 +342,8 @@ function renderPower(report) {
   const { produced_wh, consumed_wh } = report.power;
   setHTML("power-card", `
 <div>
-  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#67e8f9;margin-bottom:4px">Power Generation</div>
-  <div class="o2-row" style="gap:16px">
+  <div class="gauge-title">Power Generation</div>
+  <div class="o2-row">
     ${percentageDonut(produced_wh, consumed_wh)}
   </div>
 </div>`);
@@ -419,15 +417,15 @@ function renderFood(rows, dupeCount, foodReport) {
   if (over10) segs.push(`<div class="day-seg-over">∞</div>`);
   const daysLabel = `${totalDays.toFixed(1)} days`;
   const runwayBlock = `<div style="flex:1;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:4px">
-    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#67e8f9">Runway</span>
-    <div class="food-days-row" style="margin-top:0"><span style="display:none"></span>${segs.join('')}<span class="food-days-label">${escapeHtml(daysLabel)}</span></div>
+    <span class="gauge-sublabel">Runway</span>
+    <div class="food-days-row">${segs.join('')}<span class="food-days-label">${escapeHtml(daysLabel)}</span></div>
   </div>`;
 
   // ── Generation balance + runway side by side ──────────────────────────────
   const genHTML = `
 <div>
-  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#67e8f9;margin-bottom:4px">Food Generation</div>
-  <div class="o2-row" style="gap:16px">
+  <div class="gauge-title">Food Generation</div>
+  <div class="o2-row">
     ${percentageDonut(foodReport?.produced_kcal, foodReport?.consumed_kcal)}
     ${runwayBlock}
   </div>
