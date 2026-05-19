@@ -77,6 +77,19 @@ function fmtMass(units) {
   return `${u.toFixed(0)} kg`;
 }
 
+function fmtWh(wh) {
+  const w = Number(wh);
+  if (!Number.isFinite(w)) return "?";
+  if (w >= 1_000_000) return `${(w/1_000_000).toFixed(1)} MW`;
+  if (w >= 1_000)     return `${(w/1_000).toFixed(1)} kW`;
+  return `${Math.round(w)} W`;
+}
+
+function bar(pct) {
+  const v = Math.max(0, Math.min(100, Number(pct) || 0));
+  const cls = v >= T.stress_bad ? "high" : v >= T.stress_warn ? "med" : "";
+  return `<div class="bar-track"><div class="bar-fill ${cls}" style="width: ${v}%"></div></div>`;
+}
 
 function fileBaseName(path) {
   if (!path) return "";
@@ -113,7 +126,7 @@ function stressDeltaTri(name) {
   return `<span class="stress-delta-tri" style="color:rgb(${v},${v},${v})">${dir}</span>`;
 }
 
-/** Unified donut label+ring widget. Label sits above, ring below, consistent margins. */
+/* ── Donut gauges — kept for potential future use ────────────────────────────
 function donutWidget(label, svgHtml) {
   return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0">
     <span class="gauge-sublabel">${label}</span>
@@ -134,12 +147,59 @@ function simpleDonut(pct, col, S = 50) {
   const arc = span > 0.3
     ? `<path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`
     : '';
-  // Always draw the 12-o'clock marker dot so an empty (0%) donut isn't invisible.
   const dot = `<circle cx="${x1}" cy="${y1}" r="${sw / 2}" fill="${col}"/>`;
   return `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}" style="flex-shrink:0;display:block">
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1c1c30" stroke-width="${sw}"/>
     ${arc}${dot}
   </svg>`;
+}
+── end donut gauges ─────────────────────────────────────────────────────── */
+
+// ── Segmented Pips Gauge ──────────────────────────────────────────────────────
+
+function _pipRow(pct, col) {
+  const color = col ?? (pct >= 15 ? '#4ade80' : pct >= 0 ? '#fb923c' : '#ff2222');
+  const mag = Math.abs(pct) / 100;
+  const lit = Math.max(1, Math.round(mag * 8));
+  const pips = [];
+  for (let i = 0; i < 8; i++) {
+    if (i < lit) {
+      const op = lit === 1 ? 0.9 : lit === 2 ? (i === 0 ? 0.55 : 0.9) : i === 0 ? 0.35 : i === 1 ? 0.6 : 1.0;
+      pips.push(`<div style="width:8px;height:26px;border-radius:4px;background:${color};opacity:${op};flex-shrink:0"></div>`);
+    } else {
+      pips.push(`<div style="width:8px;height:26px;border-radius:4px;background:#1c1c30;flex-shrink:0"></div>`);
+    }
+  }
+  return `<div style="display:flex;gap:3px">${pips.join('')}</div>`;
+}
+
+function _pipChipShell(label, pipsHtml, valueHtml) {
+  return `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:5px 8px;flex-shrink:0">
+  <div style="font-size:11px;color:#fb923c;white-space:nowrap">${label}</div>
+  ${pipsHtml}
+  ${valueHtml}
+</div>`;
+}
+
+/** Balance chip: green surplus, red deficit, actual delta value + unit. */
+function segmentedPipsGauge(label, produced, consumed, fmtFn) {
+  const valid = produced != null && consumed != null;
+  let pct = 0;
+  if (valid) {
+    const scale = Math.max(produced, consumed, 1);
+    pct = Math.max(-100, Math.min(100, ((produced - consumed) / scale) * 100));
+  }
+  const delta = valid ? produced - consumed : 0;
+  const col   = pct >= 15 ? '#4ade80' : pct >= 0 ? '#fb923c' : '#ff2222';
+  const sign  = delta >= 0 ? '+' : '−';
+  const val   = `<div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${sign}${fmtFn(Math.abs(delta))}</div>`;
+  return _pipChipShell(label, _pipRow(pct), val);
+}
+
+/** Simple chip: 0–100 percentage with explicit color (stress, breathability). */
+function simplePipsGauge(label, pct, col, valLabel) {
+  const val = `<div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${valLabel}</div>`;
+  return _pipChipShell(label, _pipRow(Math.max(0, Math.min(100, pct)), col), val);
 }
 
 function renderDupes(rows) {
@@ -153,7 +213,7 @@ function renderDupes(rows) {
   const stressCol   = avgStress >= T.stress_bad ? '#ff2222' : avgStress >= T.stress_warn ? '#facc15' : '#4ade80';
   const moraleSummary = `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
     <div style="display:flex;align-items:center;gap:16px">
-      ${donutWidget('Stress', simpleDonut(avgStress, stressCol))}
+      ${simplePipsGauge('Stress', avgStress, stressCol, avgStress + '%')}
     </div>
   </div>`;
 
@@ -258,24 +318,20 @@ function onPickerChange() {
   renderResources(allElements);
 }
 
-/**
- * Percentage donut gauge. 12 o'clock = zero, fills CW (surplus/green) or
- * CCW (deficit/red). A green dot always marks 12 o'clock so zero isn't empty.
- */
+// ── Renderers ─────────────────────────────────────────────────────────────────
+
+/* ── percentageDonut — kept for potential future use ─────────────────────────
 function percentageDonut(produced, consumed, S = 50) {
   const cx = S / 2, cy = S / 2, r = S * 0.36, sw = S * 0.155;
-
   let pct = 0;
   const valid = produced != null && consumed != null;
   if (valid) {
     const scale = Math.max(produced, consumed, 1);
     pct = Math.max(-100, Math.min(100, ((produced - consumed) / scale) * 100));
   }
-
   const isPos  = pct >= 0;
   const color  = isPos ? '#4ade80' : '#ff2222';
   const span   = Math.abs(pct) / 100 * 320;
-
   function ptd(deg) {
     const a = deg * Math.PI / 180;
     return [+(cx + r * Math.sin(a)).toFixed(2), +(cy - r * Math.cos(a)).toFixed(2)];
@@ -287,16 +343,15 @@ function percentageDonut(produced, consumed, S = 50) {
     const large = spanDeg > 180 ? 1 : 0;
     return `<path d="M${x1},${y1} A${r},${r} 0 ${large},${cw ? 1 : 0} ${x2},${y2}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`;
   }
-
   const [dotX, dotY] = ptd(0);
   const dot = isPos ? `<circle cx="${dotX}" cy="${dotY}" r="${sw / 2}" fill="#4ade80"/>` : '';
-
   return `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}" style="flex-shrink:0;display:block">
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1c1c30" stroke-width="${sw}"/>
     ${arcSeg(span, isPos, color)}
     ${dot}
   </svg>`;
 }
+── end percentageDonut ──────────────────────────────────────────────────── */
 
 function renderOxygen(oxygen) {
   if (!oxygen) { setHTML("oxygen-card", `<div class="empty">no data</div>`); return; }
@@ -307,8 +362,8 @@ function renderOxygen(oxygen) {
   setHTML("oxygen-card", `
 <div>
   <div class="o2-row">
-    ${donutWidget('O2 Production', percentageDonut(report?.produced_kg, report?.consumed_kg))}
-    ${donutWidget('Breathability', simpleDonut(badPct, '#ff2222'))}
+    ${segmentedPipsGauge('O₂ Production', report?.produced_kg, report?.consumed_kg, fmtMass)}
+    ${simplePipsGauge('Breathability', badPct, '#ff2222', badPct.toFixed(1) + '% bad')}
   </div>
 </div>`);
 }
@@ -383,7 +438,7 @@ function renderPower(report, resources, generators) {
   setHTML("power-card", `
 <div>
   <div class="o2-row" style="align-items:center;flex-wrap:wrap">
-    ${donutWidget('Power Gen', percentageDonut(produced_wh, consumed_wh))}
+    ${segmentedPipsGauge('Power', produced_wh, consumed_wh, fmtWh)}
     ${runwayBlock}
     <div class="food-chip-row" style="flex:1;margin-top:0;justify-content:flex-start">${chips}</div>
   </div>
@@ -481,7 +536,7 @@ function renderFood(rows, dupeCount, foodReport) {
   setHTML("food-card", `
 <div>
   <div class="o2-row" style="align-items:center;flex-wrap:wrap">
-    ${donutWidget('Food Gen', percentageDonut(foodReport?.produced_kcal, foodReport?.consumed_kcal))}
+    ${segmentedPipsGauge('Food Gen', foodReport?.produced_kcal, foodReport?.consumed_kcal, fmtKcal)}
     ${runwayBlock}
     <div class="food-chip-row" style="flex:1;margin-top:0;justify-content:flex-start">${chips}</div>
   </div>
