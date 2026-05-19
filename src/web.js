@@ -152,8 +152,9 @@ function serveEvents(res) {
     // Allow the browser to reconnect after the daemon restarts.
     "Retry": "3000",
   });
-  // Send an immediate comment so the browser knows it's connected.
-  res.write(": connected\n\n");
+  // Send an immediate parse event so a reconnecting tab fetches fresh data
+  // without waiting for the next game save. Also serves as a connectivity ping.
+  res.write(`event: parse\ndata: {}\n\n`);
 
   sseClients.add(res);
 

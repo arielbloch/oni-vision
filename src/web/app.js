@@ -135,6 +135,14 @@ function stressDeltaTri(name) {
   return `<span class="stress-delta-tri" style="color:rgb(${v},${v},${v})">${dir}</span>`;
 }
 
+/** Unified donut label+ring widget. Label sits above, ring below, consistent margins. */
+function donutWidget(label, svgHtml) {
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0">
+    <span class="gauge-sublabel">${label}</span>
+    ${svgHtml}
+  </div>`;
+}
+
 function simpleDonut(pct, col, S = 50) {
   const cx = S / 2, cy = S / 2, r = S * 0.36, sw = S * 0.155;
   const span = Math.min(319.9, pct / 100 * 320);
@@ -145,13 +153,15 @@ function simpleDonut(pct, col, S = 50) {
   const [x1, y1] = ptd(0);
   const [x2, y2] = ptd(span);
   const large = span > 180 ? 1 : 0;
-  const arc = span > 0.3
+  const hasArc = span > 0.3;
+  const arc = hasArc
     ? `<path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`
     : '';
+  // Always draw the 12-o'clock marker dot so an empty (0%) donut isn't invisible.
+  const dot = `<circle cx="${x1}" cy="${y1}" r="${sw / 2}" fill="${col}"/>`;
   return `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}" style="flex-shrink:0;display:block">
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1c1c30" stroke-width="${sw}"/>
-    ${arc}
-    <circle cx="${x1}" cy="${y1}" r="${sw / 2}" fill="${col}"/>
+    ${arc}${dot}
   </svg>`;
 }
 
@@ -165,10 +175,8 @@ function renderDupes(rows) {
   const avgStress   = stressVals.length ? Math.round(stressVals.reduce((s, v) => s + v, 0) / stressVals.length) : 0;
   const stressCol   = avgStress >= T.stress_bad ? '#ff2222' : avgStress >= T.stress_warn ? '#facc15' : '#4ade80';
   const moraleSummary = `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
-    <div class="gauge-title">Stress</div>
     <div style="display:flex;align-items:center;gap:16px">
-      ${simpleDonut(avgStress, stressCol)}
-      <div style="font-size:15px;font-weight:600;color:${stressCol}">${avgStress}%</div>
+      ${donutWidget('Stress', simpleDonut(avgStress, stressCol))}
     </div>
   </div>`;
 
@@ -323,13 +331,9 @@ function renderOxygen(oxygen) {
 
   setHTML("oxygen-card", `
 <div>
-  <div class="gauge-title">O2 Gen</div>
   <div class="o2-row">
-    ${percentageDonut(report?.produced_kg, report?.consumed_kg)}
-    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;margin-left:4px">
-      ${simpleDonut(parseFloat(badPct), '#ff2222')}
-      <span class="gauge-sublabel">Breathability</span>
-    </div>
+    ${donutWidget('O2 Production', percentageDonut(report?.produced_kg, report?.consumed_kg))}
+    ${donutWidget('Breathability', simpleDonut(parseFloat(badPct), '#ff2222'))}
   </div>
 </div>`);
 }
@@ -339,9 +343,8 @@ function renderPower(report) {
   const { produced_wh, consumed_wh } = report.power;
   setHTML("power-card", `
 <div>
-  <div class="gauge-title">Power Gen</div>
   <div class="o2-row">
-    ${percentageDonut(produced_wh, consumed_wh)}
+    ${donutWidget('Power', percentageDonut(produced_wh, consumed_wh))}
   </div>
 </div>`);
 }
@@ -436,9 +439,8 @@ function renderFood(rows, dupeCount, foodReport) {
   // ── Generation donut + runway + chips all on one row ─────────────────────
   setHTML("food-card", `
 <div>
-  <div class="gauge-title">Food Gen</div>
   <div class="o2-row" style="align-items:center;flex-wrap:wrap">
-    ${percentageDonut(foodReport?.produced_kcal, foodReport?.consumed_kcal)}
+    ${donutWidget('Food Gen', percentageDonut(foodReport?.produced_kcal, foodReport?.consumed_kcal))}
     ${runwayBlock}
     <div class="food-chip-row" style="flex:1;margin-top:0;justify-content:flex-start">${chips}</div>
   </div>

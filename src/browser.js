@@ -27,7 +27,7 @@ function tryFocusExistingTabMac(url) {
   const base = url.replace(/\/$/, "");
   const script = [
     `set u to "${base}"`,
-    `set browsers to {"Google Chrome", "Brave Browser", "Microsoft Edge", "Chromium"}`,
+    `set browsers to {"Google Chrome", "Brave Browser", "Microsoft Edge", "Chromium", "Arc"}`,
     `repeat with b in browsers`,
     `  try`,
     `    tell application b`,
