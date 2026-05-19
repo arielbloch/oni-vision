@@ -14,6 +14,8 @@
 import { THRESHOLDS } from "./thresholds.js";
 import { ANSI, paint, bar, pad, fit, lpad, formatMass, formatKcal, formatAge, stressColor } from "./format.js";
 import { oxygenStats } from "./oxygen.js";
+import { reportStats } from "./report.js";
+import { POWER_FUELS } from "./generators.js";
 
 /**
  * Pull the headline facts out of save_meta. Returns a plain object;
@@ -274,6 +276,90 @@ export function renderOxygen(db, { color = false } = {}) {
   return `${header}  Breathability ${breathBar}  ${Math.round(avg_breath_pct)}%   O₂ Gen  ${leftHalf}${hair}${rightHalf}  ${genLabel}`;
 }
 
+/**
+ * Power monitor: generation vs consumption ratio + fuel runway.
+ * Mirrors the web dashboard's power card with a text-based bar.
+ */
+export function renderPower(db, { color = false } = {}) {
+  const rs = reportStats(db);
+  if (!rs.power) return paint("Power: no data", ANSI.dim, color);
+
+  const { produced_wh, consumed_wh } = rs.power;
+  const consumption = consumed_wh || 0;
+
+  // Detect built generators
+  const builtGens = new Set(
+    db.prepare(`SELECT b.prefab_id FROM behaviors beh JOIN buildings b ON b.game_object_id = beh.game_object_id WHERE beh.name = 'EnergyGenerator'`).all().map(r => r.prefab_id)
+  );
+
+  // Fuel mass by element_id
+  const massRows = db.prepare(`
+    SELECT element_id, SUM(units) AS total_units
+    FROM (
+      SELECT element_id, units FROM storage_contents WHERE element_id IS NOT NULL
+      UNION ALL
+      SELECT element_id, units FROM world_objects WHERE element_id IS NOT NULL
+    )
+    GROUP BY element_id
+  `).all();
+  const massByElement = {};
+  for (const r of massRows) {
+    if (r.element_id != null) massByElement[String(Math.trunc(Number(r.element_id)))] = r.total_units ?? 0;
+  }
+
+  // Per-fuel runway
+  const fuels = [];
+  for (const f of POWER_FUELS) {
+    if (!builtGens.has(f.generator_prefab)) continue;
+    const mass = massByElement[String(f.element_id)] ?? 0;
+    if (mass <= 0) continue;
+    const cycles = consumption > 0 ? (mass * f.j_per_kg) / consumption : Infinity;
+    fuels.push({ name: f.name, cycles, mass });
+  }
+  fuels.sort((a, b) => b.cycles - a.cycles);
+
+  const totalCycles = fuels.reduce((s, r) => s + r.cycles, 0);
+
+  // Ratio bar: 10 chars, green from center for surplus
+  const ratio = consumption > 0 ? produced_wh / consumption : (produced_wh > 0 ? Infinity : 0);
+  let genLabel;
+  let redB = 0, greenB = 0;
+  const BAR = 10;
+  if (consumption === 0 && produced_wh === 0) {
+    genLabel = "—";
+  } else if (produced_wh === 0) {
+    redB = BAR;
+    genLabel = "no gen";
+  } else if (ratio >= 1) {
+    greenB = Math.min(BAR, Math.round((ratio - 1) * BAR));
+    genLabel = ratio >= 10 ? ">10×" : `${ratio.toFixed(1)}×`;
+  } else {
+    redB = Math.min(BAR, Math.round((1 - ratio) * BAR));
+    genLabel = `${Math.round(ratio * 100)}%`;
+  }
+  const redDim = BAR - redB;
+  const greenDim = BAR - greenB;
+  const mid = color ? `${ANSI.dim}│${ANSI.reset}` : "│";
+  const leftBar = color
+    ? `${ANSI.dim}${ANSI.red}${"░".repeat(redDim)}${ANSI.reset}${ANSI.red}${"█".repeat(redB)}${ANSI.reset}`
+    : `${"░".repeat(redDim)}${"█".repeat(redB)}`;
+  const rightBar = color
+    ? `${ANSI.green}${"█".repeat(greenB)}${ANSI.reset}${ANSI.dim}${ANSI.green}${"░".repeat(greenDim)}${ANSI.reset}`
+    : `${"█".repeat(greenB)}${"░".repeat(greenDim)}`;
+
+  const totalStr = totalCycles === Infinity ? "∞" : totalCycles.toFixed(1);
+  const header = paint("Power", ANSI.bold + ANSI.green, color);
+  const runwayStr = totalCycles > 999 ? ">999 d" : `${totalStr} d`;
+  const lines = [`${header}  ${leftBar}${mid}${rightBar}  ${genLabel}   Runway ${runwayStr}`];
+
+  for (const f of fuels) {
+    const s = f.cycles === Infinity ? "∞ d" : `${f.cycles.toFixed(1)} d`;
+    lines.push(`  ${lpad(s, 6)}  ${f.name}`);
+  }
+
+  return lines.join("\n");
+}
+
 /** Top elements by mass across loose piles + storage_contents. */
 export function renderStockpile(db, { color = false, limit = 8 } = {}) {
   const rows = db.prepare(`
@@ -323,6 +409,8 @@ export function render(db, opts = {}) {
     renderDupes(db, opts),
     "",
     renderOxygen(db, opts),
+    "",
+    renderPower(db, opts),
     "",
     renderGeysers(db, opts),
     "",

@@ -21,6 +21,7 @@ import { statusObject } from "../oni-vision-plugin/lib/queries.js";
 import { THRESHOLDS } from "./thresholds.js";
 import { oxygenStats } from "./oxygen.js";
 import { reportStats } from "./report.js";
+import { POWER_FUELS } from "./generators.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(HERE, "web");
@@ -342,10 +343,21 @@ function serveStatus(res, outputDir) {
     payload.stockpile_filters = readStockpileFilters(db);
     Object.assign(payload, serveLookups(db));
     payload.thresholds = THRESHOLDS;
+    payload.power_fuels = POWER_FUELS;
     payload.oxygen = oxygenStats(db);
     const rs = reportStats(db);
     payload.oxygen.report = rs.oxygen;
     payload.report = rs;
+
+    // Built power generators by prefab_id — used by the FE to decide which
+    // fuel types are relevant for the power runway breakdown.
+    payload.generators = db.prepare(
+      `SELECT b.prefab_id, COUNT(*) AS n
+       FROM behaviors beh
+       JOIN buildings b ON b.game_object_id = beh.game_object_id
+       WHERE beh.name = 'EnergyGenerator'
+       GROUP BY b.prefab_id`
+    ).all();
 
     res.writeHead(200, {
       "Content-Type": "application/json",

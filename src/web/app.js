@@ -20,6 +20,7 @@ let GEYSER_NAMES  = {};  // type_id (string)    → name
 let BAD_EFFECTS   = {};  // effect string        → { label, cls }
 let STRESS_DELTA  = {};  // dupe name → net stress %-pts last cycle (from ReportManager type 2)
 let DISTANCE      = {};  // dupe name → tiles walked last cycle (from ReportManager type 10)
+let POWER_FUELS   = [];  // populated from API — { element_id, name, j_per_kg, generator_prefab }
 
 /** Resolve a numeric element_id to a display name. */
 function elementName(id) {
@@ -312,13 +313,79 @@ function renderOxygen(oxygen) {
 </div>`);
 }
 
-function renderPower(report) {
+function renderPower(report, resources, generators) {
   if (!report?.power) { setHTML("power-card", `<div class="empty">no data</div>`); return; }
   const { produced_wh, consumed_wh } = report.power;
+
+  // Build a set of built generator prefabs so we only show fuels the colony
+  // can actually burn.
+  const builtGens = new Set((generators ?? []).map(g => g.prefab_id));
+
+  // Look up total mass per element_id from the resources payload.
+  const massByElement = {};
+  for (const r of resources) {
+    if (r.element_id != null) massByElement[String(Math.trunc(Number(r.element_id)))] = r.total_units ?? 0;
+  }
+
+  // Compute runway per fuel type (cycles = days in ONI).
+  const consumption = consumed_wh || 0;
+  const fuelRows = [];
+  for (const f of POWER_FUELS) {
+    if (!builtGens.has(f.generator_prefab)) continue;
+    const key = String(f.element_id);
+    const mass = massByElement[key] ?? 0;
+    if (mass <= 0) continue;
+    const energy = mass * f.j_per_kg; // joules available
+    const cycles = consumption > 0 ? energy / consumption : Infinity;
+    fuelRows.push({ name: f.name, cycles, mass });
+  }
+
+  // Sort by runway descending (largest fuel buffer first).
+  fuelRows.sort((a, b) => b.cycles - a.cycles);
+
+  const totalCycles = fuelRows.reduce((s, r) => s + r.cycles, 0);
+  const over10 = totalCycles > 10;
+  const whole = Math.min(10, Math.floor(totalCycles));
+  const frac  = over10 ? 0 : totalCycles - whole;
+  const BG_EMPTY = 'var(--bg-elev)';
+
+  // ── Runway bar (mirrors food) ─────────────────────────────────────────────
+  const segs = [];
+  for (let i = 0; i < 10; i++) {
+    if (i < whole) {
+      segs.push(`<div class="day-seg" style="background:var(--good)"></div>`);
+    } else if (i === whole && frac > 0) {
+      const pct = (frac * 100).toFixed(1);
+      segs.push(`<div class="day-seg" style="background:linear-gradient(to right,var(--good) ${pct}%,${BG_EMPTY} ${pct}%)"></div>`);
+    } else {
+      segs.push(`<div class="day-seg" style="background:${BG_EMPTY}"></div>`);
+    }
+  }
+  if (over10) segs.push(`<div class="day-seg-over">∞</div>`);
+  const daysLabel = totalCycles === Infinity ? "∞ days" : `${totalCycles.toFixed(1)} days`;
+  const runwayBlock = `<div style="display:inline-flex;flex-direction:column;gap:3px;flex-shrink:0">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <span class="gauge-sublabel">Runway</span>
+      <span class="food-days-label">${escapeHtml(daysLabel)}</span>
+    </div>
+    <div class="food-days-row">${segs.join('')}</div>
+  </div>`;
+
+  // ── Per-fuel chips ────────────────────────────────────────────────────────
+  const chips = fuelRows.map((r, i) => {
+    const color = RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
+    return `<div class="runway-chip">
+  <div class="runway-chip-name" style="color:${color}">${escapeHtml(r.name)}</div>
+  ${runwaySegs(r.cycles, color)}
+</div>`;
+  }).join('');
+
   setHTML("power-card", `
 <div>
-  <div class="o2-row">
-    ${donutWidget('Power', percentageDonut(produced_wh, consumed_wh))}
+  <div class="o2-row" style="align-items:center;flex-wrap:wrap">
+    ${donutWidget('Power Gen', percentageDonut(produced_wh, consumed_wh))}
+    ${runwayBlock}
+    <div class="food-chip-row" style="flex:1;margin-top:0;justify-content:flex-start">${chips}</div>
   </div>
 </div>`);
 }
@@ -508,6 +575,7 @@ async function refresh() {
     if (data.geyser_types) GEYSER_NAMES  = data.geyser_types;
     if (data.effects)      BAD_EFFECTS   = data.effects;
     if (data.thresholds)   T             = { ...T, ...data.thresholds };
+    if (data.power_fuels)  POWER_FUELS   = data.power_fuels;
     if (data.report) {
       STRESS_DELTA = data.report.stress_delta ?? {};
       DISTANCE     = data.report.distance     ?? {};
@@ -516,7 +584,7 @@ async function refresh() {
     renderCounts(data.counts || {});
     renderDupes(data.top_dupes || []);
     renderOxygen(data.oxygen || null);
-    renderPower(data.report || null);
+    renderPower(data.report || null, data.all_resources || [], data.generators || []);
     renderGeysers(data.geysers || []);
     renderFood(data.food || [], data.counts?.duplicants ?? 0, data.report?.food ?? null);
 
