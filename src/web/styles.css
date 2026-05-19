@@ -108,7 +108,6 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
 .badge.bad  { background: #ef4444; color: #fff; }
 .badge.warn { background: #f59e0b; color: #1a0e00; }
 .o2-row { display: flex; align-items: center; gap: 16px; }
-.gauge-title    { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--label); margin-bottom: 4px; }
 .gauge-sublabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--label); }
 .o2-value { font-family: var(--mono); font-size: 13px; color: var(--fg-dim); width: 52px; text-align: right; flex-shrink: 0; }
 .o2-breath-bar {

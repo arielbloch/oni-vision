@@ -152,7 +152,7 @@ function serveEvents(res) {
   });
   // Send an immediate parse event so a reconnecting tab fetches fresh data
   // without waiting for the next game save. Also serves as a connectivity ping.
-  res.write(`event: parse\ndata: {}\n\n`);
+  res.write(`: connected\n\n`);
 
   sseClients.add(res);
 

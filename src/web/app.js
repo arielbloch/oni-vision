@@ -15,16 +15,11 @@
 // source files (src/elements.js, src/food.js, etc.) during each parse.
 // Starting empty is fine — they're filled before the first render call.
 
-let ELEMENT_NAMES    = {};  // element_id (string) → name
-let GEYSER_NAMES     = {};  // type_id (string)    → name
-let BAD_EFFECTS      = {};  // effect string        → { label, cls }
-let FOOD             = {};  // prefab_id            → { name, kcal, morale }
-let SKILL_LABELS     = {};  // branch → label (kept for potential future use)
-let CHORE_GROUPS     = {};  // chore_group internal name → { label, domain, abbr, sort_order }
-                            // Populated from /api/status; source of truth is src/chore_groups.js.
-                            // docs/frontend-design.md documents the colour/abbr design exploration.
-let STRESS_DELTA     = {};  // dupe name → net stress %-pts last cycle (from ReportManager type 2)
-let DISTANCE         = {};  // dupe name → tiles walked last cycle (from ReportManager type 10)
+let ELEMENT_NAMES = {};  // element_id (string) → name
+let GEYSER_NAMES  = {};  // type_id (string)    → name
+let BAD_EFFECTS   = {};  // effect string        → { label, cls }
+let STRESS_DELTA  = {};  // dupe name → net stress %-pts last cycle (from ReportManager type 2)
+let DISTANCE      = {};  // dupe name → tiles walked last cycle (from ReportManager type 10)
 
 /** Resolve a numeric element_id to a display name. */
 function elementName(id) {
@@ -71,19 +66,6 @@ function fmtAge(seconds) {
   return `${Math.floor(s/86400)}d ago`;
 }
 
-function fmtKcal(kcal) {
-  if (kcal == null || !Number.isFinite(Number(kcal))) return "?";
-  const k = Number(kcal);
-  if (k >= 1_000_000) return `${(k / 1_000_000).toFixed(1)} Mkcal`;
-  if (k >= 1_000)     return `${(k / 1_000).toFixed(0)} kkcal`;
-  return `${k.toFixed(0)} kcal`;
-}
-
-function fmtDays(days) {
-  if (days == null || !Number.isFinite(days) || days <= 0) return "—";
-  if (days > 999) return ">999 d";
-  return `${days.toFixed(1)} d`;
-}
 
 function fmtMass(units) {
   if (units == null) return "?";
@@ -94,11 +76,6 @@ function fmtMass(units) {
   return `${u.toFixed(0)} kg`;
 }
 
-function bar(pct) {
-  const v = Math.max(0, Math.min(100, Number(pct) || 0));
-  const cls = v >= T.stress_bad ? "high" : v >= T.stress_warn ? "med" : "";
-  return `<div class="bar-track"><div class="bar-fill ${cls}" style="width: ${v}%"></div></div>`;
-}
 
 function fileBaseName(path) {
   if (!path) return "";
@@ -153,8 +130,7 @@ function simpleDonut(pct, col, S = 50) {
   const [x1, y1] = ptd(0);
   const [x2, y2] = ptd(span);
   const large = span > 180 ? 1 : 0;
-  const hasArc = span > 0.3;
-  const arc = hasArc
+  const arc = span > 0.3
     ? `<path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`
     : '';
   // Always draw the 12-o'clock marker dot so an empty (0%) donut isn't invisible.
@@ -180,10 +156,10 @@ function renderDupes(rows) {
     </div>
   </div>`;
 
-  const html = rows.map(r => {
+  const html = rows.map((r, i) => {
     const name = r.name ?? "(unnamed)";
-    const stressVal = r.stress == null ? 0 : Math.max(0, Math.min(100, r.stress));
-    const stressBar = `<div class="stress-wrap">${stressDeltaTri(name)}<div class="stress-track"><div class="stress-fill" style="width:${stressVal}%"></div></div></div>`;
+    const stressVal = stressVals[i];
+    const stressBar = `<div class="stress-wrap">${stressDeltaTri(name)}<div class="stress-track"><div class="stress-fill" style="width:${stressVal}%"></div></div><span class="stress-val">${Math.round(stressVal)}%</span></div>`;
     const moralePct = Math.min(100, Math.round((r.morale_cost ?? 0) / T.morale_bar_max * 100));
     const moraleBar = `<div class="bar-track"><div class="bar-fill" style="width:${moralePct}%;background:var(--good)"></div></div>`;
     const badges = (r.effects ?? [])
@@ -281,8 +257,6 @@ function onPickerChange() {
   renderResources(allElements);
 }
 
-// ── Renderers ─────────────────────────────────────────────────────────────────
-
 /**
  * Percentage donut gauge. 12 o'clock = zero, fills CW (surplus/green) or
  * CCW (deficit/red). A green dot always marks 12 o'clock so zero isn't empty.
@@ -327,13 +301,13 @@ function renderOxygen(oxygen) {
   if (!oxygen) { setHTML("oxygen-card", `<div class="empty">no data</div>`); return; }
   const { avg_breath_pct, report } = oxygen;
   const breathPct = Math.max(0, Math.min(100, avg_breath_pct ?? 100));
-  const badPct = (100 - breathPct).toFixed(1);
+  const badPct = 100 - breathPct;
 
   setHTML("oxygen-card", `
 <div>
   <div class="o2-row">
     ${donutWidget('O2 Production', percentageDonut(report?.produced_kg, report?.consumed_kg))}
-    ${donutWidget('Breathability', simpleDonut(parseFloat(badPct), '#ff2222'))}
+    ${donutWidget('Breathability', simpleDonut(badPct, '#ff2222'))}
   </div>
 </div>`);
 }
@@ -532,10 +506,7 @@ async function refresh() {
     // Populate lookup tables and thresholds from the DB-backed API response.
     if (data.elements)     ELEMENT_NAMES = data.elements;
     if (data.geyser_types) GEYSER_NAMES  = data.geyser_types;
-    if (data.foods)        FOOD          = data.foods;
     if (data.effects)      BAD_EFFECTS   = data.effects;
-    if (data.skills)       SKILL_LABELS  = data.skills;
-    if (data.chore_groups) CHORE_GROUPS  = data.chore_groups;
     if (data.thresholds)   T             = { ...T, ...data.thresholds };
     if (data.report) {
       STRESS_DELTA = data.report.stress_delta ?? {};
