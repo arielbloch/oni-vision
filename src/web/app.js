@@ -234,7 +234,8 @@ function segmentedPipsGauge(label, produced, consumed, fmtFn) {
   }
   const delta = valid ? produced - consumed : 0;
   const col   = pct >= -1 ? '#4ade80' : pct >= -15 ? '#fb923c' : '#ff2222';
-  const val   = `<div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${fmtFn(Math.abs(delta))}</div>`;
+  const sign  = delta < -0.001 ? '−' : '';
+  const val   = `<div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${sign}${fmtFn(Math.abs(delta))}</div>`;
   return _pipChipShell(label, _pipRow(pct), val);
 }
 
