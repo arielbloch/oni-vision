@@ -261,18 +261,45 @@ function breathabilityGauge(label, goodPct) {
   return _pipChipShell(label, pipsHtml, val);
 }
 
+/** Aggregated vitals row: all 5 pip gauges in one card. */
+function renderStatus(dupes, oxygen, report) {
+  const avgStress = (dupes ?? []).length > 0
+    ? Math.round(dupes.reduce((s, r) => s + Math.max(0, Math.min(100, r.stress ?? 0)), 0) / dupes.length)
+    : 0;
+  const stressCol = avgStress >= T.stress_bad ? '#ff2222' : avgStress >= T.stress_warn ? '#facc15' : '#4ade80';
+  const breathPct = Math.max(0, Math.min(100, oxygen?.avg_breath_pct ?? 100));
+
+  // Morale placeholder — real calculation (avg duplicant morale balance) wired up later.
+  const moraleGauge = segmentedPipsGauge('Morale', 90, 100, v => `${Math.round(v)}%`);
+
+  setHTML("status-card", `
+<div style="display:flex;gap:${cfg.chipgap}px;flex-wrap:nowrap;overflow:hidden;
+    -webkit-mask-image:linear-gradient(to right,black 70%,transparent 95%);
+    mask-image:linear-gradient(to right,black 70%,transparent 95%)">
+  ${breathabilityGauge('Breathability', breathPct)}
+  ${segmentedPipsGauge('O₂ Gen', oxygen?.report?.produced_kg, oxygen?.report?.consumed_kg, fmtMass)}
+  ${moraleGauge}
+  ${simplePipsGauge('Stress', avgStress, stressCol, avgStress + '%')}
+  ${segmentedPipsGauge('Food Gen', report?.food?.produced_kcal, report?.food?.consumed_kcal, fmtKcal)}
+  ${segmentedPipsGauge('Power Gen', report?.power?.produced_wh, report?.power?.consumed_wh, fmtWh)}
+</div>`);
+}
+
 function renderDupes(rows) {
   if (!rows || rows.length === 0) {
     setHTML("dupes-card", `<div class="empty">no duplicants in this save</div>`);
     return;
   }
-
-  const stressVals = rows.map(r => Math.max(0, Math.min(100, r.stress ?? 0)));
-  const avgStress  = stressVals.length ? Math.round(stressVals.reduce((s, v) => s + v, 0) / stressVals.length) : 0;
-  const stressCol  = avgStress >= T.stress_bad ? '#ff2222' : avgStress >= T.stress_warn ? '#facc15' : '#4ade80';
-  setHTML("dupes-card", `<div style="display:flex;align-items:center;gap:16px">
-    ${simplePipsGauge('Stress', avgStress, stressCol, avgStress + '%')}
-  </div>`);
+  const html = rows.map(r => {
+    const stress = Math.max(0, Math.min(100, r.stress ?? 0));
+    const col = stress >= T.stress_bad ? '#ff2222' : stress >= T.stress_warn ? '#facc15' : '#4ade80';
+    return `<tr>
+      <td style="font-size:12px">${escapeHtml(r.name)}</td>
+      <td style="font-size:11px;color:var(--fg-dim)">${escapeHtml(r.current_role ?? '')}</td>
+      <td class="metric" style="color:${col}">${stress.toFixed(0)}%</td>
+    </tr>`;
+  }).join('');
+  setHTML("dupes-card", `<table><tbody>${html}</tbody></table>`);
 }
 
 function renderGeysers(rows) {
@@ -391,21 +418,6 @@ function percentageDonut(produced, consumed, S = 50) {
 }
 ── end percentageDonut ──────────────────────────────────────────────────── */
 
-function renderOxygen(oxygen) {
-  if (!oxygen) { setHTML("oxygen-card", `<div class="empty">no data</div>`); return; }
-  const { avg_breath_pct, report } = oxygen;
-  const breathPct   = Math.max(0, Math.min(100, avg_breath_pct ?? 100));
-  const badPct      = 100 - breathPct;
-  const breathColor = badPct <= 1 ? '#38bdf8' : badPct <= 30 ? '#fb923c' : '#ff2222';
-
-  setHTML("oxygen-card", `
-<div class="gauge-row">
-  <div class="gauge-col1">
-    ${segmentedPipsGauge('O₂ Gen', report?.produced_kg, report?.consumed_kg, fmtMass)}
-    ${breathabilityGauge('Breathability', breathPct)}
-  </div>
-</div>`);
-}
 
 function renderPower(report, resources, generators) {
   if (!report?.power) { setHTML("power-card", `<div class="empty">no data</div>`); return; }
@@ -478,7 +490,6 @@ function renderPower(report, resources, generators) {
 
   setHTML("power-card", `
 <div class="gauge-row">
-  <div class="gauge-col1">${segmentedPipsGauge('Power Gen', produced_wh, consumed_wh, fmtWh)}</div>
   <div class="gauge-col2">${runwayBlock}</div>
   <div class="gauge-col3">${chips}</div>
 </div>`);
@@ -520,7 +531,7 @@ function runwaySegs(days, color) {
   return `<div style="display:flex;gap:${cfg.seggap}px;align-items:center">${parts.join('')}</div>`;
 }
 
-function renderFood(rows, dupeCount, foodReport) {
+function renderFood(rows, dupeCount) {
   const known = (rows ?? [])
     .filter(r => r.kcal != null)
     .sort((a, b) => b.morale - a.morale || (b.kcal * b.qty) - (a.kcal * a.qty));
@@ -570,10 +581,8 @@ function renderFood(rows, dupeCount, foodReport) {
 </div>`;
   }).join('');
 
-  // ── Generation donut + runway + chips all on one row ─────────────────────
   setHTML("food-card", `
 <div class="gauge-row">
-  <div class="gauge-col1">${segmentedPipsGauge('Food Gen', foodReport?.produced_kcal, foodReport?.consumed_kcal, fmtKcal)}</div>
   <div class="gauge-col2">${runwayBlock}</div>
   <div class="gauge-col3">${chips}</div>
 </div>`);
@@ -682,12 +691,11 @@ async function refresh() {
 
 function renderAll(data) {
   renderCounts(data.counts || {});
-  renderDupes(data.top_dupes || []);
-  renderOxygen(data.oxygen || null);
+  renderStatus(data.top_dupes || [], data.oxygen || null, data.report || null);
+  // renderDupes(data.top_dupes || []);  // commented out — dupes section hidden
+  renderFood(data.food || [], data.counts?.duplicants ?? 0);
   renderPower(data.report || null, data.all_resources || [], data.generators || []);
   renderGeysers(data.geysers || []);
-  renderFood(data.food || [], data.counts?.duplicants ?? 0, data.report?.food ?? null);
-
   renderResources(data.all_resources || []);
 }
 
