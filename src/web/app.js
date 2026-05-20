@@ -22,6 +22,42 @@ let STRESS_DELTA  = {};  // dupe name → net stress %-pts last cycle (from Repo
 let DISTANCE      = {};  // dupe name → tiles walked last cycle (from ReportManager type 10)
 let POWER_FUELS   = [];  // populated from API — { element_id, name, j_per_kg, generator_prefab }
 
+// ── Visual settings ───────────────────────────────────────────────────────────
+// Persisted to localStorage; sliders in the settings panel update these and
+// call renderAll() to redraw without re-fetching.
+
+const SETTINGS_LS = "oni-settings-v1";
+let cfg = {
+  fs:      18,         // chip title font size (px)
+  color:   "#fb923c",  // chip title color
+  pad:     5,          // chip padding (px)
+  seggap:  2,          // gap between pips / runway segments (px)
+  chipgap: 10,         // gap between chips in a row (px)
+  seg:     18,         // pip / runway segment size (px)
+  sfs:     18,         // section label font size (px)
+  sdist:   2,          // gap between section label and card (px)
+  cgap:    40,         // gap between gauge columns (px)
+  slc:     44,         // section label lightness (0–100 = black → white)
+  cpad:    6,          // card inner padding (px)
+};
+try {
+  const raw = localStorage.getItem(SETTINGS_LS);
+  if (raw) cfg = { ...cfg, ...JSON.parse(raw) };
+} catch { /**/ }
+
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_LS, JSON.stringify(cfg)); } catch { /**/ }
+  const root = document.documentElement;
+  root.style.setProperty("--seg-size", cfg.seg + "px");
+  root.style.setProperty("--sfs",      cfg.sfs  + "px");
+  root.style.setProperty("--sdist",    cfg.sdist + "px");
+  root.style.setProperty("--cgap",     cfg.cgap  + "px");
+  root.style.setProperty("--slc",      `hsl(0,0%,${cfg.slc}%)`);
+  root.style.setProperty("--cpad",     cfg.cpad + "px");
+}
+
+let _lastData = null;  // cached API response for instant settings re-render
+
 /** Resolve a numeric element_id to a display name. */
 function elementName(id) {
   if (id == null) return "?";
@@ -45,13 +81,14 @@ const POLL_MS = 10000;  // polling fallback (SSE is the primary push path)
 // response; from then on every refresh overwrites T with the server values,
 // keeping the FE always in sync with the canonical source.
 let T = {
-  stale_after_s:       600,
-  stress_warn:          30,
-  stress_bad:           60,
-  geyser_quality_good:  70,
-  geyser_quality_warn:  40,
-  morale_bar_max:       20,
-  priority_boost:        5,
+  stale_after_s:          600,
+  stress_warn:             30,
+  stress_bad:              60,
+  geyser_quality_good:     70,
+  geyser_quality_warn:     40,
+  morale_bar_max:          20,
+  priority_boost:           5,
+  kcal_per_dupe_per_cycle: 1000,
 };
 
 function $(id) { return document.getElementById(id); }
@@ -67,6 +104,14 @@ function fmtAge(seconds) {
   return `${Math.floor(s/86400)}d ago`;
 }
 
+
+function fmtKcal(kcal) {
+  if (kcal == null || !Number.isFinite(Number(kcal))) return "?";
+  const k = Number(kcal);
+  if (k >= 1_000_000) return `${(k / 1_000_000).toFixed(1)} Mkcal`;
+  if (k >= 1_000)     return `${(k / 1_000).toFixed(0)} kCal`;
+  return `${k.toFixed(0)} kcal`;
+}
 
 function fmtMass(units) {
   if (units == null) return "?";
@@ -105,15 +150,13 @@ function escapeHtml(s) {
 // ── Renderers ────────────────────────────────────────────────────────────────
 
 function renderCounts(c) {
-  const items = [
-    ["duplicants", c.duplicants],
-    ["critters",   c.critters],
-    ["geysers",    c.geysers],
-    ["buildings",  c.buildings],
+  const parts = [
+    [c.duplicants, "dupes"],
+    [c.critters,   "critters"],
+    [c.geysers,    "geysers"],
+    [c.buildings,  "buildings"],
   ];
-  setHTML("counts", items.map(([label, n]) =>
-    `<div class="count-card"><div class="n">${n ?? "—"}</div><div class="label">${label}</div></div>`
-  ).join(""));
+  setText("counts", parts.map(([n, label]) => `${n ?? "—"} ${label}`).join("  ·  "));
 }
 
 /** Grey triangle indicating stress trend. Brightness: 0%→50%grey, +50→white, -50→black. */
@@ -158,24 +201,24 @@ function simpleDonut(pct, col, S = 50) {
 // ── Segmented Pips Gauge ──────────────────────────────────────────────────────
 
 function _pipRow(pct, col) {
-  const color = col ?? (pct >= 15 ? '#4ade80' : pct >= 0 ? '#fb923c' : '#ff2222');
+  const color = col ?? (pct >= -1 ? '#4ade80' : pct >= -15 ? '#fb923c' : '#ff2222');
   const mag = Math.abs(pct) / 100;
   const lit = Math.max(1, Math.round(mag * 8));
   const pips = [];
   for (let i = 0; i < 8; i++) {
     if (i < lit) {
       const op = lit === 1 ? 0.9 : lit === 2 ? (i === 0 ? 0.55 : 0.9) : i === 0 ? 0.35 : i === 1 ? 0.6 : 1.0;
-      pips.push(`<div style="width:8px;height:26px;border-radius:4px;background:${color};opacity:${op};flex-shrink:0"></div>`);
+      pips.push(`<div style="width:8px;height:${cfg.seg}px;border-radius:4px;background:${color};opacity:${op};flex-shrink:0"></div>`);
     } else {
-      pips.push(`<div style="width:8px;height:26px;border-radius:4px;background:#1c1c30;flex-shrink:0"></div>`);
+      pips.push(`<div style="width:8px;height:${cfg.seg}px;border-radius:4px;background:#1c1c30;flex-shrink:0"></div>`);
     }
   }
-  return `<div style="display:flex;gap:3px">${pips.join('')}</div>`;
+  return `<div style="display:flex;gap:${cfg.seggap}px">${pips.join('')}</div>`;
 }
 
 function _pipChipShell(label, pipsHtml, valueHtml) {
-  return `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:5px 8px;flex-shrink:0">
-  <div style="font-size:11px;color:#fb923c;white-space:nowrap">${label}</div>
+  return `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;flex-shrink:0">
+  <div style="font-size:${cfg.fs}px;color:${cfg.color};white-space:nowrap">${label}</div>
   ${pipsHtml}
   ${valueHtml}
 </div>`;
@@ -190,9 +233,8 @@ function segmentedPipsGauge(label, produced, consumed, fmtFn) {
     pct = Math.max(-100, Math.min(100, ((produced - consumed) / scale) * 100));
   }
   const delta = valid ? produced - consumed : 0;
-  const col   = pct >= 15 ? '#4ade80' : pct >= 0 ? '#fb923c' : '#ff2222';
-  const sign  = delta >= 0 ? '+' : '−';
-  const val   = `<div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${sign}${fmtFn(Math.abs(delta))}</div>`;
+  const col   = pct >= -1 ? '#4ade80' : pct >= -15 ? '#fb923c' : '#ff2222';
+  const val   = `<div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${fmtFn(Math.abs(delta))}</div>`;
   return _pipChipShell(label, _pipRow(pct), val);
 }
 
@@ -202,49 +244,34 @@ function simplePipsGauge(label, pct, col, valLabel) {
   return _pipChipShell(label, _pipRow(Math.max(0, Math.min(100, pct)), col), val);
 }
 
+/** Breathability chip: green pips = breathable portion, red pips = bad portion. */
+function breathabilityGauge(label, goodPct) {
+  const pct = Math.max(0, Math.min(100, goodPct));
+  // Below 95% always show at least 1 red pip so the issue is visible.
+  const litGreen = pct >= 95 ? 8 : Math.min(7, Math.round(pct / 100 * 8));
+  const pips = [];
+  for (let i = 0; i < 8; i++) {
+    const color = i < litGreen ? '#4ade80' : '#ff2222';
+    pips.push(`<div style="width:8px;height:${cfg.seg}px;border-radius:4px;background:${color};flex-shrink:0"></div>`);
+  }
+  const pipsHtml = `<div style="display:flex;gap:${cfg.seggap}px">${pips.join('')}</div>`;
+  const col = pct >= 95 ? '#4ade80' : pct >= 70 ? '#fb923c' : '#ff2222';
+  const val = `<div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${pct.toFixed(1)}%</div>`;
+  return _pipChipShell(label, pipsHtml, val);
+}
+
 function renderDupes(rows) {
   if (!rows || rows.length === 0) {
     setHTML("dupes-card", `<div class="empty">no duplicants in this save</div>`);
     return;
   }
 
-  const stressVals  = rows.map(r => Math.max(0, Math.min(100, r.stress ?? 0)));
-  const avgStress   = stressVals.length ? Math.round(stressVals.reduce((s, v) => s + v, 0) / stressVals.length) : 0;
-  const stressCol   = avgStress >= T.stress_bad ? '#ff2222' : avgStress >= T.stress_warn ? '#facc15' : '#4ade80';
-  const moraleSummary = `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
-    <div style="display:flex;align-items:center;gap:16px">
-      ${simplePipsGauge('Stress', avgStress, stressCol, avgStress + '%')}
-    </div>
-  </div>`;
-
-  const html = rows.map((r, i) => {
-    const name = r.name ?? "(unnamed)";
-    const stressVal = stressVals[i];
-    const stressBar = `<div class="stress-wrap">${stressDeltaTri(name)}<div class="stress-track"><div class="stress-fill" style="width:${stressVal}%"></div></div><span class="stress-val">${Math.round(stressVal)}%</span></div>`;
-    const moralePct = Math.min(100, Math.round((r.morale_cost ?? 0) / T.morale_bar_max * 100));
-    const moraleBar = `<div class="bar-track"><div class="bar-fill" style="width:${moralePct}%;background:var(--good)"></div></div>`;
-    const badges = (r.effects ?? [])
-      .map(e => BAD_EFFECTS[e])
-      .filter(Boolean)
-      .map(e => `<span class="badge ${e.cls}">${escapeHtml(e.label)}</span>`)
-      .join("");
-    const commuteTiles = DISTANCE[name] ?? 0;
-    const commutePct = Math.min(100, (commuteTiles / 1000) * 100).toFixed(1);
-    const commuteBar = `<div class="commute-wrap"><div class="commute-track"><div class="commute-fill" style="width:${commutePct}%"></div></div></div>`;
-    return `<tr>
-      <td class="name">${escapeHtml(name)}${badges}</td>
-      <td class="bar">${stressBar}</td>
-      <td class="skills">${moraleBar}</td>
-      <td class="focus">${commuteBar}</td>
-    </tr>`;
-  }).join("");
-  const thead = `<thead><tr>
-    <th></th>
-    <th>Stress</th>
-    <th>Morale</th>
-    <th>Commute</th>
-  </tr></thead>`;
-  setHTML("dupes-card", `${moraleSummary}<table>${thead}<tbody>${html}</tbody></table>`);
+  const stressVals = rows.map(r => Math.max(0, Math.min(100, r.stress ?? 0)));
+  const avgStress  = stressVals.length ? Math.round(stressVals.reduce((s, v) => s + v, 0) / stressVals.length) : 0;
+  const stressCol  = avgStress >= T.stress_bad ? '#ff2222' : avgStress >= T.stress_warn ? '#facc15' : '#4ade80';
+  setHTML("dupes-card", `<div style="display:flex;align-items:center;gap:16px">
+    ${simplePipsGauge('Stress', avgStress, stressCol, avgStress + '%')}
+  </div>`);
 }
 
 function renderGeysers(rows) {
@@ -268,19 +295,15 @@ function renderGeysers(rows) {
   setHTML("geysers-card", `<table><tbody>${html}</tbody></table>`);
 }
 
-// ── Stockpile picker state ────────────────────────────────────────────────────
+// ── Stockpile state ───────────────────────────────────────────────────────────
 
-// Persist selected element IDs across reloads in localStorage.
-// null means "show top 8 by mass" (default before user configures anything).
-const LS_KEY = "oni-stockpile-v1";
-let stockpileSelection = null; // Set<string> | null
-try {
-  const raw = localStorage.getItem(LS_KEY);
-  if (raw) stockpileSelection = new Set(JSON.parse(raw));
-} catch { /**/ }
+let allElements     = [];  // all_resources from API (element-based)
+let pinnedResources = [];  // WorldInventory.pinnedResources with quantities
 
-let allElements = [];   // populated from latest API response
-let inGameFilters = null; // Set<string> | null — from TreeFilterable in the save
+/** Format an ONI internal PascalCase/underscore prefab name for display. */
+function formatPrefabName(name) {
+  return name.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+}
 
 function togglePicker() {
   const el = $("stockpile-picker");
@@ -291,30 +314,44 @@ function togglePicker() {
 
 function renderPicker() {
   const el = $("stockpile-picker");
-  if (!el || allElements.length === 0) return;
-  el.innerHTML = allElements.map(r => {
-    const id = String(Math.trunc(Number(r.element_id)));
-    const checked = stockpileSelection === null || stockpileSelection.has(id) ? "checked" : "";
-    const name = escapeHtml(elementName(r.element_id));
-    const mass = escapeHtml(fmtMass(r.total_units));
+  if (!el) return;
+
+  // Show the pinned list with checkboxes so the user can hide individual rows.
+  const LS_KEY = "oni-stockpile-hidden-v1";
+  let hidden;
+  try { hidden = new Set(JSON.parse(localStorage.getItem(LS_KEY) || "[]")); }
+  catch { hidden = new Set(); }
+
+  if (pinnedResources.length === 0 && allElements.length === 0) {
+    el.innerHTML = '<div class="empty">no data yet</div>';
+    return;
+  }
+
+  const rows = pinnedResources.length > 0 ? pinnedResources : allElements.slice(0, 20).map(r => ({
+    name: String(ELEMENT_NAMES[String(Math.trunc(Number(r.element_id)))] ?? r.element_id),
+    hash: r.element_id,
+    total_units: r.total_units,
+    is_element: true,
+  }));
+
+  el.innerHTML = rows.map(r => {
+    const key = String(r.hash);
+    const checked = !hidden.has(key) ? "checked" : "";
+    const displayName = r.is_element ? escapeHtml(elementName(r.hash)) : escapeHtml(formatPrefabName(r.name));
+    const qty = escapeHtml(r.is_element ? fmtMass(r.total_units) : `${Math.round(r.total_units)}`);
     return `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer">
-      <input type="checkbox" data-id="${escapeHtml(id)}" ${checked} onchange="onPickerChange()">
-      <span style="flex:1">${name}</span>
-      <span style="color:var(--fg-muted)">${mass}</span>
+      <input type="checkbox" data-key="${escapeHtml(key)}" ${checked} onchange="onPickerChange()">
+      <span style="flex:1">${displayName}</span>
+      <span style="color:var(--fg-muted)">${qty}</span>
     </label>`;
   }).join("");
 }
 
 function onPickerChange() {
+  const LS_KEY = "oni-stockpile-hidden-v1";
   const checkboxes = ($("stockpile-picker") ?? {}).querySelectorAll?.("input[type=checkbox]") ?? [];
-  if ([...checkboxes].every(cb => cb.checked)) {
-    // All checked → treat as "no filter" (same as default)
-    stockpileSelection = null;
-    localStorage.removeItem(LS_KEY);
-  } else {
-    stockpileSelection = new Set([...checkboxes].filter(cb => cb.checked).map(cb => cb.dataset.id));
-    try { localStorage.setItem(LS_KEY, JSON.stringify([...stockpileSelection])); } catch { /**/ }
-  }
+  const hidden = new Set([...checkboxes].filter(cb => !cb.checked).map(cb => cb.dataset.key));
+  try { localStorage.setItem(LS_KEY, JSON.stringify([...hidden])); } catch { /**/ }
   renderResources(allElements);
 }
 
@@ -330,7 +367,7 @@ function percentageDonut(produced, consumed, S = 50) {
     pct = Math.max(-100, Math.min(100, ((produced - consumed) / scale) * 100));
   }
   const isPos  = pct >= 0;
-  const color  = isPos ? '#4ade80' : '#ff2222';
+  const color  = isPos ? '#38bdf8' : '#ff2222';
   const span   = Math.abs(pct) / 100 * 320;
   function ptd(deg) {
     const a = deg * Math.PI / 180;
@@ -344,7 +381,7 @@ function percentageDonut(produced, consumed, S = 50) {
     return `<path d="M${x1},${y1} A${r},${r} 0 ${large},${cw ? 1 : 0} ${x2},${y2}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`;
   }
   const [dotX, dotY] = ptd(0);
-  const dot = isPos ? `<circle cx="${dotX}" cy="${dotY}" r="${sw / 2}" fill="#4ade80"/>` : '';
+  const dot = isPos ? `<circle cx="${dotX}" cy="${dotY}" r="${sw / 2}" fill="#38bdf8"/>` : '';
   return `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}" style="flex-shrink:0;display:block">
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1c1c30" stroke-width="${sw}"/>
     ${arcSeg(span, isPos, color)}
@@ -356,14 +393,15 @@ function percentageDonut(produced, consumed, S = 50) {
 function renderOxygen(oxygen) {
   if (!oxygen) { setHTML("oxygen-card", `<div class="empty">no data</div>`); return; }
   const { avg_breath_pct, report } = oxygen;
-  const breathPct = Math.max(0, Math.min(100, avg_breath_pct ?? 100));
-  const badPct = 100 - breathPct;
+  const breathPct   = Math.max(0, Math.min(100, avg_breath_pct ?? 100));
+  const badPct      = 100 - breathPct;
+  const breathColor = badPct <= 1 ? '#38bdf8' : badPct <= 30 ? '#fb923c' : '#ff2222';
 
   setHTML("oxygen-card", `
-<div>
-  <div class="o2-row">
-    ${segmentedPipsGauge('O₂ Production', report?.produced_kg, report?.consumed_kg, fmtMass)}
-    ${simplePipsGauge('Breathability', badPct, '#ff2222', badPct.toFixed(1) + '% bad')}
+<div class="gauge-row">
+  <div class="gauge-col1">
+    ${segmentedPipsGauge('O₂ Gen', report?.produced_kg, report?.consumed_kg, fmtMass)}
+    ${breathabilityGauge('Breathability', breathPct)}
   </div>
 </div>`);
 }
@@ -418,30 +456,30 @@ function renderPower(report, resources, generators) {
   }
   if (over10) segs.push(`<div class="day-seg-over">∞</div>`);
   const daysLabel = totalCycles === Infinity ? "∞ days" : `${totalCycles.toFixed(1)} days`;
-  const runwayBlock = `<div style="display:inline-flex;flex-direction:column;gap:3px;flex-shrink:0">
-    <div style="display:flex;justify-content:space-between;align-items:baseline">
-      <span class="gauge-sublabel">Runway</span>
-      <span class="food-days-label">${escapeHtml(daysLabel)}</span>
-    </div>
-    <div class="food-days-row">${segs.join('')}</div>
+  const runwayBlock = `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;flex-shrink:0">
+    <div style="font-size:${cfg.fs}px;color:${cfg.color};white-space:nowrap">Fuel Left</div>
+    <div style="display:flex;gap:${cfg.seggap}px;align-items:center">${segs.join('')}</div>
+    <div style="font-size:13px;font-weight:700;color:var(--good);white-space:nowrap">${escapeHtml(daysLabel)}</div>
   </div>`;
 
   // ── Per-fuel chips ────────────────────────────────────────────────────────
   const chips = fuelRows.map((r, i) => {
     const color = RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
-    return `<div class="runway-chip">
-  <div class="runway-chip-name" style="color:${color}">${escapeHtml(r.name)}</div>
+    const cval  = r.cycles === Infinity
+      ? `<div style="font-size:13px;font-weight:700;color:${color}">∞ d</div>`
+      : `<div style="font-size:13px;font-weight:700;color:${color};white-space:nowrap">${r.cycles.toFixed(1)} d</div>`;
+    return `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;flex-shrink:0">
+  <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(r.name)}</div>
   ${runwaySegs(r.cycles, color)}
+  ${cval}
 </div>`;
   }).join('');
 
   setHTML("power-card", `
-<div>
-  <div class="o2-row" style="align-items:center;flex-wrap:wrap">
-    ${segmentedPipsGauge('Power', produced_wh, consumed_wh, fmtWh)}
-    ${runwayBlock}
-    <div class="food-chip-row" style="flex:1;margin-top:0;justify-content:flex-start">${chips}</div>
-  </div>
+<div class="gauge-row">
+  <div class="gauge-col1">${segmentedPipsGauge('Power Gen', produced_wh, consumed_wh, fmtWh)}</div>
+  <div class="gauge-col2">${runwayBlock}</div>
+  <div class="gauge-col3">${chips}</div>
 </div>`);
 }
 
@@ -463,21 +501,22 @@ function runwaySegs(days, color) {
   const capped  = Math.min(days, RUNWAY_SEGS);
   const whole   = Math.floor(capped);
   const frac    = capped - whole;
+  const sz      = `width:${cfg.seg}px;height:${cfg.seg}px;border-radius:2px;flex-shrink:0`;
   const parts   = [];
   for (let i = 0; i < RUNWAY_SEGS; i++) {
     if (i < whole) {
-      parts.push(`<div class="runway-seg" style="background:${color}"></div>`);
+      parts.push(`<div style="${sz};background:${color}"></div>`);
     } else if (i === whole && frac > 0.04) {
       const pct = (frac * 100).toFixed(1);
-      parts.push(`<div class="runway-seg" style="background:linear-gradient(to right,${color} ${pct}%,${emptyBg} ${pct}%)"></div>`);
+      parts.push(`<div style="${sz};background:linear-gradient(to right,${color} ${pct}%,${emptyBg} ${pct}%)"></div>`);
     } else {
-      parts.push(`<div class="runway-seg" style="background:${emptyBg}"></div>`);
+      parts.push(`<div style="${sz};background:${emptyBg}"></div>`);
     }
   }
   if (days > RUNWAY_SEGS) {
-    parts.push(`<div class="runway-seg-over" style="color:${color}">∞</div>`);
+    parts.push(`<div style="height:${cfg.seg}px;font-size:${cfg.seg}px;font-weight:700;color:${color};line-height:1;padding:0 3px;display:flex;align-items:center;flex-shrink:0">∞</div>`);
   }
-  return `<div class="runway-segs">${parts.join('')}</div>`;
+  return `<div style="display:flex;gap:${cfg.seggap}px;align-items:center">${parts.join('')}</div>`;
 }
 
 function renderFood(rows, dupeCount, foodReport) {
@@ -512,69 +551,65 @@ function renderFood(rows, dupeCount, foodReport) {
   }
   if (over10) segs.push(`<div class="day-seg-over">∞</div>`);
   const daysLabel = `${totalDays.toFixed(1)} days`;
-  // Runway block: inline-flex column shrinks to segs width (178px) so the
-  // space-between title row puts "1.2 days" flush with the last rect's right edge.
-  const runwayBlock = `<div style="display:inline-flex;flex-direction:column;gap:3px;flex-shrink:0">
-    <div style="display:flex;justify-content:space-between;align-items:baseline">
-      <span class="gauge-sublabel">Runway</span>
-      <span class="food-days-label">${escapeHtml(daysLabel)}</span>
-    </div>
-    <div class="food-days-row">${segs.join('')}</div>
+  const runwayBlock = `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;flex-shrink:0">
+    <div style="font-size:${cfg.fs}px;color:${cfg.color};white-space:nowrap">Food Left</div>
+    <div style="display:flex;gap:${cfg.seggap}px;align-items:center">${segs.join('')}</div>
+    <div style="font-size:13px;font-weight:700;color:var(--good);white-space:nowrap">${escapeHtml(daysLabel)}</div>
   </div>`;
 
   // ── Per-food runway chips — same row as donut+runway, to the right of segs ──
   const chips = known.map((r, i) => {
     const days  = (r.qty * r.kcal) / T.kcal_per_dupe_per_cycle / n;
     const color = RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
-    return `<div class="runway-chip">
-  <div class="runway-chip-name" style="color:${color}">${escapeHtml(r.name ?? r.prefab_id)}</div>
+    const dval  = `<div style="font-size:13px;font-weight:700;color:${color};white-space:nowrap">${days.toFixed(1)} d</div>`;
+    return `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;flex-shrink:0">
+  <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(r.name ?? r.prefab_id)}</div>
   ${runwaySegs(days, color)}
+  ${dval}
 </div>`;
   }).join('');
 
   // ── Generation donut + runway + chips all on one row ─────────────────────
   setHTML("food-card", `
-<div>
-  <div class="o2-row" style="align-items:center;flex-wrap:wrap">
-    ${segmentedPipsGauge('Food Gen', foodReport?.produced_kcal, foodReport?.consumed_kcal, fmtKcal)}
-    ${runwayBlock}
-    <div class="food-chip-row" style="flex:1;margin-top:0;justify-content:flex-start">${chips}</div>
-  </div>
+<div class="gauge-row">
+  <div class="gauge-col1">${segmentedPipsGauge('Food Gen', foodReport?.produced_kcal, foodReport?.consumed_kcal, fmtKcal)}</div>
+  <div class="gauge-col2">${runwayBlock}</div>
+  <div class="gauge-col3">${chips}</div>
 </div>`);
 }
 
 function renderResources(rows) {
   allElements = rows ?? [];
 
-  // Priority: user-configured selection > in-game filter > top 8 by mass.
+  const LS_KEY = "oni-stockpile-hidden-v1";
+  let hidden;
+  try { hidden = new Set(JSON.parse(localStorage.getItem(LS_KEY) || "[]")); }
+  catch { hidden = new Set(); }
+
   let display;
-  if (stockpileSelection !== null && stockpileSelection.size > 0) {
-    // User has manually chosen specific elements via the picker.
-    display = allElements.filter(r => {
-      const id = String(Math.trunc(Number(r.element_id)));
-      return stockpileSelection.has(id);
-    });
-  } else if (inGameFilters !== null && inGameFilters.size > 0) {
-    // Default: mirror the in-game storage filter settings from the save.
-    display = allElements.filter(r => {
-      const id = String(Math.trunc(Number(r.element_id)));
-      return inGameFilters.has(id);
-    });
+  if (pinnedResources.length > 0) {
+    display = pinnedResources.filter(r => !hidden.has(String(r.hash)));
   } else {
-    // Last resort: top 8 elements by total mass.
-    display = allElements.slice(0, 8);
+    display = allElements.slice(0, 8).map(r => ({
+      name: String(ELEMENT_NAMES[String(Math.trunc(Number(r.element_id)))] ?? r.element_id),
+      hash: r.element_id,
+      total_units: r.total_units,
+      is_element: true,
+    }));
   }
 
   if (display.length === 0) {
     setHTML("resources-card", `<div class="empty">stockpile empty</div>`);
     return;
   }
-  const html = display.map(r =>
-    `<tr>
-      <td style="font-size:12px">${escapeHtml(elementName(r.element_id))}</td>
-      <td class="metric">${fmtMass(r.total_units)}</td>
-    </tr>`
-  ).join("");
+  const html = display.map(r => {
+    const name = r.is_element ? escapeHtml(elementName(r.hash)) : escapeHtml(formatPrefabName(r.name));
+    const qty  = r.is_element ? fmtMass(r.total_units) : `${Math.round(r.total_units ?? 0)}`;
+    return `<tr>
+      <td style="font-size:12px">${name}</td>
+      <td class="metric">${qty}</td>
+    </tr>`;
+  }).join("");
   setHTML("resources-card", `<table><tbody>${html}</tbody></table>`);
 }
 
@@ -631,28 +666,106 @@ async function refresh() {
     if (data.effects)      BAD_EFFECTS   = data.effects;
     if (data.thresholds)   T             = { ...T, ...data.thresholds };
     if (data.power_fuels)  POWER_FUELS   = data.power_fuels;
+    if (data.pinned_resources) pinnedResources = data.pinned_resources;
     if (data.report) {
       STRESS_DELTA = data.report.stress_delta ?? {};
       DISTANCE     = data.report.distance     ?? {};
     }
 
-    renderCounts(data.counts || {});
-    renderDupes(data.top_dupes || []);
-    renderOxygen(data.oxygen || null);
-    renderPower(data.report || null, data.all_resources || [], data.generators || []);
-    renderGeysers(data.geysers || []);
-    renderFood(data.food || [], data.counts?.duplicants ?? 0, data.report?.food ?? null);
-
-    // Update in-game filter defaults before rendering resources.
-    if (data.stockpile_filters && data.stockpile_filters.length > 0) {
-      inGameFilters = new Set(
-        data.stockpile_filters.map(h => String(Math.trunc(Number(h))))
-      );
-    }
-    renderResources(data.all_resources || []);
+    _lastData = data;
+    renderAll(data);
   } catch (err) {
     showError(`fetch failed: ${err.message}`);
   }
+}
+
+function renderAll(data) {
+  renderCounts(data.counts || {});
+  renderDupes(data.top_dupes || []);
+  renderOxygen(data.oxygen || null);
+  renderPower(data.report || null, data.all_resources || [], data.generators || []);
+  renderGeysers(data.geysers || []);
+  renderFood(data.food || [], data.counts?.duplicants ?? 0, data.report?.food ?? null);
+
+  renderResources(data.all_resources || []);
+}
+
+// ── Settings panel ────────────────────────────────────────────────────────────
+
+function toggleSettings() {
+  const el = $("settings-panel");
+  if (!el) return;
+  const open = el.hidden;
+  el.hidden = !open;
+  if (!el.hidden) renderSettingsPanel();
+}
+
+const SWATCHES = [
+  { hex: "#fb923c", label: "orange" },
+  { hex: "#ffffff", label: "white" },
+  { hex: "#e2e2ee", label: "near-white" },
+  { hex: "#67e8f9", label: "cyan" },
+  { hex: "#a78bfa", label: "lavender" },
+  { hex: "#7a7aa0", label: "muted" },
+];
+
+function renderSettingsPanel() {
+  const swatchHtml = SWATCHES.map(s =>
+    `<div onclick="onColorSwatch('${s.hex}')" title="${s.label}"
+      style="width:22px;height:22px;border-radius:3px;cursor:pointer;flex-shrink:0;
+             background:${s.hex};border:2px solid ${s.hex === cfg.color ? '#fff' : 'transparent'}"></div>`
+  ).join('');
+
+  function slider(id, label, min, max, step, key, unit = "px") {
+    return `<div class="settings-ctrl">
+      <label class="settings-label">${label} <span id="sp-${id}-val">${cfg[key]}${unit}</span></label>
+      <input type="range" min="${min}" max="${max}" step="${step}" value="${cfg[key]}"
+        oninput="onSetting('${key}',+this.value,'sp-${id}-val','${unit}')">
+    </div>`;
+  }
+
+  setHTML("settings-panel", `
+    <div class="settings-grid">
+      ${slider("fs",      "Title size",       8, 24, 1, "fs")}
+      ${slider("seg",     "Segment size",    10, 40, 1, "seg")}
+      ${slider("pad",     "Chip padding",     2, 16, 1, "pad")}
+      ${slider("seggap",  "Seg gap",          1, 10, 1, "seggap")}
+      ${slider("chipgap", "Chip gap",         2, 24, 1, "chipgap")}
+      ${slider("sfs",     "Section label",    8, 24, 1, "sfs")}
+      ${slider("sdist",   "Label distance",   2, 32, 1, "sdist")}
+      ${slider("cgap",    "Column gap",       4, 60, 1, "cgap")}
+      ${slider("slc",     "Section color",    0,100, 1, "slc", "%")}
+      ${slider("cpad",    "Card padding",     0, 24, 1, "cpad")}
+      <div class="settings-ctrl">
+        <label class="settings-label">Title color</label>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;align-items:center">
+          ${swatchHtml}
+          <input type="color" value="${cfg.color}" oninput="onColorPick(this.value)"
+            style="width:22px;height:22px;padding:1px;border:1px solid var(--border);border-radius:3px;background:none;cursor:pointer">
+        </div>
+      </div>
+    </div>`);
+}
+
+function onSetting(key, val, lblId, unit) {
+  cfg[key] = val;
+  const lbl = $(lblId);
+  if (lbl) lbl.textContent = val + unit;
+  saveSettings();
+  if (_lastData) renderAll(_lastData);
+}
+
+function onColorSwatch(hex) {
+  cfg.color = hex;
+  saveSettings();
+  if (_lastData) renderAll(_lastData);
+  renderSettingsPanel();
+}
+
+function onColorPick(hex) {
+  cfg.color = hex;
+  saveSettings();
+  if (_lastData) renderAll(_lastData);
 }
 
 // ── SSE — instant push when a new save lands ─────────────────────────────────
@@ -667,6 +780,7 @@ function connectSSE() {
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
+saveSettings();  // apply CSS vars from persisted cfg on load
 refresh();
 connectSSE();
 // Polling as a safety net: covers cases where the SSE connection drops and

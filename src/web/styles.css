@@ -7,7 +7,7 @@
   --fg-muted: #454560;
   --accent: #7f77dd;
   --hi: #facc15;
-  --good: #4ade80;
+  --good: #38bdf8;
   --warn: #facc15;
   --bad: #f87171;
   --border: #25254a;
@@ -33,7 +33,7 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 14px; line-height: 1.5;
 }
-body { padding: 16px; max-width: 1200px; margin: 0 auto; }
+body { padding: 16px; }
 h1 { font-size: 22px; margin: 0; font-weight: 600; }
 h2 { font-size: 13px; margin: 18px 0 8px; color: white; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .mono { font-family: var(--mono); }
@@ -53,7 +53,7 @@ header { padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bo
 }
 .count-card .n { font-family: var(--mono); font-size: 20px; font-weight: 600; color: var(--hi); }
 .count-card .label { font-size: 11px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.05em; }
-.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-top: 10px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: var(--cpad, 12px); margin-top: 10px; }
 table { width: 100%; border-collapse: collapse; font-family: var(--mono); }
 td { padding: 4px 6px; vertical-align: middle; }
 td.name { width: 22%; white-space: nowrap; }
@@ -124,16 +124,33 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
 }
 /* Food bars stack vertically; chips sit below right-aligned */
 .food-days-row { display: flex; gap: 2px; align-items: center; }
-.day-seg { width: 16px; height: 16px; border-radius: 2px; flex-shrink: 0; }
-.day-seg-over { flex-shrink: 0; padding: 0 3px; font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--good); line-height: 1; display: flex; align-items: center; }
+.day-seg { width: var(--seg-size, 20px); height: var(--seg-size, 20px); border-radius: 2px; flex-shrink: 0; }
+.day-seg-over { flex-shrink: 0; padding: 0 3px; font-family: var(--mono); font-size: var(--seg-size, 20px); height: var(--seg-size, 20px); font-weight: 700; color: var(--good); line-height: 1; display: flex; align-items: center; }
 .food-days-label { margin-left: 8px; font-size: 12px; color: var(--fg); font-family: var(--mono); }
 /* Runway gauge — per-food day-segment chips (below bars, right-aligned) */
-.food-chip-row { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; margin-top: 8px; }
+.food-chip-row { display: flex; flex-wrap: nowrap; gap: 5px; justify-content: flex-end; margin-top: 8px; }
 .runway-chip { display: flex; flex-direction: column; gap: 3px; background: #0a0a14; border: 1px solid var(--border); border-radius: 5px; padding: 5px 8px; }
 .runway-chip-name { font-size: 12px; white-space: nowrap; }
 .runway-segs { display: flex; gap: 2px; align-items: center; }
-.runway-seg { width: 16px; height: 16px; border-radius: 2px; flex-shrink: 0; }
+.runway-seg { width: 26px; height: 26px; border-radius: 2px; flex-shrink: 0; }
 .runway-seg-over { flex-shrink: 0; padding: 0 3px; font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--good); line-height: 1; display: flex; align-items: center; }
+.section { display: flex; flex-direction: row; align-items: stretch; gap: var(--sdist, 10px); margin-top: 8px; }
+.section-label {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-size: var(--sfs, 13px); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--slc, white); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: flex-end; padding: 2px 0;
+}
+.section > .card { margin-top: 0; flex: 1; }
+.gauge-row { display: flex; gap: var(--cgap, 12px); align-items: flex-start; }
+.gauge-col1 { width: var(--gcol1, 215px); flex-shrink: 0; display: flex; gap: 8px; align-items: flex-start; }
+.gauge-col2 { width: var(--gcol2, 255px); flex-shrink: 0; display: flex; gap: 8px; align-items: flex-start; }
+.gauge-col3 {
+  flex: 1; min-width: 0; display: flex; gap: 8px; align-items: flex-start;
+  overflow: hidden; flex-wrap: nowrap;
+  -webkit-mask-image: linear-gradient(to right, black 65%, transparent 95%);
+  mask-image: linear-gradient(to right, black 65%, transparent 95%);
+}
 :root { --logo: #fb923c; }
 @media (prefers-color-scheme: light) { :root { --logo: #854F0B; } }
 .app-header {
@@ -145,3 +162,20 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
   font-size: 17px; font-weight: 800; letter-spacing: 0.01em;
   color: var(--logo);
 }
+.settings-btn {
+  font-size: 15px; line-height: 1; padding: 2px 6px; cursor: pointer;
+  background: transparent; border: 1px solid var(--border); border-radius: 4px;
+  color: var(--fg-dim);
+}
+.settings-btn:hover { color: var(--fg); border-color: var(--fg-dim); }
+.settings-panel { margin-bottom: 10px; }
+.settings-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px;
+}
+.settings-ctrl { display: flex; flex-direction: column; gap: 4px; }
+.settings-label {
+  font-size: 11px; color: var(--fg-dim);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.settings-label span { color: var(--fg); font-weight: 600; font-family: var(--mono); }
+input[type=range] { width: 100%; accent-color: var(--good); }

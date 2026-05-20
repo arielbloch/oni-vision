@@ -26,45 +26,63 @@
 <header>
   <div class="row">
     <h1 id="base-name">…</h1>
-    <span class="cycle" id="cycle">cycle —</span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="cycle" id="cycle">cycle —</span>
+      <button onclick="toggleSettings()" class="settings-btn" aria-label="Settings">⚙</button>
+    </div>
   </div>
-  <div class="status-line">
-    <span class="dot cold" id="liveness-dot"></span>
-    <span id="liveness">connecting…</span>
-    <span style="color: var(--fg-muted);">·</span>
-    <span class="source" id="source-file"></span>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px">
+    <div class="status-line" style="margin-top:0">
+      <span class="dot cold" id="liveness-dot"></span>
+      <span id="liveness">connecting…</span>
+      <span style="color:var(--fg-muted)">·</span>
+      <span class="source" id="source-file"></span>
+    </div>
+    <div style="font-size:12px;color:var(--fg-dim);font-family:var(--mono)">
+      <span id="counts"></span>
+    </div>
   </div>
 </header>
 
 <main id="main">
   <div id="err-banner" class="err" hidden></div>
 
-  <div class="counts" id="counts"></div>
+  <div id="settings-panel" class="card settings-panel" hidden></div>
 
-  <h2>Dupes</h2>
-  <div class="card" id="dupes-card"><div class="empty">loading…</div></div>
+  <div class="section">
+    <div class="section-label">Dupes</div>
+    <div class="card" id="dupes-card"><div class="empty">loading…</div></div>
+  </div>
 
-  <h2>Oxygen</h2>
-  <div class="card" id="oxygen-card"><div class="empty">loading…</div></div>
+  <div class="section">
+    <div class="section-label">Oxygen</div>
+    <div class="card" id="oxygen-card"><div class="empty">loading…</div></div>
+  </div>
 
-  <h2>Power</h2>
-  <div class="card" id="power-card"><div class="empty">loading…</div></div>
+  <div class="section">
+    <div class="section-label">Food</div>
+    <div class="card" id="food-card"><div class="empty">loading…</div></div>
+  </div>
 
-  <h2>Food</h2>
-  <div class="card" id="food-card"><div class="empty">loading…</div></div>
+  <div class="section">
+    <div class="section-label">Power</div>
+    <div class="card" id="power-card"><div class="empty">loading…</div></div>
+  </div>
 
-  <div class="two-up">
-    <div>
-      <h2>Geysers</h2>
+  <div class="two-up" style="margin-top:8px">
+    <div class="section" style="margin-top:0">
+      <div class="section-label">Geysers</div>
       <div class="card" id="geysers-card"><div class="empty">loading…</div></div>
     </div>
-    <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px">
-        <h2 style="margin:0">Stockpile</h2>
-        <button id="stockpile-cfg-btn" onclick="togglePicker()" style="font-size:11px;padding:2px 8px;cursor:pointer;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--fg-dim)">configure</button>
+    <div class="section" style="margin-top:0;align-items:flex-start">
+      <div class="section-label">Stockpile</div>
+      <div class="card" style="margin-top:0;flex:1;min-width:0">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+          <button id="stockpile-cfg-btn" onclick="togglePicker()" style="font-size:11px;padding:2px 8px;cursor:pointer;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--fg-dim)">configure</button>
+        </div>
+        <div id="stockpile-picker" style="display:none;background:var(--bg-elev);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;font-size:12px;max-height:180px;overflow-y:auto"></div>
+        <div id="resources-card"><div class="empty">loading…</div></div>
       </div>
-      <div id="stockpile-picker" style="display:none;background:var(--bg-elev);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;font-size:12px;max-height:180px;overflow-y:auto"></div>
-      <div class="card" id="resources-card"><div class="empty">loading…</div></div>
     </div>
   </div>
 </main>
