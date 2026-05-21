@@ -364,6 +364,9 @@ function serveStatus(res, outputDir) {
   let db;
   try {
     db = new DatabaseSync(dbPath, { readOnly: true });
+    // If the pipeline is mid-COMMIT, SQLite throws SQLITE_BUSY immediately.
+    // Tell it to wait and retry automatically for up to 2 seconds.
+    db.exec("PRAGMA busy_timeout = 2000");
     const payload = statusObject(db, { dupeLimit: 50 });
 
     enrichDupes(db, payload.top_dupes);

@@ -91,7 +91,16 @@ export async function buildOutputs({ savePath, outputDir }) {
   const dbFinal = join(outputDir, "current.sqlite");
   await rmIfExists(dbTmp);
   writeDatabase(dbTmp, tables);
-  await rename(dbTmp, dbFinal);
+  try {
+    await rename(dbTmp, dbFinal);
+  } catch (renameErr) {
+    if (renameErr.code !== "ENOENT") throw renameErr;
+    // Tmp file disappeared between writeDatabase and rename (e.g. a concurrent
+    // rmIfExists from an overlapping run). Fall back to writing directly.
+    console.warn("[pipeline] sqlite tmp vanished before rename — writing directly");
+    await rmIfExists(dbTmp);
+    writeDatabase(dbFinal, tables);
+  }
 
   // JSON sidecar: only the parts that don't belong in tables.
   const sidecar = {
@@ -122,6 +131,7 @@ export async function buildOutputs({ savePath, outputDir }) {
   let renderDb = null;
   try {
     renderDb = new DatabaseSync(dbFinal, { readOnly: true });
+    renderDb.exec("PRAGMA busy_timeout = 2000");
     const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
     const width = process.stdout.columns ?? 80;
     console.log("\n" + render(renderDb, { color: useColor, width }) + "\n");
