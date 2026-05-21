@@ -198,23 +198,7 @@ function simpleDonut(pct, col, S = 50) {
 }
 ── end donut gauges ─────────────────────────────────────────────────────── */
 
-// ── Segmented Pips Gauge ──────────────────────────────────────────────────────
-
-function _pipRow(pct, col) {
-  const color = col ?? (pct >= -1 ? '#4ade80' : pct >= -15 ? '#fb923c' : '#ff2222');
-  const mag = Math.abs(pct) / 100;
-  const lit = Math.max(1, Math.round(mag * 8));
-  const pips = [];
-  for (let i = 0; i < 8; i++) {
-    if (i < lit) {
-      const op = lit === 1 ? 0.9 : lit === 2 ? (i === 0 ? 0.55 : 0.9) : i === 0 ? 0.35 : i === 1 ? 0.6 : 1.0;
-      pips.push(`<div style="width:8px;height:${cfg.seg}px;border-radius:4px;background:${color};opacity:${op};flex-shrink:0"></div>`);
-    } else {
-      pips.push(`<div style="width:8px;height:${cfg.seg}px;border-radius:4px;background:#1c1c30;flex-shrink:0"></div>`);
-    }
-  }
-  return `<div style="display:flex;gap:${cfg.seggap}px">${pips.join('')}</div>`;
-}
+// ── Gauge primitives ─────────────────────────────────────────────────────────
 
 function _pipChipShell(label, pipsHtml, valueHtml) {
   return `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;flex-shrink:0">
@@ -224,64 +208,72 @@ function _pipChipShell(label, pipsHtml, valueHtml) {
 </div>`;
 }
 
-/** Balance chip: green surplus, red deficit, actual delta value + unit. */
-function segmentedPipsGauge(label, produced, consumed, fmtFn) {
+function _pip(lit, col) {
+  return `<div style="width:8px;height:${cfg.seg}px;border-radius:4px;background:${lit ? col : '#1c1c30'};flex-shrink:0"></div>`;
+}
+
+/**
+ * Design 1 — Percent gauge (0–100%, higher = better).
+ * Pips fill left-to-right. Color: ≥80% green, ≥50% orange, <50% red.
+ * Pass displayLabel to override the text (e.g. Stress shows raw %, gauge
+ * receives inverted value so high stress = few lit pips = red).
+ */
+function percentGauge(label, pct, displayLabel) {
+  const p   = Math.max(0, Math.min(100, Number(pct) || 0));
+  const lit = Math.round(p / 100 * 8);
+  const col = p >= 80 ? '#4ade80' : p >= 50 ? '#fb923c' : '#ff2222';
+  const pips = Array.from({ length: 8 }, (_, i) => _pip(i < lit, col)).join('');
+  return _pipChipShell(label,
+    `<div style="display:flex;gap:${cfg.seggap}px">${pips}</div>`,
+    `<div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${displayLabel ?? `${p.toFixed(1)}%`}</div>`
+  );
+}
+
+/**
+ * Design 2 — Balance gauge (production vs consumption).
+ * 8 pips split at center: left 4 = deficit side, right 4 = surplus side.
+ * Lights from center outward. X (range) = max(produced, consumed) * xFactor.
+ * Color: green ≥0, orange ≥ −30%·X, red < −30%·X.
+ */
+function balanceGauge(label, produced, consumed, fmtFn, xFactor = 0.2) {
   const valid = produced != null && consumed != null;
-  let pct = 0;
-  if (valid) {
-    const scale = Math.max(produced, consumed, 1);
-    pct = Math.max(-100, Math.min(100, ((produced - consumed) / scale) * 100));
-  }
-  const delta = valid ? produced - consumed : 0;
-  const col   = pct >= -1 ? '#4ade80' : pct >= -15 ? '#fb923c' : '#ff2222';
-  const sign  = delta < -0.001 ? '−' : '';
-  const val   = `<div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${sign}${fmtFn(Math.abs(delta))}</div>`;
-  return _pipChipShell(label, _pipRow(pct), val);
+  const p     = Number(produced ?? 0);
+  const c     = Number(consumed ?? 0);
+  const X     = Math.max(p, c, 1) * xFactor;
+  const delta = valid ? p - c : 0;
+  const norm  = valid ? Math.max(-1, Math.min(1, delta / X)) : 0;
+  const col   = norm >= 0 ? '#4ade80' : norm >= -0.3 ? '#fb923c' : '#ff2222';
+  const lit   = Math.round(Math.abs(norm) * 4);
+
+  const leftPips  = Array.from({ length: 4 }, (_, i) => _pip(norm < 0 && i >= 4 - lit, col)).join('');
+  const rightPips = Array.from({ length: 4 }, (_, i) => _pip(norm >= 0 && i < lit, col)).join('');
+  const divider   = `<div style="width:2px;height:${Math.round(cfg.seg * 0.65)}px;background:#454560;border-radius:1px;flex-shrink:0"></div>`;
+  const pipsHtml  = `<div style="display:flex;gap:${cfg.seggap}px;align-items:center"><div style="display:flex;gap:${cfg.seggap}px">${leftPips}</div>${divider}<div style="display:flex;gap:${cfg.seggap}px">${rightPips}</div></div>`;
+
+  const sign = delta < -0.001 ? '−' : '';
+  return _pipChipShell(label, pipsHtml,
+    `<div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${sign}${fmtFn(Math.abs(delta))}</div>`
+  );
 }
 
-/** Simple chip: 0–100 percentage with explicit color (stress, breathability). */
-function simplePipsGauge(label, pct, col, valLabel) {
-  const val = `<div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${valLabel}</div>`;
-  return _pipChipShell(label, _pipRow(Math.max(0, Math.min(100, pct)), col), val);
-}
-
-/** Breathability chip: green pips = breathable portion, red pips = bad portion. */
-function breathabilityGauge(label, goodPct) {
-  const pct = Math.max(0, Math.min(100, goodPct));
-  // Below 95% always show at least 1 red pip so the issue is visible.
-  const litGreen = pct >= 95 ? 8 : Math.min(7, Math.round(pct / 100 * 8));
-  const pips = [];
-  for (let i = 0; i < 8; i++) {
-    const color = i < litGreen ? '#4ade80' : '#ff2222';
-    pips.push(`<div style="width:8px;height:${cfg.seg}px;border-radius:4px;background:${color};flex-shrink:0"></div>`);
-  }
-  const pipsHtml = `<div style="display:flex;gap:${cfg.seggap}px">${pips.join('')}</div>`;
-  const col = pct >= 95 ? '#4ade80' : pct >= 70 ? '#fb923c' : '#ff2222';
-  const val = `<div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${pct.toFixed(1)}%</div>`;
-  return _pipChipShell(label, pipsHtml, val);
-}
-
-/** Aggregated vitals row: all 5 pip gauges in one card. */
+/** Aggregated vitals row: all gauges in one card. */
 function renderStatus(dupes, oxygen, report) {
   const avgStress = (dupes ?? []).length > 0
     ? Math.round(dupes.reduce((s, r) => s + Math.max(0, Math.min(100, r.stress ?? 0)), 0) / dupes.length)
     : 0;
-  const stressCol = avgStress >= T.stress_bad ? '#ff2222' : avgStress >= T.stress_warn ? '#facc15' : '#4ade80';
   const breathPct = Math.max(0, Math.min(100, oxygen?.avg_breath_pct ?? 100));
-
-  // Morale placeholder — real calculation (avg duplicant morale balance) wired up later.
-  const moraleGauge = segmentedPipsGauge('Morale', 90, 100, v => `${Math.round(v)}%`);
 
   setHTML("status-card", `
 <div style="display:flex;gap:${cfg.chipgap}px;flex-wrap:nowrap;overflow:hidden;
-    -webkit-mask-image:linear-gradient(to right,black 70%,transparent 95%);
-    mask-image:linear-gradient(to right,black 70%,transparent 95%)">
-  ${breathabilityGauge('Breathability', breathPct)}
-  ${segmentedPipsGauge('O₂ Gen', oxygen?.report?.produced_kg, oxygen?.report?.consumed_kg, fmtMass)}
-  ${moraleGauge}
-  ${simplePipsGauge('Stress', avgStress, stressCol, avgStress + '%')}
-  ${segmentedPipsGauge('Food Gen', report?.food?.produced_kcal, report?.food?.consumed_kcal, fmtKcal)}
-  ${segmentedPipsGauge('Power Gen', report?.power?.produced_wh, report?.power?.consumed_wh, fmtWh)}
+    -webkit-mask-image:linear-gradient(to right,black 90%,transparent 96%);
+    mask-image:linear-gradient(to right,black 90%,transparent 96%)">
+  ${percentGauge('Breathability', breathPct)}
+  ${balanceGauge('Morale', 90, 100, v => `${Math.round(v)}%`)}
+  ${percentGauge('Stress', 100 - avgStress, avgStress + '%')}
+  <div style="flex-shrink:0;width:30px"></div>
+  ${balanceGauge('O₂ Gen', oxygen?.report?.produced_kg, oxygen?.report?.consumed_kg, fmtMass)}
+  ${balanceGauge('Food Gen', report?.food?.produced_kcal, report?.food?.consumed_kcal, fmtKcal)}
+  ${balanceGauge('Power Gen', report?.power?.produced_wh, report?.power?.consumed_wh, fmtWh)}
 </div>`);
 }
 
@@ -525,9 +517,8 @@ function runwaySegs(days, color) {
       parts.push(`<div style="${sz};background:${emptyBg}"></div>`);
     }
   }
-  if (days > RUNWAY_SEGS) {
-    parts.push(`<div style="height:${cfg.seg}px;font-size:${cfg.seg}px;font-weight:700;color:${color};line-height:1;padding:0 3px;display:flex;align-items:center;flex-shrink:0">∞</div>`);
-  }
+  // Always reserve space for ∞ so chip width is consistent regardless of days value
+  parts.push(`<div style="height:${cfg.seg}px;font-size:${cfg.seg}px;font-weight:700;color:${days > RUNWAY_SEGS ? color : 'transparent'};line-height:1;padding:0 3px;display:flex;align-items:center;flex-shrink:0">∞</div>`);
   return `<div style="display:flex;gap:${cfg.seggap}px;align-items:center">${parts.join('')}</div>`;
 }
 
@@ -782,9 +773,17 @@ function onColorPick(hex) {
 function connectSSE() {
   const es = new EventSource("/api/events");
   es.addEventListener("parse", () => refresh());
-  es.onerror = () => {
-    // EventSource auto-reconnects; nothing extra needed.
-  };
+  es.addEventListener("reload", (e) => {
+    const ts = String((JSON.parse(e.data || "{}")).ts ?? "");
+    const stored = sessionStorage.getItem("oni-server-ts");
+    sessionStorage.setItem("oni-server-ts", ts);
+    if (stored !== null && stored !== ts) {
+      window.location.reload();
+    } else {
+      refresh();
+    }
+  });
+  es.onerror = () => { /* EventSource auto-reconnects */ };
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────

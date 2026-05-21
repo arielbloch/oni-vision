@@ -18,7 +18,7 @@ export const FOOD_META = [
   { prefab_id: "MealLice",            name: "Meal Lice",             kcal:   600, morale: -1 },
   { prefab_id: "BasicForagePlant",    name: "Muckroot",              kcal:   800, morale: -1 },
   { prefab_id: "Mushroom",            name: "Raw Mushroom",          kcal:  2400, morale:  0 },
-  { prefab_id: "PrickleFruit",        name: "Bristle Berry",         kcal:  1600, morale:  0 },
+  { prefab_id: "PrickleFruit",        name: "Gristle Berry",         kcal:  1600, morale:  0 },
   { prefab_id: "SwampFruit",          name: "Bog Jelly",             kcal:  1840, morale:  0 },
   { prefab_id: "WormBasicFruit",      name: "Spindly Grubfruit",     kcal:   800, morale:  0 },
   { prefab_id: "WormSuperFruit",      name: "Grubfruit",             kcal:   250, morale:  1 },
@@ -29,7 +29,7 @@ export const FOOD_META = [
   { prefab_id: "PacuFillet",          name: "Pacu Fillet",           kcal:  1000, morale:  2 },
   // ── Cooked (grill / pot) ─────────────────────────────────────────────────
   { prefab_id: "FriedMushroom",       name: "Fried Mushroom",        kcal:  2800, morale:  1 },
-  { prefab_id: "GrilledPrickleFruit", name: "Gristle Berry",         kcal:  2000, morale:  1 },
+  { prefab_id: "GrilledPrickleFruit", name: "Bristle Berry",         kcal:  2000, morale:  1 },
   { prefab_id: "CookedEgg",           name: "Omelette",              kcal:  2800, morale:  2 },
   { prefab_id: "CookedMeat",          name: "Cooked Meat",           kcal:  2400, morale:  2 },
   { prefab_id: "CookedSeafood",       name: "Cooked Seafood",        kcal:  1600, morale:  3 },

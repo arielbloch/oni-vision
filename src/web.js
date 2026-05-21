@@ -28,6 +28,10 @@ const WEB_ROOT = join(HERE, "web");
 
 // ── SSE client registry ───────────────────────────────────────────────────────
 
+/** Timestamp of this server process start — sent with every SSE connect so
+ *  tabs can detect a restart and do a full page reload to pick up new code. */
+const SERVER_START_TS = Date.now();
+
 /** Set of active SSE response objects. */
 const sseClients = new Set();
 
@@ -151,9 +155,11 @@ function serveEvents(res) {
     // Allow the browser to reconnect after the daemon restarts.
     "Retry": "3000",
   });
-  // Fire a parse event immediately on connect so any tab that reconnects after
-  // a server restart picks up fresh data without waiting for the next game save.
-  res.write(`event: parse\ndata: {}\n\n`);
+  // Send a reload event with this server's start timestamp. The tab compares
+  // it against the last-seen timestamp stored in sessionStorage: if different,
+  // it does a full page reload (picks up new JS/CSS); if same, just refreshes
+  // data. This prevents reload loops while ensuring stale tabs update on restart.
+  res.write(`event: reload\ndata: ${JSON.stringify({ ts: SERVER_START_TS })}\n\n`);
 
   sseClients.add(res);
 
@@ -374,17 +380,28 @@ function serveStatus(res, outputDir) {
     // Food in storage sorted by morale DESC (best food first); includes name,
     // kcal, morale from the lookup so the FE can compute days without a
     // second JOIN against the FOOD map it holds in memory.
+    // Exclude items in cooking buildings (ingredients being processed, not ready to eat)
+    // and raw animal products that ONI doesn't count as available food stock.
+    const COOKING_BUILDINGS  = `'CookingStation','GasGrill','ElectricGrill','MicrobeMusher','GasRange','FoodProcessor'`;
+    const RAW_ANIMAL_ITEMS   = `'Meat','RawEgg','Mushroom'`;
     payload.food = db.prepare(
       `SELECT src.pid AS item_prefab_id, fm.name, fm.kcal, fm.morale, SUM(src.cnt) AS qty
        FROM (
-         SELECT item_prefab_id AS pid, COALESCE(SUM(units), 0) AS cnt
-         FROM storage_contents GROUP BY item_prefab_id
+         SELECT sc.item_prefab_id AS pid, COALESCE(SUM(sc.units), 0) AS cnt
+         FROM storage_contents sc
+         LEFT JOIN buildings b ON b.game_object_id = sc.owner_id
+         WHERE (b.prefab_id IS NULL OR b.prefab_id NOT IN (${COOKING_BUILDINGS}))
+           AND sc.item_prefab_id NOT IN (${RAW_ANIMAL_ITEMS})
+         GROUP BY sc.item_prefab_id
          UNION ALL
          SELECT prefab_id AS pid, COALESCE(SUM(units), 0) AS cnt
-         FROM world_objects GROUP BY prefab_id
+         FROM world_objects
+         WHERE prefab_id NOT IN (${RAW_ANIMAL_ITEMS})
+         GROUP BY prefab_id
        ) src
        JOIN foods fm ON fm.prefab_id = src.pid
        GROUP BY src.pid
+       HAVING qty > 0
        ORDER BY fm.morale DESC, (fm.kcal * SUM(src.cnt)) DESC
        LIMIT 30`
     ).all();

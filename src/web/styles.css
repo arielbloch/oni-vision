@@ -134,7 +134,7 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
 .runway-segs { display: flex; gap: 2px; align-items: center; }
 .runway-seg { width: 26px; height: 26px; border-radius: 2px; flex-shrink: 0; }
 .runway-seg-over { flex-shrink: 0; padding: 0 3px; font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--good); line-height: 1; display: flex; align-items: center; }
-.section { display: flex; flex-direction: row; align-items: stretch; gap: var(--sdist, 10px); margin-top: 8px; }
+.section { display: flex; flex-direction: row; align-items: flex-start; gap: var(--sdist, 10px); margin-top: 8px; }
 .section-label {
   writing-mode: vertical-rl; transform: rotate(180deg);
   font-size: var(--sfs, 13px); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
@@ -148,8 +148,8 @@ td.count { font-family: var(--mono); text-align: right; color: var(--fg-dim); }
 .gauge-col3 {
   flex: 1; min-width: 0; display: flex; gap: 8px; align-items: flex-start;
   overflow: hidden; flex-wrap: nowrap;
-  -webkit-mask-image: linear-gradient(to right, black 65%, transparent 95%);
-  mask-image: linear-gradient(to right, black 65%, transparent 95%);
+  -webkit-mask-image: linear-gradient(to right, black 90%, transparent 96%);
+  mask-image: linear-gradient(to right, black 90%, transparent 96%);
 }
 :root { --logo: #fb923c; }
 @media (prefers-color-scheme: light) { :root { --logo: #854F0B; } }
