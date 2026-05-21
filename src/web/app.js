@@ -39,6 +39,7 @@ let cfg = {
   cgap:    40,         // gap between gauge columns (px)
   slc:     44,         // section label lightness (0–100 = black → white)
   cpad:    6,          // card inner padding (px)
+  runSat:  90,         // runway gauge color saturation (0–100%)
 };
 try {
   const raw = localStorage.getItem(SETTINGS_LS);
@@ -268,8 +269,8 @@ function renderStatus(dupes, oxygen, report) {
     -webkit-mask-image:linear-gradient(to right,black 90%,transparent 96%);
     mask-image:linear-gradient(to right,black 90%,transparent 96%)">
   ${percentGauge('Breathability', breathPct)}
-  ${balanceGauge('Morale', 90, 100, v => `${Math.round(v)}%`)}
   ${percentGauge('Stress', 100 - avgStress, avgStress + '%')}
+  ${balanceGauge('Morale', 90, 100, v => `${Math.round(v)}%`)}
   <div style="flex-shrink:0;width:30px"></div>
   ${balanceGauge('O₂ Gen', oxygen?.report?.produced_kg, oxygen?.report?.consumed_kg, fmtMass)}
   ${balanceGauge('Food Gen', report?.food?.produced_kcal, report?.food?.consumed_kcal, fmtKcal)}
@@ -320,9 +321,32 @@ function renderGeysers(rows) {
 let allElements     = [];  // all_resources from API (element-based)
 let pinnedResources = [];  // WorldInventory.pinnedResources with quantities
 
-/** Format an ONI internal PascalCase/underscore prefab name for display. */
+// ONI internal prefab ID → in-game display name (for non-element pinned items).
+const PREFAB_DISPLAY_NAMES = {
+  // Seeds / plant materials
+  "BasicSingleHarvestPlantSeed": "Mealwood Seed",
+  "BasicFabricMaterialPlantSeed": "Thimble Reed Seed",
+  "BulbPlantSeed":     "Bulb Plant Seed",
+  "CactusPlantSeed":   "Wheezewort Seed",
+  "ColdWheatSeed":     "Sleet Wheat Grain",
+  "EvenFlowerSeed":    "Blossom Seed",
+  "ForestTreeSeed":    "Arbor Acorn",
+  "LeafyPlantSeed":    "Bristle Blossom Seed",
+  "MushroomSeed":      "Dusk Cap Spore",
+  "PrickleFlowerSeed": "Prickle Flower Seed",
+  "PrickleGrassSeed":  "Pincha Pepper Seed",
+  "SeaLettuceSeed":    "Waterweed Seed",
+  "SpiceVineSeed":     "Spice Vine Seed",
+  "SwampHarvestPlantSeed": "Thimble Reed Seed",
+  "WormPlantSeed":     "Grubfig Seed",
+  // Crafted / processed materials
+  "BasicFabric":       "Reed Fiber",
+  "EggShell":          "Eggshell",
+};
+
+/** Format an ONI internal prefab name for display, checking the lookup table first. */
 function formatPrefabName(name) {
-  return name.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+  return PREFAB_DISPLAY_NAMES[name] ?? name.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
 }
 
 function togglePicker() {
@@ -442,40 +466,41 @@ function renderPower(report, resources, generators) {
   fuelRows.sort((a, b) => b.cycles - a.cycles);
 
   const totalCycles = fuelRows.reduce((s, r) => s + r.cycles, 0);
-  const over10 = totalCycles > 10;
-  const whole = Math.min(10, Math.floor(totalCycles));
-  const frac  = over10 ? 0 : totalCycles - whole;
-  const BG_EMPTY = 'var(--bg-elev)';
+  const over10   = !isFinite(totalCycles) || totalCycles > 10;
+  const whole    = Math.min(10, isFinite(totalCycles) ? Math.floor(totalCycles) : 10);
+  const frac     = over10 ? 0 : totalCycles - whole;
+  const BG_EMPTY = '#1c1c30';
+  const runColor = runwayColor(totalCycles);
 
-  // ── Runway bar (mirrors food) ─────────────────────────────────────────────
+  // ── Runway bar ───────────────────────────────────────────────────────────
   const segs = [];
   for (let i = 0; i < 10; i++) {
     if (i < whole) {
-      segs.push(`<div class="day-seg" style="background:var(--good)"></div>`);
+      segs.push(`<div class="day-seg" style="background:${runColor}"></div>`);
     } else if (i === whole && frac > 0) {
       const pct = (frac * 100).toFixed(1);
-      segs.push(`<div class="day-seg" style="background:linear-gradient(to right,var(--good) ${pct}%,${BG_EMPTY} ${pct}%)"></div>`);
+      segs.push(`<div class="day-seg" style="background:linear-gradient(to right,${runColor} ${pct}%,${BG_EMPTY} ${pct}%)"></div>`);
     } else {
       segs.push(`<div class="day-seg" style="background:${BG_EMPTY}"></div>`);
     }
   }
-  if (over10) segs.push(`<div class="day-seg-over">∞</div>`);
-  const daysLabel = totalCycles === Infinity ? "∞ days" : `${totalCycles.toFixed(1)} days`;
+  segs.push(`<div class="day-seg-over" style="color:${over10 ? runColor : 'transparent'}">∞</div>`);
+  const daysLabel = !isFinite(totalCycles) ? "∞ days" : `${totalCycles.toFixed(1)} days`;
   const runwayBlock = `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;flex-shrink:0">
     <div style="font-size:${cfg.fs}px;color:${cfg.color};white-space:nowrap">Fuel Left</div>
     <div style="display:flex;gap:${cfg.seggap}px;align-items:center">${segs.join('')}</div>
-    <div style="font-size:13px;font-weight:700;color:var(--good);white-space:nowrap">${escapeHtml(daysLabel)}</div>
+    <div style="font-size:13px;font-weight:700;color:${runColor};white-space:nowrap">${escapeHtml(daysLabel)}</div>
   </div>`;
 
   // ── Per-fuel chips ────────────────────────────────────────────────────────
-  const chips = fuelRows.map((r, i) => {
-    const color = RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
-    const cval  = r.cycles === Infinity
+  const chips = fuelRows.map((r) => {
+    const color = runwayColor(r.cycles);
+    const cval  = !isFinite(r.cycles)
       ? `<div style="font-size:13px;font-weight:700;color:${color}">∞ d</div>`
       : `<div style="font-size:13px;font-weight:700;color:${color};white-space:nowrap">${r.cycles.toFixed(1)} d</div>`;
     return `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;flex-shrink:0">
   <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(r.name)}</div>
-  ${runwaySegs(r.cycles, color)}
+  ${runwaySegs(r.cycles)}
   ${cval}
 </div>`;
   }).join('');
@@ -489,19 +514,19 @@ function renderPower(report, resources, generators) {
 
 // ── Runway gauge ─────────────────────────────────────────────────────────────
 
-const RUNWAY_PALETTE = ['#fb923c','#4ade80','#22d3ee','#a78bfa','#f472b6','#facc15','#34d399','#818cf8','#f87171','#67e8f9'];
-const RUNWAY_SEGS    = 5;
+const RUNWAY_SEGS = 5;
 
-function darkTint(hex) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const f = 0.20;
-  return `rgb(${Math.round(r*f)},${Math.round(g*f)},${Math.round(b*f)})`;
+/** Threshold color for runway gauges. <1d=red, 1–3d=orange, ≥3d=green. */
+function runwayColor(days) {
+  const s = cfg.runSat ?? 90;
+  if (!isFinite(days) || days >= 3) return `hsl(120,${s}%,45%)`;
+  if (days >= 1) return `hsl(30,${s}%,55%)`;
+  return `hsl(0,${s}%,55%)`;
 }
 
-function runwaySegs(days, color) {
-  const emptyBg = darkTint(color);
+function runwaySegs(days) {
+  const color   = runwayColor(days);
+  const emptyBg = '#1c1c30';
   const capped  = Math.min(days, RUNWAY_SEGS);
   const whole   = Math.floor(capped);
   const frac    = capped - whole;
@@ -517,7 +542,6 @@ function runwaySegs(days, color) {
       parts.push(`<div style="${sz};background:${emptyBg}"></div>`);
     }
   }
-  // Always reserve space for ∞ so chip width is consistent regardless of days value
   parts.push(`<div style="height:${cfg.seg}px;font-size:${cfg.seg}px;font-weight:700;color:${days > RUNWAY_SEGS ? color : 'transparent'};line-height:1;padding:0 3px;display:flex;align-items:center;flex-shrink:0">∞</div>`);
   return `<div style="display:flex;gap:${cfg.seggap}px;align-items:center">${parts.join('')}</div>`;
 }
@@ -538,36 +562,37 @@ function renderFood(rows, dupeCount) {
   const over10    = totalDays > 10;
   const wholeDays = Math.min(10, Math.floor(totalDays));
   const frac      = over10 ? 0 : totalDays - wholeDays;
-  const BG_EMPTY  = 'var(--bg-elev)';
+  const BG_EMPTY  = '#1c1c30';
+  const runColor  = runwayColor(totalDays);
 
   // ── Runway days bar ───────────────────────────────────────────────────────
   const segs = [];
   for (let i = 0; i < 10; i++) {
     if (i < wholeDays) {
-      segs.push(`<div class="day-seg" style="background:var(--good)"></div>`);
+      segs.push(`<div class="day-seg" style="background:${runColor}"></div>`);
     } else if (i === wholeDays && frac > 0) {
       const pct = (frac * 100).toFixed(1);
-      segs.push(`<div class="day-seg" style="background:linear-gradient(to right,var(--good) ${pct}%,${BG_EMPTY} ${pct}%)"></div>`);
+      segs.push(`<div class="day-seg" style="background:linear-gradient(to right,${runColor} ${pct}%,${BG_EMPTY} ${pct}%)"></div>`);
     } else {
       segs.push(`<div class="day-seg" style="background:${BG_EMPTY}"></div>`);
     }
   }
-  if (over10) segs.push(`<div class="day-seg-over">∞</div>`);
+  segs.push(`<div class="day-seg-over" style="color:${over10 ? runColor : 'transparent'}">∞</div>`);
   const daysLabel = `${totalDays.toFixed(1)} days`;
   const runwayBlock = `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;flex-shrink:0">
     <div style="font-size:${cfg.fs}px;color:${cfg.color};white-space:nowrap">Food Left</div>
     <div style="display:flex;gap:${cfg.seggap}px;align-items:center">${segs.join('')}</div>
-    <div style="font-size:13px;font-weight:700;color:var(--good);white-space:nowrap">${escapeHtml(daysLabel)}</div>
+    <div style="font-size:13px;font-weight:700;color:${runColor};white-space:nowrap">${escapeHtml(daysLabel)}</div>
   </div>`;
 
-  // ── Per-food runway chips — same row as donut+runway, to the right of segs ──
-  const chips = known.map((r, i) => {
+  // ── Per-food runway chips ─────────────────────────────────────────────────
+  const chips = known.map((r) => {
     const days  = (r.qty * r.kcal) / T.kcal_per_dupe_per_cycle / n;
-    const color = RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
+    const color = runwayColor(days);
     const dval  = `<div style="font-size:13px;font-weight:700;color:${color};white-space:nowrap">${days.toFixed(1)} d</div>`;
     return `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;flex-shrink:0">
   <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(r.name ?? r.prefab_id)}</div>
-  ${runwaySegs(days, color)}
+  ${runwaySegs(days)}
   ${dval}
 </div>`;
   }).join('');
@@ -647,6 +672,14 @@ async function refresh() {
     if (!res.ok) { showError(`HTTP ${res.status}`); return; }
     const data = await res.json();
     clearError();
+
+    // Detect server restart: if server_ts changed, reload to pick up new JS/CSS.
+    if (data.server_ts != null) {
+      const ts = String(data.server_ts);
+      const stored = sessionStorage.getItem("oni-server-ts");
+      sessionStorage.setItem("oni-server-ts", ts);
+      if (stored !== null && stored !== ts) { window.location.reload(); return; }
+    }
 
     setText("base-name", data.base_name || "(unnamed colony)");
     setText("cycle", data.cycle != null ? `cycle ${data.cycle}` : "(unknown cycle)");
@@ -736,6 +769,7 @@ function renderSettingsPanel() {
       ${slider("cgap",    "Column gap",       4, 60, 1, "cgap")}
       ${slider("slc",     "Section color",    0,100, 1, "slc", "%")}
       ${slider("cpad",    "Card padding",     0, 24, 1, "cpad")}
+      ${slider("runSat",  "Runway saturation",0,100, 1, "runSat", "%")}
       <div class="settings-ctrl">
         <label class="settings-label">Title color</label>
         <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;align-items:center">

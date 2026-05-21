@@ -439,6 +439,8 @@ function serveStatus(res, outputDir) {
        GROUP BY b.prefab_id`
     ).all();
 
+    payload.server_ts = SERVER_START_TS;
+
     res.writeHead(200, {
       "Content-Type": "application/json",
       "Cache-Control": "no-cache",
