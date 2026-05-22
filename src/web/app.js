@@ -40,6 +40,7 @@ let cfg = {
   slc:     44,         // section label lightness (0–100 = black → white)
   cpad:    6,          // card inner padding (px)
   runSat:  90,         // runway gauge color saturation (0–100%)
+  chipPalette: 1,      // 1 = per-item chips use distinct palette colors, 0 = threshold
 };
 try {
   const raw = localStorage.getItem(SETTINGS_LS);
@@ -493,14 +494,14 @@ function renderPower(report, resources, generators) {
   </div>`;
 
   // ── Per-fuel chips ────────────────────────────────────────────────────────
-  const chips = fuelRows.map((r) => {
-    const color = runwayColor(r.cycles);
+  const chips = fuelRows.map((r, i) => {
+    const color = cfg.chipPalette ? RUNWAY_PALETTE[i % RUNWAY_PALETTE.length] : runwayColor(r.cycles);
     const cval  = !isFinite(r.cycles)
       ? `<div style="font-size:13px;font-weight:700;color:${color}">∞ d</div>`
       : `<div style="font-size:13px;font-weight:700;color:${color};white-space:nowrap">${r.cycles.toFixed(1)} d</div>`;
     return `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;flex-shrink:0">
   <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(r.name)}</div>
-  ${runwaySegs(r.cycles)}
+  ${runwaySegs(r.cycles, cfg.chipPalette ? color : undefined)}
   ${cval}
 </div>`;
   }).join('');
@@ -514,7 +515,8 @@ function renderPower(report, resources, generators) {
 
 // ── Runway gauge ─────────────────────────────────────────────────────────────
 
-const RUNWAY_SEGS = 5;
+const RUNWAY_PALETTE = ['#fb923c','#4ade80','#22d3ee','#a78bfa','#f472b6','#facc15','#34d399','#818cf8','#f87171','#67e8f9'];
+const RUNWAY_SEGS    = 5;
 
 /** Threshold color for runway gauges. ≤2d=red, 3–6d=orange, ≥7d=green. */
 function runwayColor(days) {
@@ -524,8 +526,9 @@ function runwayColor(days) {
   return `hsl(0,${s}%,55%)`;
 }
 
-function runwaySegs(days) {
-  const color   = runwayColor(days);
+/** overrideColor overrides threshold when supplied (used by per-item palette chips). */
+function runwaySegs(days, overrideColor) {
+  const color   = overrideColor ?? runwayColor(days);
   const emptyBg = '#1c1c30';
   const capped  = Math.min(days, RUNWAY_SEGS);
   const whole   = Math.floor(capped);
@@ -586,13 +589,13 @@ function renderFood(rows, dupeCount) {
   </div>`;
 
   // ── Per-food runway chips ─────────────────────────────────────────────────
-  const chips = known.map((r) => {
+  const chips = known.map((r, i) => {
     const days  = (r.qty * r.kcal) / T.kcal_per_dupe_per_cycle / n;
-    const color = runwayColor(days);
+    const color = cfg.chipPalette ? RUNWAY_PALETTE[i % RUNWAY_PALETTE.length] : runwayColor(days);
     const dval  = `<div style="font-size:13px;font-weight:700;color:${color};white-space:nowrap">${days.toFixed(1)} d</div>`;
     return `<div style="display:flex;flex-direction:column;gap:4px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;flex-shrink:0">
   <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(r.name ?? r.prefab_id)}</div>
-  ${runwaySegs(days)}
+  ${runwaySegs(days, cfg.chipPalette ? color : undefined)}
   ${dval}
 </div>`;
   }).join('');
@@ -771,6 +774,13 @@ function renderSettingsPanel() {
       ${slider("cpad",    "Card padding",     0, 24, 1, "cpad")}
       ${slider("runSat",  "Runway saturation",0,100, 1, "runSat", "%")}
       <div class="settings-ctrl">
+        <label class="settings-label">Chip colors
+          <input type="checkbox" ${cfg.chipPalette ? 'checked' : ''} onchange="onToggle('chipPalette',this.checked)"
+            style="margin-left:6px;accent-color:var(--good);cursor:pointer">
+          <span style="color:var(--fg);font-weight:600;font-family:var(--mono)">${cfg.chipPalette ? 'palette' : 'threshold'}</span>
+        </label>
+      </div>
+      <div class="settings-ctrl">
         <label class="settings-label">Title color</label>
         <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;align-items:center">
           ${swatchHtml}
@@ -787,6 +797,13 @@ function onSetting(key, val, lblId, unit) {
   if (lbl) lbl.textContent = val + unit;
   saveSettings();
   if (_lastData) renderAll(_lastData);
+}
+
+function onToggle(key, val) {
+  cfg[key] = val ? 1 : 0;
+  saveSettings();
+  if (_lastData) renderAll(_lastData);
+  renderSettingsPanel();
 }
 
 function onColorSwatch(hex) {
