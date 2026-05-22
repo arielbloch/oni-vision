@@ -516,11 +516,11 @@ function renderPower(report, resources, generators) {
 
 const RUNWAY_SEGS = 5;
 
-/** Threshold color for runway gauges. <1d=red, 1–3d=orange, ≥3d=green. */
+/** Threshold color for runway gauges. ≤2d=red, 3–6d=orange, ≥7d=green. */
 function runwayColor(days) {
   const s = cfg.runSat ?? 90;
-  if (!isFinite(days) || days >= 3) return `hsl(120,${s}%,45%)`;
-  if (days >= 1) return `hsl(30,${s}%,55%)`;
+  if (!isFinite(days) || days >= 7) return `hsl(120,${s}%,45%)`;
+  if (days >= 3) return `hsl(30,${s}%,55%)`;
   return `hsl(0,${s}%,55%)`;
 }
 
