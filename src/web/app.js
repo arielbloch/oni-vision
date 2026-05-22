@@ -40,6 +40,7 @@ let cfg = {
   slc:     44,         // section label lightness (0–100 = black → white)
   cpad:    6,          // card inner padding (px)
   runSat:  90,         // runway gauge color saturation (0–100%)
+  col1:    30,         // column-1 offset as % of card width (10–90)
   chipPalette: 1,      // 1 = per-item chips use distinct palette colors, 0 = threshold
 };
 try {
@@ -56,6 +57,7 @@ function saveSettings() {
   root.style.setProperty("--cgap",     cfg.cgap  + "px");
   root.style.setProperty("--slc",      `hsl(0,0%,${cfg.slc}%)`);
   root.style.setProperty("--cpad",     cfg.cpad + "px");
+  root.style.setProperty("--col1",     cfg.col1  + "%");
 }
 
 let _lastData = null;  // cached API response for instant settings re-render
@@ -200,6 +202,22 @@ function simpleDonut(pct, col, S = 50) {
 }
 ── end donut gauges ─────────────────────────────────────────────────────── */
 
+// ── Layout helper ────────────────────────────────────────────────────────────
+
+/**
+ * Two-section row. `before` fills up to --col1 % of the card width,
+ * then `after` starts at that offset and scrolls/fades to the right.
+ */
+function twoColRow(before, after) {
+  const gap = cfg.chipgap + "px";
+  return `<div style="display:flex;gap:${gap};align-items:flex-start">
+  <div style="min-width:var(--col1,30%);display:flex;gap:${gap};align-items:flex-start;flex-shrink:0">${before}</div>
+  <div style="display:flex;gap:${gap};align-items:flex-start;flex:1;overflow:hidden;
+    -webkit-mask-image:linear-gradient(to right,black 90%,transparent 96%);
+    mask-image:linear-gradient(to right,black 90%,transparent 96%)">${after}</div>
+</div>`;
+}
+
 // ── Gauge primitives ─────────────────────────────────────────────────────────
 
 function _pipChipShell(label, pipsHtml, valueHtml) {
@@ -269,18 +287,14 @@ function renderStatus(dupes, oxygen, report) {
     : 0;
   const breathPct = Math.max(0, Math.min(100, oxygen?.avg_breath_pct ?? 100));
 
-  setHTML("status-card", `
-<div style="display:flex;gap:${cfg.chipgap}px;flex-wrap:nowrap;overflow:hidden;
-    -webkit-mask-image:linear-gradient(to right,black 90%,transparent 96%);
-    mask-image:linear-gradient(to right,black 90%,transparent 96%)">
-  ${percentGauge('Breathability', breathPct)}
-  ${percentGauge('Stress', avgStress, avgStress + '%', false)}
-  ${balanceGauge('Morale', 90, 100, v => `${Math.round(v)}%`)}
-  <div style="flex-shrink:0;width:30px"></div>
-  ${balanceGauge('O₂ Gen', oxygen?.report?.produced_kg, oxygen?.report?.consumed_kg, fmtMass)}
-  ${balanceGauge('Food Gen', report?.food?.produced_kcal, report?.food?.consumed_kcal, fmtKcal)}
-  ${balanceGauge('Power Gen', report?.power?.produced_wh, report?.power?.consumed_wh, fmtWh)}
-</div>`);
+  setHTML("status-card", twoColRow(
+    `${percentGauge('Breathability', breathPct)}
+     ${percentGauge('Stress', avgStress, avgStress + '%', false)}
+     ${balanceGauge('Morale', 90, 100, v => `${Math.round(v)}%`)}`,
+    `${balanceGauge('O₂ Gen', oxygen?.report?.produced_kg, oxygen?.report?.consumed_kg, fmtMass)}
+     ${balanceGauge('Food Gen', report?.food?.produced_kcal, report?.food?.consumed_kcal, fmtKcal)}
+     ${balanceGauge('Power Gen', report?.power?.produced_wh, report?.power?.consumed_wh, fmtWh)}`
+  ));
 }
 
 function renderDupes(rows) {
@@ -510,11 +524,7 @@ function renderPower(report, resources, generators) {
 </div>`;
   }).join('');
 
-  setHTML("power-card", `
-<div class="gauge-row">
-  <div class="gauge-col1">${runwayBlock}</div>
-  <div class="gauge-col2">${chips}</div>
-</div>`);
+  setHTML("power-card", twoColRow(runwayBlock, chips));
 }
 
 // ── Runway gauge ─────────────────────────────────────────────────────────────
@@ -603,11 +613,7 @@ function renderFood(rows, dupeCount, foodReport) {
 </div>`;
   }).join('');
 
-  setHTML("food-card", `
-<div class="gauge-row">
-  <div class="gauge-col1">${runwayBlock}</div>
-  <div class="gauge-col2">${chips}</div>
-</div>`);
+  setHTML("food-card", twoColRow(runwayBlock, chips));
 }
 
 function renderResources(rows) {
@@ -776,6 +782,7 @@ function renderSettingsPanel() {
       ${slider("slc",     "Section color",    0,100, 1, "slc", "%")}
       ${slider("cpad",    "Card padding",     0, 24, 1, "cpad")}
       ${slider("runSat",  "Runway saturation",0,100, 1, "runSat", "%")}
+      ${slider("col1",    "Column 1 offset", 10, 90, 1, "col1",   "%")}
       <div class="settings-ctrl">
         <label class="settings-label">Chip colors
           <input type="checkbox" ${cfg.chipPalette ? 'checked' : ''} onchange="onToggle('chipPalette',this.checked)"
