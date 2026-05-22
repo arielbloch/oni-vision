@@ -512,8 +512,8 @@ function renderPower(report, resources, generators) {
 
   setHTML("power-card", `
 <div class="gauge-row">
-  <div class="gauge-col2">${runwayBlock}</div>
-  <div class="gauge-col3">${chips}</div>
+  <div class="gauge-col1">${runwayBlock}</div>
+  <div class="gauge-col2">${chips}</div>
 </div>`);
 }
 
@@ -605,8 +605,8 @@ function renderFood(rows, dupeCount, foodReport) {
 
   setHTML("food-card", `
 <div class="gauge-row">
-  <div class="gauge-col2">${runwayBlock}</div>
-  <div class="gauge-col3">${chips}</div>
+  <div class="gauge-col1">${runwayBlock}</div>
+  <div class="gauge-col2">${chips}</div>
 </div>`);
 }
 
