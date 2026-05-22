@@ -220,10 +220,14 @@ function _pip(lit, col) {
  * Pass displayLabel to override the text (e.g. Stress shows raw %, gauge
  * receives inverted value so high stress = few lit pips = red).
  */
-function percentGauge(label, pct, displayLabel) {
+// hiIsGood=true (default): high pct = green (breathability, morale).
+// hiIsGood=false: low pct = green (stress — fewer pips = healthier colony).
+function percentGauge(label, pct, displayLabel, hiIsGood = true) {
   const p   = Math.max(0, Math.min(100, Number(pct) || 0));
   const lit = Math.round(p / 100 * 8);
-  const col = p >= 80 ? '#4ade80' : p >= 50 ? '#fb923c' : '#ff2222';
+  const col = hiIsGood
+    ? (p >= 80 ? '#4ade80' : p >= 50 ? '#fb923c' : '#ff2222')
+    : (p <= T.stress_warn ? '#4ade80' : p <= T.stress_bad ? '#fb923c' : '#ff2222');
   const pips = Array.from({ length: 8 }, (_, i) => _pip(i < lit, col)).join('');
   return _pipChipShell(label,
     `<div style="display:flex;gap:${cfg.seggap}px">${pips}</div>`,
@@ -270,7 +274,7 @@ function renderStatus(dupes, oxygen, report) {
     -webkit-mask-image:linear-gradient(to right,black 90%,transparent 96%);
     mask-image:linear-gradient(to right,black 90%,transparent 96%)">
   ${percentGauge('Breathability', breathPct)}
-  ${percentGauge('Stress', 100 - avgStress, avgStress + '%')}
+  ${percentGauge('Stress', avgStress, avgStress + '%', false)}
   ${balanceGauge('Morale', 90, 100, v => `${Math.round(v)}%`)}
   <div style="flex-shrink:0;width:30px"></div>
   ${balanceGauge('O₂ Gen', oxygen?.report?.produced_kg, oxygen?.report?.consumed_kg, fmtMass)}
@@ -508,6 +512,7 @@ function renderPower(report, resources, generators) {
 
   setHTML("power-card", `
 <div class="gauge-row">
+  <div class="gauge-col1">${balanceGauge('Power Gen', produced_wh, consumed_wh, fmtWh)}</div>
   <div class="gauge-col2">${runwayBlock}</div>
   <div class="gauge-col3">${chips}</div>
 </div>`);
@@ -520,10 +525,9 @@ const RUNWAY_SEGS    = 5;
 
 /** Threshold color for runway gauges. ≤2d=red, 3–6d=orange, ≥7d=green. */
 function runwayColor(days) {
-  const s = cfg.runSat ?? 90;
-  if (!isFinite(days) || days >= 7) return `hsl(120,${s}%,45%)`;
-  if (days >= 3) return `hsl(30,${s}%,55%)`;
-  return `hsl(0,${s}%,55%)`;
+  if (!isFinite(days) || days >= 7) return '#4ade80';
+  if (days >= 3) return '#fb923c';
+  return '#ff2222';
 }
 
 /** overrideColor overrides threshold when supplied (used by per-item palette chips). */
@@ -549,7 +553,7 @@ function runwaySegs(days, overrideColor) {
   return `<div style="display:flex;gap:${cfg.seggap}px;align-items:center">${parts.join('')}</div>`;
 }
 
-function renderFood(rows, dupeCount) {
+function renderFood(rows, dupeCount, foodReport) {
   const known = (rows ?? [])
     .filter(r => r.kcal != null)
     .sort((a, b) => b.morale - a.morale || (b.kcal * b.qty) - (a.kcal * a.qty));
@@ -602,6 +606,7 @@ function renderFood(rows, dupeCount) {
 
   setHTML("food-card", `
 <div class="gauge-row">
+  <div class="gauge-col1">${balanceGauge('Food Gen', foodReport?.produced_kcal, foodReport?.consumed_kcal, fmtKcal)}</div>
   <div class="gauge-col2">${runwayBlock}</div>
   <div class="gauge-col3">${chips}</div>
 </div>`);
@@ -720,7 +725,7 @@ function renderAll(data) {
   renderCounts(data.counts || {});
   renderStatus(data.top_dupes || [], data.oxygen || null, data.report || null);
   // renderDupes(data.top_dupes || []);  // commented out — dupes section hidden
-  renderFood(data.food || [], data.counts?.duplicants ?? 0);
+  renderFood(data.food || [], data.counts?.duplicants ?? 0, data.report?.food ?? null);
   renderPower(data.report || null, data.all_resources || [], data.generators || []);
   renderGeysers(data.geysers || []);
   renderResources(data.all_resources || []);
