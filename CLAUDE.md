@@ -90,7 +90,7 @@ SELECT skill  FROM duplicant_skills WHERE duplicant_id = (SELECT game_object_id 
 
 ## Lookup tables
 
-Five static tables written once per parse let you resolve SimHash integers to human-readable names in any query:
+Seven static tables written once per parse let you resolve SimHash integers to human-readable names in any query:
 
 | Table | Key column | Name column | Use for |
 |-------|-----------|-------------|---------|
@@ -100,6 +100,9 @@ Five static tables written once per parse let you resolve SimHash integers to hu
 | `effects(effect, label, severity)` | `effect` (TEXT) | `label` | dupe status effects |
 | `skills(branch, label)` | `branch` (TEXT) | `label` | skill branches |
 | `chore_groups(hash, name, label, domain, abbr, sort_order)` | `name` (TEXT) | `label` | chore priorities |
+| `diseases(disease_id, name)` | `disease_id` (INTEGER) | `name` | disease SimHashes on `world_objects`, `storage_contents`, `buildings` |
+
+`duplicant_priorities(duplicant_id, chore_group, priority)` is a data table (not a lookup) — join it with `chore_groups` to see each dupe's task priorities, or filter `WHERE priority >= 5` to find boosted roles.
 
 **Example — elements by mass with human-readable names:**
 

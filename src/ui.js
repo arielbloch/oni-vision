@@ -15,7 +15,7 @@ import { THRESHOLDS } from "./thresholds.js";
 import { ANSI, paint, bar, pad, fit, lpad, formatMass, formatKcal, formatAge, stressColor } from "./format.js";
 import { oxygenStats } from "./oxygen.js";
 import { reportStats } from "./report.js";
-import { POWER_FUELS } from "./generators.js";
+import { GENERATOR_SPECS } from "./generators.js";
 
 /**
  * Pull the headline facts out of save_meta. Returns a plain object;
@@ -287,35 +287,54 @@ export function renderPower(db, { color = false } = {}) {
   const { produced_wh, consumed_wh } = rs.power;
   const consumption = consumed_wh || 0;
 
-  // Detect built generators
-  const builtGens = new Set(
-    db.prepare(`SELECT b.prefab_id FROM behaviors beh JOIN buildings b ON b.game_object_id = beh.game_object_id WHERE beh.name = 'EnergyGenerator'`).all().map(r => r.prefab_id)
-  );
+  // Discover generator+fuel pairs from storage, resolve element names via SQL.
+  const generatorFuels = db.prepare(`
+    SELECT b.prefab_id AS generator_prefab,
+           sc.element_id,
+           COALESCE(en.name, sc.item_prefab_id) AS fuel_name,
+           SUM(sc.units) AS stored_kg
+    FROM buildings b
+    JOIN behaviors beh ON beh.game_object_id = b.game_object_id
+                      AND beh.name = 'EnergyGenerator'
+    JOIN storage_contents sc ON sc.owner_id = b.game_object_id
+    LEFT JOIN elements en ON en.element_id = sc.element_id
+    WHERE sc.element_id IS NOT NULL
+    GROUP BY b.prefab_id, sc.element_id
+  `).all();
 
-  // Fuel mass by element_id
-  const massRows = db.prepare(`
+  // Total fuel mass per element (storage + loose) for runway calculation.
+  const massByElement = {};
+  for (const r of db.prepare(`
     SELECT element_id, SUM(units) AS total_units
     FROM (
       SELECT element_id, units FROM storage_contents WHERE element_id IS NOT NULL
       UNION ALL
-      SELECT element_id, units FROM world_objects WHERE element_id IS NOT NULL
+      SELECT element_id, units FROM world_objects   WHERE element_id IS NOT NULL
     )
     GROUP BY element_id
-  `).all();
-  const massByElement = {};
-  for (const r of massRows) {
+  `).all()) {
     if (r.element_id != null) massByElement[String(Math.trunc(Number(r.element_id)))] = r.total_units ?? 0;
   }
 
-  // Per-fuel runway
-  const fuels = [];
-  for (const f of POWER_FUELS) {
-    if (!builtGens.has(f.generator_prefab)) continue;
-    const mass = massByElement[String(f.element_id)] ?? 0;
+  // Per-fuel runway: join DB-discovered pairs with static j_per_kg specs.
+  // Multiple generator types burning the same element are summed.
+  const energyByElement = {};
+  const nameByElement   = {};
+  for (const gf of generatorFuels) {
+    const spec = GENERATOR_SPECS[gf.generator_prefab];
+    if (!spec) continue; // unknown generator type — add to GENERATOR_SPECS
+    const key  = String(Math.trunc(Number(gf.element_id)));
+    const mass = massByElement[key] ?? 0;
     if (mass <= 0) continue;
-    const cycles = consumption > 0 ? (mass * f.j_per_kg) / consumption : Infinity;
-    fuels.push({ name: f.name, cycles, mass });
+    energyByElement[key] = (energyByElement[key] ?? 0) + mass * spec.j_per_kg;
+    nameByElement[key]   = nameByElement[key] ?? gf.fuel_name;
   }
+
+  const fuels = Object.entries(energyByElement).map(([key, energy]) => ({
+    name:   nameByElement[key] ?? key,
+    cycles: consumption > 0 ? energy / consumption : Infinity,
+    mass:   massByElement[key] ?? 0,
+  }));
   fuels.sort((a, b) => b.cycles - a.cycles);
 
   const totalCycles = fuels.reduce((s, r) => s + r.cycles, 0);

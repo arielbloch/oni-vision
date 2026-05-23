@@ -34,6 +34,7 @@ Each module is a plain JS file that exports structured data. `pipeline.js` proje
 | `src/effects.js` | `effects(effect, label, severity)` | Status effect string → display label + severity tier |
 | `src/skills.js` | `skills(branch, label)` | Skill branch prefix → display name (mining → Miner) |
 | `src/chore_groups.js` | `chore_groups(hash, name, label, domain, abbr, sort_order)` | Chore-group SimHash → name, UI label, and FE display metadata (colour domain, abbreviation, column order) |
+| `src/diseases.js` | `diseases(disease_id, name)` | Disease SimHash integer → display name (Food Poisoning, Slimelung, …) |
 
 **Game rules that also live in `src/skills.js`:**
 - `moraleCostOf(skillsCsv)` — sums the tier digits of mastered skills; result stored as `duplicants.morale_cost` (computed once by the extractor, not re-derived client-side).
@@ -51,7 +52,8 @@ The extractor walks every `gameObjects` group in the save and lifts well-known b
 | Table | Source behaviors | Typical use |
 |-------|-----------------|------------|
 | `duplicants` | `MinionIdentity`, `MinionResume`, `MinionModifiers` | Stress, calories, stamina, morale_cost |
-| `duplicant_traits / skills / attributes / effects / amounts / priorities` | Linked by `duplicant_id` | Per-dupe detail |
+| `duplicant_traits / skills / attributes / effects / amounts` | Linked by `duplicant_id` | Per-dupe detail |
+| `duplicant_priorities` | `ChoreConsumer` / `Prioritizable` | Per-dupe per-chore-group priority (0–9); join with `chore_groups`; filter `priority >= 5` for boosted roles |
 | `buildings` | `BuildingComplete` + `PrimaryElement` | Placed structures (count, material, temperature) |
 | `world_objects` | `PrimaryElement` only (no BuildingComplete) | Loose debris, plants, dropped food |
 | `storage_contents` | `Storage.extraData` | Items inside containers; `owner_id` joins to `buildings` or `world_objects` |

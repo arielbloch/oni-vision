@@ -19,9 +19,10 @@ let ELEMENT_NAMES = {};  // element_id (string) → name
 let GEYSER_NAMES  = {};  // type_id (string)    → name
 let BAD_EFFECTS   = {};  // effect string        → { label, cls }
 let STRESS_DELTA  = {};  // dupe name → net stress %-pts last cycle (from ReportManager type 2)
-let DISTANCE      = {};  // dupe name → tiles walked last cycle (from ReportManager type 10)
 let GENERATOR_SPECS = {}; // populated from API — { [prefab_id]: { j_per_kg } }
 let GENERATOR_FUELS = []; // populated from API — [{ generator_prefab, element_id, fuel_prefab, stored_kg }]
+// Note: DISTANCE (tiles walked per dupe per cycle) is available in data.report.distance
+// but has no renderer yet; add one before wiring it up here.
 
 // ── Visual settings ───────────────────────────────────────────────────────────
 // Persisted to localStorage; sliders in the settings panel update these and
@@ -127,7 +128,7 @@ function fmtMass(units) {
   return `${u.toFixed(0)} kg`;
 }
 
-function fmtWh(wh) {
+function fmtW(wh) {
   const w = Number(wh);
   if (!Number.isFinite(w)) return "?";
   if (w >= 1_000_000) return `${(w/1_000_000).toFixed(1)} MW`;
@@ -173,35 +174,6 @@ function stressDeltaTri(name) {
   const dir = delta >= 0 ? '▲' : '▼';
   return `<span class="stress-delta-tri" style="color:rgb(${v},${v},${v})">${dir}</span>`;
 }
-
-/* ── Donut gauges — kept for potential future use ────────────────────────────
-function donutWidget(label, svgHtml) {
-  return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0">
-    <span class="gauge-sublabel">${label}</span>
-    ${svgHtml}
-  </div>`;
-}
-
-function simpleDonut(pct, col, S = 50) {
-  const cx = S / 2, cy = S / 2, r = S * 0.36, sw = S * 0.155;
-  const span = Math.min(319.9, pct / 100 * 320);
-  function ptd(deg) {
-    const a = deg * Math.PI / 180;
-    return [+(cx + r * Math.sin(a)).toFixed(2), +(cy - r * Math.cos(a)).toFixed(2)];
-  }
-  const [x1, y1] = ptd(0);
-  const [x2, y2] = ptd(span);
-  const large = span > 180 ? 1 : 0;
-  const arc = span > 0.3
-    ? `<path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`
-    : '';
-  const dot = `<circle cx="${x1}" cy="${y1}" r="${sw / 2}" fill="${col}"/>`;
-  return `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}" style="flex-shrink:0;display:block">
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1c1c30" stroke-width="${sw}"/>
-    ${arc}${dot}
-  </svg>`;
-}
-── end donut gauges ─────────────────────────────────────────────────────── */
 
 // ── Layout helper ────────────────────────────────────────────────────────────
 
@@ -287,14 +259,18 @@ function renderStatus(dupes, oxygen, report) {
     ? Math.round(dupes.reduce((s, r) => s + Math.max(0, Math.min(100, r.stress ?? 0)), 0) / dupes.length)
     : 0;
   const breathPct = Math.max(0, Math.min(100, oxygen?.avg_breath_pct ?? 100));
+  // morale_cost = total skill morale requirement; show as % of the threshold max.
+  const avgMoralePct = (dupes ?? []).length > 0
+    ? Math.round(dupes.reduce((s, r) => s + (r.morale_cost ?? 0), 0) / dupes.length / (T.morale_bar_max || 20) * 100)
+    : 0;
 
   setHTML("status-card", twoColRow(
     `${percentGauge('Breathability', breathPct)}
      ${percentGauge('Stress', avgStress, avgStress + '%', false)}
-     ${balanceGauge('Morale', 90, 100, v => `${Math.round(v)}%`)}`,
+     ${percentGauge('Morale req', avgMoralePct)}`,
     `${balanceGauge('O₂ Gen', oxygen?.report?.produced_kg, oxygen?.report?.consumed_kg, fmtMass)}
      ${balanceGauge('Food Gen', report?.food?.produced_kcal, report?.food?.consumed_kcal, fmtKcal)}
-     ${balanceGauge('Power Gen', report?.power?.produced_wh, report?.power?.consumed_wh, fmtWh)}`
+     ${balanceGauge('Power Gen', report?.power?.produced_wh, report?.power?.consumed_wh, fmtW)}`
   ));
 }
 
@@ -420,40 +396,6 @@ function onPickerChange() {
 }
 
 // ── Renderers ─────────────────────────────────────────────────────────────────
-
-/* ── percentageDonut — kept for potential future use ─────────────────────────
-function percentageDonut(produced, consumed, S = 50) {
-  const cx = S / 2, cy = S / 2, r = S * 0.36, sw = S * 0.155;
-  let pct = 0;
-  const valid = produced != null && consumed != null;
-  if (valid) {
-    const scale = Math.max(produced, consumed, 1);
-    pct = Math.max(-100, Math.min(100, ((produced - consumed) / scale) * 100));
-  }
-  const isPos  = pct >= 0;
-  const color  = isPos ? '#38bdf8' : '#ff2222';
-  const span   = Math.abs(pct) / 100 * 320;
-  function ptd(deg) {
-    const a = deg * Math.PI / 180;
-    return [+(cx + r * Math.sin(a)).toFixed(2), +(cy - r * Math.cos(a)).toFixed(2)];
-  }
-  function arcSeg(spanDeg, cw, col) {
-    if (spanDeg < 0.3) return '';
-    const [x1, y1] = ptd(0);
-    const [x2, y2] = ptd(cw ? spanDeg : -spanDeg);
-    const large = spanDeg > 180 ? 1 : 0;
-    return `<path d="M${x1},${y1} A${r},${r} 0 ${large},${cw ? 1 : 0} ${x2},${y2}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`;
-  }
-  const [dotX, dotY] = ptd(0);
-  const dot = isPos ? `<circle cx="${dotX}" cy="${dotY}" r="${sw / 2}" fill="#38bdf8"/>` : '';
-  return `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}" style="flex-shrink:0;display:block">
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1c1c30" stroke-width="${sw}"/>
-    ${arcSeg(span, isPos, color)}
-    ${dot}
-  </svg>`;
-}
-── end percentageDonut ──────────────────────────────────────────────────── */
-
 
 function renderPower(report, resources, generatorFuels, generatorSpecs) {
   if (!report?.power) { setHTML("power-card", `<div class="empty">no data</div>`); return; }
@@ -725,7 +667,6 @@ async function refresh() {
     if (data.pinned_resources) pinnedResources = data.pinned_resources;
     if (data.report) {
       STRESS_DELTA = data.report.stress_delta ?? {};
-      DISTANCE     = data.report.distance     ?? {};
     }
 
     _lastData = data;
@@ -738,7 +679,6 @@ async function refresh() {
 function renderAll(data) {
   renderCounts(data.counts || {});
   renderStatus(data.top_dupes || [], data.oxygen || null, data.report || null);
-  // renderDupes(data.top_dupes || []);  // commented out — dupes section hidden
   renderFood(data.food || [], data.counts?.duplicants ?? 0, data.report?.food ?? null);
   renderPower(data.report || null, data.all_resources || [], GENERATOR_FUELS, GENERATOR_SPECS);
   renderGeysers(data.geysers || []);

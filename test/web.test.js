@@ -235,18 +235,18 @@ describe("GET /api/status", () => {
 });
 
 describe("GET /api/events (SSE)", () => {
-  test("responds with text/event-stream and an initial comment", async () => {
+  test("responds with text/event-stream and an initial reload event", async () => {
     const ac = new AbortController();
     const res = await fetch(`${baseUrl}/api/events`, { signal: ac.signal });
 
     assert.equal(res.status, 200);
     assert.match(res.headers.get("content-type"), /text\/event-stream/);
 
-    // Read just enough to see the initial ": connected" comment.
+    // Read just enough to see the initial reload event sent on connect.
     const reader = res.body.getReader();
     const { value } = await reader.read();
     const text = new TextDecoder().decode(value);
-    assert.match(text, /: connected/);
+    assert.match(text, /event: reload/);
 
     ac.abort(); // close the stream
   });
@@ -270,7 +270,7 @@ describe("GET /api/events (SSE)", () => {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
 
-    // Drain the initial ": connected" comment.
+    // Drain the initial reload event sent on connect.
     await reader.read();
 
     // Trigger a push after the client is registered.

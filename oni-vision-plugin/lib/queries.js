@@ -83,7 +83,7 @@ function oneLine(v) {
 /** Stringify a cell value for TSV output, escaping format-breaking chars. */
 function escapeTsv(v) {
   if (v == null) return "";
-  const s = typeof v === "number" ? String(v) : String(v);
+  const s = String(v);
   if (s.indexOf("\\") < 0 && s.indexOf("\t") < 0 && s.indexOf("\n") < 0 && s.indexOf("\r") < 0) {
     return s; // fast path — the vast majority of cells are clean
   }

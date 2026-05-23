@@ -173,18 +173,17 @@ function serveEvents(res) {
  * keyed by dupe name (names are unique within a colony per ONI rules).
  */
 function enrichDupes(db, dupes) {
+  // morale_cost is a column on duplicants — fetch it alongside skills to avoid
+  // a second round-trip.
   const skillsByName = new Map();
+  const moraleCostByName = new Map();
   for (const row of db.prepare(
-    `SELECT d.name, GROUP_CONCAT(ds.skill, ',') AS skills
+    `SELECT d.name, d.morale_cost, GROUP_CONCAT(ds.skill, ',') AS skills
      FROM duplicants d
      LEFT JOIN duplicant_skills ds ON ds.duplicant_id = d.game_object_id
      GROUP BY d.game_object_id`
   ).all()) {
     skillsByName.set(row.name, row.skills ?? null);
-  }
-
-  const moraleCostByName = new Map();
-  for (const row of db.prepare(`SELECT name, morale_cost FROM duplicants`).all()) {
     moraleCostByName.set(row.name, row.morale_cost ?? 0);
   }
 

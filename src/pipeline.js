@@ -164,12 +164,6 @@ export async function safeBuildOutputs({ savePath, outputDir }) {
   }
 }
 
-function countRows(tables) {
-  let n = 0;
-  for (const rows of Object.values(tables)) n += rows.length;
-  return n;
-}
-
 function stripWorld(world) {
   // World data includes the entire tilemap (huge, binary). Drop it.
   if (!world) return null;

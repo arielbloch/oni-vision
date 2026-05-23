@@ -421,7 +421,7 @@ function normalize(value) {
   }
 }
 
-/** Format up to 6 fields of a bound row for an error message. */
+/** Format up to 12 fields of a bound row for an error message. */
 function diagnosticRowDump(bound, cols) {
   const preview = cols.slice(0, 12).map((c) => {
     const v = bound[c];
