@@ -21,7 +21,7 @@ import { statusObject } from "../oni-vision-plugin/lib/queries.js";
 import { THRESHOLDS } from "./thresholds.js";
 import { oxygenStats } from "./oxygen.js";
 import { reportStats } from "./report.js";
-import { POWER_FUELS } from "./generators.js";
+import { GENERATOR_SPECS } from "./generators.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(HERE, "web");
@@ -426,21 +426,41 @@ function serveStatus(res, outputDir) {
     payload.pinned_resources   = readPinnedResources(db);
     Object.assign(payload, serveLookups(db));
     payload.thresholds = THRESHOLDS;
-    payload.power_fuels = POWER_FUELS;
+    payload.generator_specs = GENERATOR_SPECS;
     payload.oxygen = oxygenStats(db);
     const rs = reportStats(db);
     payload.oxygen.report = rs.oxygen;
     payload.report = rs;
 
-    // Built power generators by prefab_id — used by the FE to decide which
-    // fuel types are relevant for the power runway breakdown.
-    payload.generators = db.prepare(
-      `SELECT b.prefab_id, COUNT(*) AS n
-       FROM behaviors beh
-       JOIN buildings b ON b.game_object_id = beh.game_object_id
-       WHERE beh.name = 'EnergyGenerator'
-       GROUP BY b.prefab_id`
+    // Discover active generator types and their current fuel elements directly
+    // from storage_contents.  Generators idle because the battery is full still
+    // have fuel in their internal storage, so they appear here.  The frontend
+    // joins this against generator_specs (j_per_kg) to compute runway.
+    const generatorFuels = db.prepare(
+      `SELECT b.prefab_id AS generator_prefab,
+              sc.element_id,
+              sc.item_prefab_id AS fuel_prefab,
+              SUM(sc.units)     AS stored_kg
+       FROM buildings b
+       JOIN behaviors beh ON beh.game_object_id = b.game_object_id
+                         AND beh.name = 'EnergyGenerator'
+       JOIN storage_contents sc ON sc.owner_id = b.game_object_id
+       WHERE sc.element_id IS NOT NULL
+       GROUP BY b.prefab_id, sc.element_id`
     ).all();
+
+    // Warn server-side for any generator type not covered by GENERATOR_SPECS
+    // so the operator knows to add a j_per_kg entry.
+    for (const gf of generatorFuels) {
+      if (!GENERATOR_SPECS[gf.generator_prefab]) {
+        console.warn(
+          `[power] Unknown generator "${gf.generator_prefab}" ` +
+          `(fuel element_id ${gf.element_id} / prefab "${gf.fuel_prefab}") — ` +
+          `add it to src/generators.js`
+        );
+      }
+    }
+    payload.generator_fuels = generatorFuels;
 
     payload.server_ts = SERVER_START_TS;
 

@@ -20,7 +20,8 @@ let GEYSER_NAMES  = {};  // type_id (string)    → name
 let BAD_EFFECTS   = {};  // effect string        → { label, cls }
 let STRESS_DELTA  = {};  // dupe name → net stress %-pts last cycle (from ReportManager type 2)
 let DISTANCE      = {};  // dupe name → tiles walked last cycle (from ReportManager type 10)
-let POWER_FUELS   = [];  // populated from API — { element_id, name, j_per_kg, generator_prefab }
+let GENERATOR_SPECS = {}; // populated from API — { [prefab_id]: { j_per_kg } }
+let GENERATOR_FUELS = []; // populated from API — [{ generator_prefab, element_id, fuel_prefab, stored_kg }]
 
 // ── Visual settings ───────────────────────────────────────────────────────────
 // Persisted to localStorage; sliders in the settings panel update these and
@@ -454,32 +455,40 @@ function percentageDonut(produced, consumed, S = 50) {
 ── end percentageDonut ──────────────────────────────────────────────────── */
 
 
-function renderPower(report, resources, generators) {
+function renderPower(report, resources, generatorFuels, generatorSpecs) {
   if (!report?.power) { setHTML("power-card", `<div class="empty">no data</div>`); return; }
   const { produced_wh, consumed_wh } = report.power;
 
-  // Build a set of built generator prefabs so we only show fuels the colony
-  // can actually burn.
-  const builtGens = new Set((generators ?? []).map(g => g.prefab_id));
-
-  // Look up total mass per element_id from the resources payload.
+  // Look up total mass per element_id from the resources payload (storage + loose).
   const massByElement = {};
   for (const r of resources) {
     if (r.element_id != null) massByElement[String(Math.trunc(Number(r.element_id)))] = r.total_units ?? 0;
   }
 
-  // Compute runway per fuel type (cycles = days in ONI).
+  // Compute runway per fuel type.
+  // generatorFuels rows come from the DB: { generator_prefab, element_id, fuel_prefab, stored_kg }
+  // generatorSpecs provides j_per_kg per prefab.
+  // Multiple generator types may burn the same element_id — sum them across prefabs.
   const consumption = consumed_wh || 0;
-  const fuelRows = [];
-  for (const f of POWER_FUELS) {
-    if (!builtGens.has(f.generator_prefab)) continue;
-    const key = String(f.element_id);
+  const energyByElement = {}; // element_id key → accumulated joules
+  const labelByElement  = {}; // element_id key → display name
+  for (const gf of (generatorFuels ?? [])) {
+    const spec = (generatorSpecs ?? {})[gf.generator_prefab];
+    if (!spec) continue; // unknown generator — server already warned
+    const key  = String(Math.trunc(Number(gf.element_id)));
     const mass = massByElement[key] ?? 0;
     if (mass <= 0) continue;
-    const energy = mass * f.j_per_kg; // joules available
-    const cycles = consumption > 0 ? energy / consumption : Infinity;
-    fuelRows.push({ name: f.name, cycles, mass });
+    energyByElement[key] = (energyByElement[key] ?? 0) + mass * spec.j_per_kg;
+    labelByElement[key]  = labelByElement[key] ?? (gf.fuel_prefab ?? key);
   }
+
+  const fuelRows = Object.entries(energyByElement).map(([key, energy]) => {
+    const cycles = consumption > 0 ? energy / consumption : Infinity;
+    const mass   = massByElement[key] ?? 0;
+    // Prefer element name from lookup table; fall back to fuel_prefab from DB.
+    const name   = ELEMENT_NAMES[key] ?? labelByElement[key] ?? key;
+    return { name, cycles, mass };
+  });
 
   // Sort by runway descending (largest fuel buffer first).
   fuelRows.sort((a, b) => b.cycles - a.cycles);
@@ -711,7 +720,8 @@ async function refresh() {
     if (data.geyser_types) GEYSER_NAMES  = data.geyser_types;
     if (data.effects)      BAD_EFFECTS   = data.effects;
     if (data.thresholds)   T             = { ...T, ...data.thresholds };
-    if (data.power_fuels)  POWER_FUELS   = data.power_fuels;
+    if (data.generator_specs)  GENERATOR_SPECS = data.generator_specs;
+    if (data.generator_fuels)  GENERATOR_FUELS = data.generator_fuels;
     if (data.pinned_resources) pinnedResources = data.pinned_resources;
     if (data.report) {
       STRESS_DELTA = data.report.stress_delta ?? {};
@@ -730,7 +740,7 @@ function renderAll(data) {
   renderStatus(data.top_dupes || [], data.oxygen || null, data.report || null);
   // renderDupes(data.top_dupes || []);  // commented out — dupes section hidden
   renderFood(data.food || [], data.counts?.duplicants ?? 0, data.report?.food ?? null);
-  renderPower(data.report || null, data.all_resources || [], data.generators || []);
+  renderPower(data.report || null, data.all_resources || [], GENERATOR_FUELS, GENERATOR_SPECS);
   renderGeysers(data.geysers || []);
   renderResources(data.all_resources || []);
 }
