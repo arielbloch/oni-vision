@@ -11,3 +11,5 @@ output/
 # Real ONI saves used for local testing — large binaries, not source.
 save/
 *.sav
+
+.claude
