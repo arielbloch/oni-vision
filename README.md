@@ -2,19 +2,17 @@
 
 ![oni-vision dashboard](images/oni-vision-dashboard.png)
 
-A small Node.js daemon that watches your **Oxygen Not Included** save folder, parses the latest `.sav` file, and writes a SQLite database (plus a JSON sidecar) that Claude — or any tool that speaks SQL — can query token-efficiently.
-
-A 4 MB ONI save expands to 30–80 MB of JSON. Reading that into Claude's context is wasteful; a focused SQL query against the same data is ~200 tokens. That's what this tool exists to do.
+A small Node.js daemon that watches your **Oxygen Not Included** save folder, parses the latest `.sav` file, and writes a SQLite database (plus a JSON sidecar) that Claude — or any tool that speaks SQL — can query token-efficiently. A focused SQL query against the same data is ~200 tokens. That's what this tool exists to do.
 
 ## Acknowledgment
 
-Save-file decoding is done by [`oni-save-parser`](https://github.com/RoboPhred/oni-save-parser) by RoboPhred — `oni-vision` is a watcher + extractor + SQLite writer sitting on top of it. None of the binary-format reverse engineering is mine. If parsing breaks on a brand-new ONI patch, the fix usually lives there first.
+Save-file decoding is done by [`oni-save-parser`](https://github.com/RoboPhred/oni-save-parser) by RoboPhred — `oni-vision` adds a watcher + extractor + SQLite writer + MCP server sitting on top of it. None of the binary-format reverse engineering is mine. If parsing breaks on a brand-new ONI patch, the fix usually lives there first.
 
 ## Features
 
 - **Zero-config startup.** Probes per-platform well-known locations for `cloud_save_files` / `save_files` and picks the most-recent `.sav`. No setup file required for typical Steam-on-Mac/Windows/Linux installs.
 - **Atomic refresh.** Every save event reparses and atomically renames `current.sqlite`, `current.json`, and `current.sav` into place — readers never see a half-written file.
-- **One DB schema, indexed for the common questions.** Typed tables for duplicants (plus traits/skills/attributes/effects), buildings, world objects, storage contents, geysers, critters; plus a generic-fallback `behaviors` table with stringified JSON for anything we haven't lifted.
+- **One DB schema, indexed for the common questions.** Typed tables for duplicants (plus traits/skills/attributes/effects), buildings, world objects, storage contents, geysers, critters; pus a generic-fallback `behaviors` table with stringified JSON for anything we haven't lifted.
 - **Cross-platform.** macOS (recent Steam + older Klei layouts), Windows, Linux.
 - **Human-readable status.** `npm run status` prints a one-screen snapshot (cycle, dupe stress bars, geyser breakdown, top stored elements). The daemon prints the same block after every save. An in-process web dashboard at `http://localhost:8080` renders the same data live — on by default, disable with `"web": { "enabled": false }` in your config.
 - **Claude Code / Cowork plugin.** [`oni-vision-plugin/`](./oni-vision-plugin) ships an MCP server with typed read-only tools (`oni_status`, `oni_dupe`, `oni_dupes`, `oni_geysers`, `oni_resources`, `oni_food`, `oni_save_meta`, `oni_freshness`, `oni_schema`, `oni_query`) plus two skills: `oni-vision` (data access) and `oni-architect` (ONI strategy / design advice grounded in your actual save). Responses default to compact JSON; tabular tools support `format: "tsv"` for further token savings.
@@ -25,7 +23,7 @@ Save-file decoding is done by [`oni-save-parser`](https://github.com/RoboPhred/o
 ## Requirements
 
 - Node.js **22.5 or newer** (for built-in `node:sqlite`).
-- macOS, Linux, or Windows.
+- OS agnostic
 
 ## Architecture
 
@@ -40,7 +38,7 @@ ONI .sav file
                 └─→ oni-vision-plugin/  (MCP server for Claude Code)
 ```
 
-Bullets:
+Features
 
 - **Two-process model.** One writer (the daemon), N readers. Readers open the DB read-only; the daemon is the only thing that mutates `~/.oni-vision/output/`.
 
@@ -60,13 +58,13 @@ For a deeper dive (schema, all consumers, design rationale) see [`docs/data-mode
 
 ## Build
 
+The project is plain JavaScript ESM:
+
 ```bash
 git clone git@github.com:arielbloch/oni-vision.git
 cd oni-vision
 npm install
 ```
-
-There's no compile step — the project is plain JavaScript ESM.
 
 ## Use
 
@@ -122,20 +120,48 @@ sqlite3 ~/.oni-vision/output/current.sqlite \
 
 **Query from Claude.** Two integration paths:
 
-- **Lightweight.** Drop the contents of [`CLAUDE.md`](./CLAUDE.md) into your project's `CLAUDE.md`. Claude then writes raw `sqlite3` queries against the DB, using the lookup-table JOIN examples to get human-readable names.
+- **Lightweight.** Drop the contents of [`CLAUDE.md`](./CLAUDE.md) into your project's `CLAUDE.md`. Claude writes raw `sqlite3` queries against the DB using the lookup-table JOIN examples for human-readable names. No plugin needed.
 
-- **Full-fat (recommended).** Install the [`oni-vision-plugin/`](./oni-vision-plugin) into Claude Code. Typed read-only tools + skills, no raw SQL needed for common questions. See [`oni-vision-plugin/README.md`](./oni-vision-plugin/README.md) for full details. Quick start:
+- **Full plugin (recommended).** [`oni-vision-plugin/`](./oni-vision-plugin) ships an MCP server with typed read-only tools and two AI skills — `oni-vision` (colony data) and `oni-architect` (strategy advice grounded in your real save). Pick the install path that matches your setup:
 
-  ```bash
-  # Option A — Claude Code plugin system
+  **Claude Code CLI** — inside a Claude Code session:
+  ```
   /plugin install /path/to/oni-vision/oni-vision-plugin
+  ```
+  This registers the MCP server and loads both skills automatically.
 
-  # Option B — register only the MCP server (no plugin system required)
+  **Claude desktop app (Cowork)** — add to `~/Library/Application Support/Claude/claude_desktop_config.json` (create it if it doesn't exist), then restart the app:
+  ```json
+  {
+    "mcpServers": {
+      "oni-vision": {
+        "command": "node",
+        "args": [
+          "--no-warnings=ExperimentalWarning",
+          "/path/to/oni-vision/oni-vision-plugin/mcp/server.js"
+        ]
+      }
+    }
+  }
+  ```
+
+  **MCP only (no plugin system):**
+  ```bash
   claude mcp add oni-vision -- node --no-warnings=ExperimentalWarning \
     /path/to/oni-vision/oni-vision-plugin/mcp/server.js
   ```
+  MCP tools are available; skills must be loaded separately.
 
-  Verify the plugin loaded: ask Claude "what tools do you have for oni-vision?" — it should list `oni_status`, `oni_dupes`, `oni_query`, etc. If tools are missing, run `claude mcp list` to check the server is registered.
+  **Verify** the plugin loaded by asking Claude: *"what oni-vision tools do you have?"* — it should list `oni_status`, `oni_dupes`, `oni_query`, etc. If tools are missing, run `claude mcp list` to check the server is registered.
+
+  **Example questions to ask Claude once connected:**
+  - "How are my dupes doing? Anyone stressed?"
+  - "What geysers do I have and are they good?"
+  - "How much food do I have and how long will it last?"
+  - "What should I build next to fix my oxygen situation?"
+  - "Give me a full rundown of Meep's skills and traits."
+
+  The `oni-architect` skill grounds strategy answers in your actual colony data — it's not generic advice.
 
 ## Configuration
 
