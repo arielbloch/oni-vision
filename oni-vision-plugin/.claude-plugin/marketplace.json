@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "oni-vision-local",
+  "description": "Local dev marketplace for the oni-vision plugin.",
+  "owner": {
+    "name": "Ariel Bloch"
+  },
+  "plugins": [
+    {
+      "name": "oni-vision",
+      "description": "Query your live Oxygen Not Included colony save from Claude Code.",
+      "author": {
+        "name": "Ariel Bloch"
+      },
+      "source": "./"
+    }
+  ]
+}
