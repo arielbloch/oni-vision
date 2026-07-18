@@ -429,7 +429,6 @@ describe("real ONI save end-to-end", { skip: skipReason }, () => {
     assert.ok(typeof out === "string" && out.length > 0, "render() returned empty");
     assert.match(out, /═══/, "banner missing");
     assert.match(out, /duplicants/, "headcounts missing");
-    assert.match(out, /Stockpile/, "stockpile section missing");
     assert.match(out, /Dupes/, "dupes section missing");
   });
 
@@ -449,11 +448,11 @@ describe("real ONI save end-to-end", { skip: skipReason }, () => {
     }
   });
 
-  test("ui.render(): stockpile shows element names not raw hashes", () => {
+  test("ui.render(): elements show display names not raw hashes", () => {
     const out = render(db, { color: false });
     // Raw numeric hashes look like "-105943486.0" or "493438017.0"
     assert.doesNotMatch(out, /\d{7,}\.0/,
-      "stockpile contains raw element_id hash (float string)");
+      "output contains raw element_id hash (float string)");
   });
 
   test("ui.render(): geysers show human names not hash blobs", () => {

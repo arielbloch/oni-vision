@@ -221,68 +221,6 @@ function enrichDupes(db, dupes) {
   }
 }
 
-/**
- * Read the pinned resource list from WorldInventory, enriched with total
- * quantities from storage and world objects. Each entry: { name, hash,
- * total_units, is_element }. is_element=true means the hash is an element_id
- * and units are kg; false means a prefab item (seed, fabric, etc.) and units
- * are a raw count/mass from storage_contents.
- */
-function readPinnedResources(db) {
-  const row = db.prepare(
-    `SELECT template_data FROM behaviors WHERE name = 'WorldInventory' LIMIT 1`
-  ).get();
-  if (!row) return [];
-  let pinned;
-  try {
-    pinned = JSON.parse(row.template_data || "{}").pinnedResources ?? [];
-  } catch { return []; }
-
-  if (pinned.length === 0) return [];
-
-  // Batch-query element totals (storage + world objects).
-  const hashes = pinned.map(r => r.hash);
-  const placeholders = hashes.map(() => "?").join(",");
-  const elementTotals = new Map();
-  for (const r of db.prepare(
-    `SELECT CAST(element_id AS INTEGER) AS eid, SUM(units) AS total FROM (
-       SELECT element_id, units FROM storage_contents WHERE CAST(element_id AS INTEGER) IN (${placeholders})
-       UNION ALL
-       SELECT element_id, units FROM world_objects   WHERE CAST(element_id AS INTEGER) IN (${placeholders}) AND units IS NOT NULL
-     ) GROUP BY eid`
-  ).all(...hashes, ...hashes)) {
-    elementTotals.set(Number(r.eid), r.total ?? 0);
-  }
-
-  // Batch-query non-element prefab totals from storage_contents.
-  const names = pinned.map(r => r.name);
-  const namePlaceholders = names.map(() => "?").join(",");
-  const prefabTotals = new Map();
-  for (const r of db.prepare(
-    `SELECT item_prefab_id, SUM(units) AS total
-     FROM storage_contents WHERE item_prefab_id IN (${namePlaceholders})
-     GROUP BY item_prefab_id`
-  ).all(...names)) {
-    prefabTotals.set(r.item_prefab_id, r.total ?? 0);
-  }
-  // Also count loose prefab world objects (seeds on the floor, etc.).
-  for (const r of db.prepare(
-    `SELECT prefab_id, COUNT(*) AS total
-     FROM world_objects WHERE prefab_id IN (${namePlaceholders}) AND element_id IS NULL
-     GROUP BY prefab_id`
-  ).all(...names)) {
-    prefabTotals.set(r.prefab_id, (prefabTotals.get(r.prefab_id) ?? 0) + r.total);
-  }
-
-  return pinned.map(r => {
-    const elemTotal = elementTotals.get(Number(r.hash));
-    if (elemTotal != null) {
-      return { name: r.name, hash: r.hash, total_units: elemTotal, is_element: true };
-    }
-    return { name: r.name, hash: r.hash, total_units: prefabTotals.get(r.name) ?? 0, is_element: false };
-  });
-}
-
 /** worldWidth/worldHeight in cells, from save_meta. Null if unknown. */
 function readWorldDims(db) {
   const rows = db.prepare(
@@ -298,25 +236,6 @@ function readPodPosition(db) {
     `SELECT position_x, position_y FROM buildings WHERE prefab_id = 'Headquarters' LIMIT 1`
   ).get();
   return { x: row?.position_x ?? null, y: row?.position_y ?? null };
-}
-
-/**
- * Read the union of element hashes accepted by any TreeFilterable behaviour
- * (storage buildings). Used by the FE as the default stockpile filter.
- */
-function readStockpileFilters(db) {
-  const hashes = new Set();
-  for (const row of db.prepare(
-    `SELECT template_data FROM behaviors WHERE name = 'TreeFilterable'`
-  ).all()) {
-    try {
-      const parsed = JSON.parse(row.template_data || "{}");
-      for (const tag of parsed.acceptedTagSet ?? []) {
-        if (tag.hash != null) hashes.add(tag.hash);
-      }
-    } catch { /* malformed JSON, skip */ }
-  }
-  return [...hashes];
 }
 
 /**
@@ -365,8 +284,8 @@ function serveLookups(db) {
 /**
  * Status endpoint. Returns a single JSON payload with the colony summary
  * (statusObject) plus per-dupe enrichment, per-geyser detail, food/resources
- * aggregates, in-game stockpile filters, all lookup tables, and the FE
- * thresholds. The FE consumes this on every refresh.
+ * aggregates, all lookup tables, and the FE thresholds. The FE consumes this
+ * on every refresh.
  */
 function serveStatus(res, outputDir) {
   const dbPath = join(outputDir, "current.sqlite");
@@ -479,8 +398,8 @@ function serveStatus(res, outputDir) {
        LIMIT 30`
     ).all();
 
-    // Every stored element (containers + loose), sorted by total mass. The
-    // client filters this down to the user's selection or in-game filter.
+    // Every stored element (containers + loose), sorted by total mass. Used
+    // by the FE power card to look up fuel mass per element for runway math.
     payload.all_resources = db.prepare(
       `SELECT element_id, SUM(units) AS total_units
        FROM (
@@ -492,8 +411,6 @@ function serveStatus(res, outputDir) {
        ORDER BY total_units DESC`
     ).all();
 
-    payload.stockpile_filters  = readStockpileFilters(db);
-    payload.pinned_resources   = readPinnedResources(db);
     Object.assign(payload, serveLookups(db));
     payload.thresholds = THRESHOLDS;
     payload.generator_specs = GENERATOR_SPECS;

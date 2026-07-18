@@ -7,12 +7,12 @@
 // whether to enable color based on stdout.isTTY and NO_COLOR.
 //
 // Layout mirrors the web dashboard (src/web/): Dupes table (name · roles ·
-// morale · stress), Geysers grouped by type with quality bar, Food section,
-// Stockpile. All name resolution is done via SQL JOINs against the lookup
+// morale · stress), Geysers grouped by type with quality bar, Food section.
+// All name resolution is done via SQL JOINs against the lookup
 // tables written by the pipeline — no in-process JS maps needed.
 
 import { THRESHOLDS } from "./thresholds.js";
-import { ANSI, paint, bar, pad, fit, lpad, formatMass, formatKcal, formatAge, stressColor } from "./format.js";
+import { ANSI, paint, bar, pad, fit, lpad, formatKcal, formatAge, stressColor } from "./format.js";
 import { oxygenStats } from "./oxygen.js";
 import { reportStats } from "./report.js";
 import { GENERATOR_SPECS } from "./generators.js";
@@ -395,34 +395,6 @@ export function renderPower(db, { color = false } = {}) {
   return lines.join("\n");
 }
 
-/** Top elements by mass across loose piles + storage_contents. */
-export function renderStockpile(db, { color = false, limit = 8 } = {}) {
-  const rows = db.prepare(`
-    SELECT COALESCE(en.name, sub.element_id) AS name,
-           SUM(sub.units) AS total_units
-    FROM (
-      SELECT element_id, SUM(units) AS units
-      FROM world_objects WHERE element_id IS NOT NULL GROUP BY element_id
-      UNION ALL
-      SELECT element_id, SUM(units) AS units
-      FROM storage_contents WHERE element_id IS NOT NULL GROUP BY element_id
-    ) sub
-    LEFT JOIN elements en ON en.element_id = sub.element_id
-    GROUP BY sub.element_id
-    ORDER BY total_units DESC
-    LIMIT ?
-  `).all(limit);
-
-  if (rows.length === 0) return paint("Stockpile: empty", ANSI.dim, color);
-
-  const header = paint("Stockpile (top elements by mass)", ANSI.bold + ANSI.green, color);
-  const lines  = rows.map((r) => {
-    const mass = formatMass(r.total_units);
-    return `  ${pad(r.name, 20)} ${lpad(mass, 12)}`;
-  });
-  return [header, ...lines].join("\n");
-}
-
 /** Top-of-mind alerts: parsed_at staleness. */
 export function renderFreshness(db, { color = false } = {}) {
   const meta = readMeta(db);
@@ -450,7 +422,5 @@ export function render(db, opts = {}) {
     renderGeysers(db, opts),
     "",
     renderFood(db, opts),
-    "",
-    renderStockpile(db, opts),
   ].join("\n");
 }

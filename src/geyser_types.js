@@ -27,8 +27,8 @@
 // src/elements.js wherever that element already exists there (e.g.
 // "Dirty Water", "Polluted O₂", "Chlorine", "Liq. Sulfur", "Methane") —
 // not the geyser's colloquial ONI name — so the same substance reads
-// identically in the Geysers card and the Stockpile card instead of
-// looking like two different resources.
+// identically wherever it's shown, instead of looking like two different
+// resources.
 
 /**
  * @type {Array<{

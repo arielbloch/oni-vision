@@ -17,7 +17,6 @@ import {
   renderBanner,
   renderHeadCounts,
   renderGeysers,
-  renderStockpile,
   renderDupes,
   renderFood,
   renderOxygen,
@@ -129,18 +128,6 @@ describe("renderGeysers", () => {
     } finally {
       db.close();
     }
-  });
-});
-
-describe("renderStockpile", () => {
-  test("aggregates across world_objects and storage_contents", () => {
-    withDb((db) => {
-      const out = renderStockpile(db);
-      // FAKE_SAVE has Algae in two places: 750 loose + 500 in locker = 1250.
-      // Water 250 in locker.
-      assert.match(out, /Algae/);
-      assert.match(out, /Water/);
-    });
   });
 });
 
@@ -261,8 +248,6 @@ describe("render", () => {
       assert.match(out, /Geysers/);
       // Food section
       assert.match(out, /Food/);
-      // Stockpile
-      assert.match(out, /Stockpile/);
       // Dupes section
       assert.match(out, /Dupes/);
       // Oxygen section

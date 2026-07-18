@@ -5,7 +5,7 @@
 //
 // Expected /api/status shape:
 //   base_name, cycle, age_seconds, source_file, counts, top_dupes,
-//   geysers (per-instance), food, all_resources, stockpile_filters,
+//   geysers (per-instance), food, all_resources,
 //   elements, geyser_types, foods, effects, skills, chore_groups
 //   (all six lookup tables), thresholds
 
@@ -63,13 +63,6 @@ function saveSettings() {
 }
 
 let _lastData = null;  // cached API response for instant settings re-render
-
-/** Resolve a numeric element_id to a display name. */
-function elementName(id) {
-  if (id == null) return "?";
-  const key = String(Math.trunc(Number(id)));
-  return ELEMENT_NAMES[key] ?? String(id);
-}
 
 /** Resolve a numeric geyser type_id to a display name. */
 function geyserName(id) {
@@ -290,12 +283,12 @@ function renderDupes(rows) {
 }
 
 // Small position-on-map indicator: a rect shaped like the real map
-// (bounded to 100px on its longest side, not square) with a white 5x5 dot
-// for the pod and a colored 5x5 dot for this geyser. Y is flipped (ONI's
-// +y is up/toward the surface; CSS `top` grows downward) so "up" in the
-// rect reads as "up" in the game.
-const MINIMAP_MAX_PX = 100;
-const MINIMAP_DOT_PX = 5;
+// (bounded to 70px on its longest side, not square) with a white 3.5x3.5
+// dot for the pod and a colored 3.5x3.5 dot for this geyser. Y is flipped
+// (ONI's +y is up/toward the surface; CSS `top` grows downward) so "up" in
+// the rect reads as "up" in the game.
+const MINIMAP_MAX_PX = 70;
+const MINIMAP_DOT_PX = 3.5;
 function geyserMiniMap(worldWidth, worldHeight, pod, xPct, yPct, color) {
   if (!worldWidth || !worldHeight || pod?.xPct == null || xPct == null) return "";
   const ratio = worldWidth / worldHeight;
@@ -315,11 +308,12 @@ function geyserMiniMap(worldWidth, worldHeight, pod, xPct, yPct, color) {
 // One card per game-relevant category (Water, Steam, Polluted Water, Salt
 // Water, Natural Gas, Crude Oil, Hydrogen, Metals, Other — server sends
 // rows pre-sorted by `category`). Each category gets its own color from the
-// same palette as the food chips, applied to the card title, the output+
-// temp line, and each geyser's mini-map dot. Geyser name is white, 20%
-// larger than the line below it, and never wraps. Exact %-location and
-// direction-from-pod text were dropped once the mini-map made them
-// redundant — the dots show position directly.
+// same palette as the food chips, applied to the card title, the output
+// line, and each geyser's mini-map dot. Geyser name (with its output temp
+// appended, e.g. "Steam Vent - 500°") is white, 20% larger than the output
+// line below it, and never wraps. Exact %-location and direction-from-pod
+// text were dropped once the mini-map made them redundant — the dots show
+// position directly.
 function renderGeysers(rows, worldWidth, worldHeight, pod) {
   if (!rows || rows.length === 0) {
     setHTML("geysers-card", `<div class="empty">no geysers detected</div>`);
@@ -344,116 +338,29 @@ function renderGeysers(rows, worldWidth, worldHeight, pod) {
     const color = RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
 
     const entries = rows.map((r) => {
-      const name = r.type_name ?? geyserName(r.type_id);
+      const baseName = r.type_name ?? geyserName(r.type_id);
+      const temp = r.output_temp_c != null ? `${Math.round(r.output_temp_c)}°` : null;
       // Real per-instance value (resolved from this geyser's own scaled_*
       // fields), not a type-level average.
       const cardLineStyle = `font-size:${BASE_FS}px;font-weight:700;color:${color}`;
-      const outputTemp = r.outputRate != null && r.output_temp_c != null
-        ? `${(r.outputRate / 1000).toFixed(1)} kg/s @ ${Math.round(r.output_temp_c)}°`
-        : null;
+      const output = r.outputRate != null ? `${(r.outputRate / 1000).toFixed(1)} kg/s` : null;
       const text = `<div>
-        <div style="${nameStyle}">${escapeHtml(name)}</div>
-        ${outputTemp ? `<div style="${cardLineStyle}">${escapeHtml(outputTemp)}</div>` : ""}
+        <div style="${nameStyle}">${escapeHtml(baseName)}${temp ? ` - <span style="color:${color}">${escapeHtml(temp)}</span>` : ""}</div>
+        ${output ? `<div style="${cardLineStyle}">${escapeHtml(output)}</div>` : ""}
       </div>`;
       const minimap = geyserMiniMap(worldWidth, worldHeight, pod, r.xPct, r.yPct, color);
       return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">${text}${minimap}</div>`;
     }).join("");
 
-    // min-width is wide enough that the longest geyser name ("Cool Chlorine
-    // Gas Vent" / "Cool Salt Slush Geyser") sits comfortably next to the
-    // mini-map without either being cut off — the name is never truncated.
-    // overflow:hidden is just a safety net so nothing pokes out past the
-    // card's own border in some unanticipated narrow layout.
-    return `<div style="display:flex;flex-direction:column;gap:8px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;min-width:280px;flex:1 1 280px;overflow:hidden">
+    // Capped at 300px so a category card never grows wider than that,
+    // regardless of how much room the flex row has to give it.
+    return `<div style="display:flex;flex-direction:column;gap:8px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;max-width:300px;flex:1 1 300px;overflow:hidden">
       <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(category)}</div>
       <div style="display:flex;flex-direction:column;gap:8px">${entries}</div>
     </div>`;
   }).join("");
 
   setHTML("geysers-card", `<div style="display:flex;flex-wrap:wrap;gap:${cfg.chipgap}px;align-items:flex-start">${cards}</div>`);
-}
-
-// ── Stockpile state ───────────────────────────────────────────────────────────
-
-let allElements     = [];  // all_resources from API (element-based)
-let pinnedResources = [];  // WorldInventory.pinnedResources with quantities
-
-// ONI internal prefab ID → in-game display name (for non-element pinned items).
-const PREFAB_DISPLAY_NAMES = {
-  // Seeds / plant materials
-  "BasicSingleHarvestPlantSeed": "Mealwood Seed",
-  "BasicFabricMaterialPlantSeed": "Thimble Reed Seed",
-  "BulbPlantSeed":     "Bulb Plant Seed",
-  "CactusPlantSeed":   "Wheezewort Seed",
-  "ColdWheatSeed":     "Sleet Wheat Grain",
-  "EvenFlowerSeed":    "Blossom Seed",
-  "ForestTreeSeed":    "Arbor Acorn",
-  "LeafyPlantSeed":    "Bristle Blossom Seed",
-  "MushroomSeed":      "Dusk Cap Spore",
-  "PrickleFlowerSeed": "Prickle Flower Seed",
-  "PrickleGrassSeed":  "Pincha Pepper Seed",
-  "SeaLettuceSeed":    "Waterweed Seed",
-  "SpiceVineSeed":     "Spice Vine Seed",
-  "SwampHarvestPlantSeed": "Thimble Reed Seed",
-  "WormPlantSeed":     "Grubfig Seed",
-  // Crafted / processed materials
-  "BasicFabric":       "Reed Fiber",
-  "EggShell":          "Eggshell",
-};
-
-/** Format an ONI internal prefab name for display, checking the lookup table first. */
-function formatPrefabName(name) {
-  return PREFAB_DISPLAY_NAMES[name] ?? name.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
-}
-
-function togglePicker() {
-  const el = $("stockpile-picker");
-  if (!el) return;
-  el.style.display = el.style.display === "none" ? "block" : "none";
-  if (el.style.display === "block") renderPicker();
-}
-
-function renderPicker() {
-  const el = $("stockpile-picker");
-  if (!el) return;
-
-  // Show the pinned list with checkboxes so the user can hide individual rows.
-  const LS_KEY = "oni-stockpile-hidden-v1";
-  let hidden;
-  try { hidden = new Set(JSON.parse(localStorage.getItem(LS_KEY) || "[]")); }
-  catch { hidden = new Set(); }
-
-  if (pinnedResources.length === 0 && allElements.length === 0) {
-    el.innerHTML = '<div class="empty">no data yet</div>';
-    return;
-  }
-
-  const rows = pinnedResources.length > 0 ? pinnedResources : allElements.slice(0, 20).map(r => ({
-    name: String(ELEMENT_NAMES[String(Math.trunc(Number(r.element_id)))] ?? r.element_id),
-    hash: r.element_id,
-    total_units: r.total_units,
-    is_element: true,
-  }));
-
-  el.innerHTML = rows.map(r => {
-    const key = String(r.hash);
-    const checked = !hidden.has(key) ? "checked" : "";
-    const displayName = r.is_element ? escapeHtml(elementName(r.hash)) : escapeHtml(formatPrefabName(r.name));
-    const qty = escapeHtml(r.is_element ? fmtMass(r.total_units) : `${Math.round(r.total_units)}`);
-    return `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer">
-      <input type="checkbox" data-key="${escapeHtml(key)}" ${checked} onchange="onPickerChange()">
-      <span style="flex:1">${displayName}</span>
-      <span style="color:var(--fg-muted)">${qty}</span>
-    </label>`;
-  }).join("");
-}
-
-function onPickerChange() {
-  const LS_KEY = "oni-stockpile-hidden-v1";
-  const checkboxes = ($("stockpile-picker") ?? {}).querySelectorAll?.("input[type=checkbox]") ?? [];
-  const hidden = new Set([...checkboxes].filter(cb => !cb.checked).map(cb => cb.dataset.key));
-  try { localStorage.setItem(LS_KEY, JSON.stringify([...hidden])); } catch { /**/ }
-  renderResources(allElements);
 }
 
 // ── Renderers ─────────────────────────────────────────────────────────────────
@@ -628,41 +535,6 @@ function renderFood(rows, dupeCount, foodReport) {
   setHTML("food-card", twoColRow(runwayBlock, chips));
 }
 
-function renderResources(rows) {
-  allElements = rows ?? [];
-
-  const LS_KEY = "oni-stockpile-hidden-v1";
-  let hidden;
-  try { hidden = new Set(JSON.parse(localStorage.getItem(LS_KEY) || "[]")); }
-  catch { hidden = new Set(); }
-
-  let display;
-  if (pinnedResources.length > 0) {
-    display = pinnedResources.filter(r => !hidden.has(String(r.hash)));
-  } else {
-    display = allElements.slice(0, 8).map(r => ({
-      name: String(ELEMENT_NAMES[String(Math.trunc(Number(r.element_id)))] ?? r.element_id),
-      hash: r.element_id,
-      total_units: r.total_units,
-      is_element: true,
-    }));
-  }
-
-  if (display.length === 0) {
-    setHTML("resources-card", `<div class="empty">stockpile empty</div>`);
-    return;
-  }
-  const html = display.map(r => {
-    const name = r.is_element ? escapeHtml(elementName(r.hash)) : escapeHtml(formatPrefabName(r.name));
-    const qty  = r.is_element ? fmtMass(r.total_units) : `${Math.round(r.total_units ?? 0)}`;
-    return `<tr>
-      <td style="font-size:12px">${name}</td>
-      <td class="metric">${qty}</td>
-    </tr>`;
-  }).join("");
-  setHTML("resources-card", `<table><tbody>${html}</tbody></table>`);
-}
-
 // ── Liveness ─────────────────────────────────────────────────────────────────
 
 function setLiveness(state, label) {
@@ -725,7 +597,6 @@ async function refresh() {
     if (data.thresholds)   T             = { ...T, ...data.thresholds };
     if (data.generator_specs)  GENERATOR_SPECS = data.generator_specs;
     if (data.generator_fuels)  GENERATOR_FUELS = data.generator_fuels;
-    if (data.pinned_resources) pinnedResources = data.pinned_resources;
     if (data.report) {
       STRESS_DELTA = data.report.stress_delta ?? {};
     }
@@ -743,7 +614,6 @@ function renderAll(data) {
   renderFood(data.food || [], data.counts?.duplicants ?? 0, data.report?.food ?? null);
   renderPower(data.report || null, data.all_resources || [], GENERATOR_FUELS, GENERATOR_SPECS);
   renderGeysers(data.geysers || [], data.world_width, data.world_height, data.pod);
-  renderResources(data.all_resources || []);
 }
 
 // ── Settings panel ────────────────────────────────────────────────────────────
