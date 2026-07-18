@@ -372,11 +372,17 @@ function serveStatus(res, outputDir) {
 
     // Per-geyser quality rolls. statusObject's grouped `geyser_types` is
     // discarded — the FE wants per-instance detail, not by-type counts.
+    // Joined against geyser_types for the resource it produces and its
+    // display name, so the FE can render Resource | Geyser Name | Location
+    // without a second round-trip.
     delete payload.geyser_types;
     payload.geysers = db.prepare(
-      `SELECT type_id, rate_roll, year_percent_roll
-       FROM geysers
-       ORDER BY type_id, rate_roll DESC`
+      `SELECT g.type_id, g.position_x, g.position_y,
+              g.rate_roll, g.year_percent_roll,
+              gt.name AS type_name, gt.element AS resource
+       FROM geysers g
+       LEFT JOIN geyser_types gt ON gt.type_id = g.type_id
+       ORDER BY gt.name, g.rate_roll DESC`
     ).all();
 
     // Food in storage sorted by morale DESC (best food first); includes name,

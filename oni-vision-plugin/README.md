@@ -267,7 +267,7 @@ Run an arbitrary SELECT (or `WITH … SELECT`) against the full DB schema. **For
 | `critters(game_object_id, prefab_id, age, calories, hp, happiness, temperature)` | |
 | `behaviors(game_object_id, name, template_data, extra_data)` | Generic fallback; template_data is JSON |
 | `elements(element_id, name)` | SimHash → element name lookup |
-| `geyser_types(type_id, name)` | SimHash → geyser type name lookup |
+| `geyser_types(type_id, name, element, output_temp_c, yield_min_kg_cycle, yield_max_kg_cycle, lifetime_avg_kg_cycle, dlc, disease)` | SimHash → geyser type name, produced resource, output temp, and yield (kg/cycle) |
 | `foods(prefab_id, name, kcal, morale)` | Food metadata |
 | `effects(effect, label, severity)` | Status effect display labels |
 | `skills(branch, label)` | Skill branch → display name |

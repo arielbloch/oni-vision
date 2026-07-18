@@ -90,8 +90,6 @@ let T = {
   stale_after_s:          600,
   stress_warn:             30,
   stress_bad:              60,
-  geyser_quality_good:     70,
-  geyser_quality_warn:     40,
   morale_bar_max:          20,
   priority_boost:           5,
   kcal_per_dupe_per_cycle: 1000,
@@ -297,16 +295,14 @@ function renderGeysers(rows) {
     return;
   }
   const html = rows.map(r => {
-    const quality = Math.round(((Number(r.rate_roll) + Number(r.year_percent_roll)) / 2) * 100);
-    const cls = quality >= T.geyser_quality_good ? "" : quality >= T.geyser_quality_warn ? "med" : "high";
+    const resource = r.resource ?? "?";
+    const name = r.type_name ?? geyserName(r.type_id);
+    const x = r.position_x != null ? Math.round(r.position_x) : "?";
+    const y = r.position_y != null ? Math.round(r.position_y) : "?";
     return `<tr>
-      <td style="font-size:12px">${escapeHtml(geyserName(r.type_id))}</td>
-      <td class="bar" style="width:50%">
-        <div class="bar-track">
-          <div class="bar-fill ${cls}" style="width:${quality}%"></div>
-        </div>
-      </td>
-      <td class="metric">${quality}%</td>
+      <td style="font-size:12px">${escapeHtml(resource)}</td>
+      <td style="font-size:12px;color:var(--fg-dim)">${escapeHtml(name)}</td>
+      <td class="metric" style="font-size:11px">${x}, ${y}</td>
     </tr>`;
   }).join("");
   setHTML("geysers-card", `<table><tbody>${html}</tbody></table>`);

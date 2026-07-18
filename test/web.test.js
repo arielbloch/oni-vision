@@ -99,7 +99,14 @@ describe("GET /api/status", () => {
     assert.equal(body.top_dupes[0].name, "Meep");
     assert.ok(Array.isArray(body.geysers), "per-geyser detail should be an array under `geysers`");
     // type_id is now a SimHash integer (-899515856 = "steam")
-    assert.ok(body.geysers.find((g) => g.type_id === -899515856));
+    const steamVent = body.geysers.find((g) => g.type_id === -899515856);
+    assert.ok(steamVent);
+    // Dashboard needs resource + display name + map position per instance
+    // (Resource | Geyser Name | Location table).
+    assert.equal(steamVent.type_name, "Steam Vent");
+    assert.equal(steamVent.resource, "Steam");
+    assert.equal(typeof steamVent.position_x, "number");
+    assert.equal(typeof steamVent.position_y, "number");
     assert.ok(Array.isArray(body.top_resources));
 
     // Feature 6: lookup tables served from DB.

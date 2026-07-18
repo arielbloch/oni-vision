@@ -93,13 +93,17 @@ describe("renderHeadCounts", () => {
 });
 
 describe("renderGeysers", () => {
-  test("lists each geyser type with a count", () => {
+  test("lists each geyser instance with resource + name + location", () => {
     withDb((db) => {
       const out = renderGeysers(db);
-      // type_id hashes are now resolved to display names.
+      // type_id hashes are now resolved to display names, joined with the
+      // resource each geyser produces and its map position.
       assert.match(out, /Steam Vent/);
       assert.match(out, /Volcano/);
-      assert.match(out, /×1/);
+      assert.match(out, /Steam/);
+      assert.match(out, /Magma/);
+      assert.match(out, /50, 60/);
+      assert.match(out, /70, 80/);
     });
   });
 });

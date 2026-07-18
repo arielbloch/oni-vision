@@ -132,42 +132,35 @@ export function renderDupes(db, { color = false, limit = 12 } = {}) {
 }
 
 /**
- * Geysers grouped by type: type name × count | quality bar | quality%.
- * Quality = average of rate_roll and year_percent_roll (0–1 each), matching
- * the web dashboard formula. Color: green ≥ 70%, yellow ≥ 40%, red below.
+ * Geysers, one row per instance: resource produced | geyser name | map
+ * location. Mirrors the web dashboard's Geysers card layout.
  */
 export function renderGeysers(db, { color = false } = {}) {
   const rows = db.prepare(`
-    SELECT g.type_id,
-           COALESCE(gtn.name, 'hash:' || g.type_id) AS type_name,
-           COUNT(*) AS n,
-           ROUND(AVG((g.rate_roll + g.year_percent_roll) / 2.0) * 100) AS quality
+    SELECT g.position_x, g.position_y,
+           COALESCE(gtn.element, '?') AS resource,
+           COALESCE(gtn.name, 'hash:' || g.type_id) AS type_name
     FROM geysers g
     LEFT JOIN geyser_types gtn ON gtn.type_id = g.type_id
-    GROUP BY g.type_id
-    ORDER BY n DESC, g.type_id
+    ORDER BY gtn.name, g.position_x
   `).all();
 
   if (rows.length === 0) return paint("Geysers: none", ANSI.dim, color);
 
-  const header = paint("Geysers", ANSI.bold + ANSI.green, color);
-  const lines  = rows.map((r) => {
-    const quality = r.quality ?? 0;
-    let qc = "";
-    let qr = "";
-    if (color) {
-      qc = quality >= THRESHOLDS.geyser_quality_good ? ANSI.green
-         : quality >= THRESHOLDS.geyser_quality_warn ? ANSI.yellow
-         : ANSI.red;
-      qr = ANSI.reset;
-    }
-    const nameAndCount = fit(`${r.type_name} ×${r.n}`, 28);
-    const qualBar      = `${qc}${bar(quality / 100)}${qr}`;
-    const qualPct      = `${lpad(String(quality), 3)}%`;
-    return `  ${nameAndCount}  ${qualBar}  ${qualPct}`;
+  const header    = paint("Geysers", ANSI.bold + ANSI.green, color);
+  const colHeader = paint(
+    `  ${"Resource".padEnd(14)}  ${"Geyser Name".padEnd(22)}  Location`,
+    ANSI.dim, color
+  );
+  const lines = rows.map((r) => {
+    const resourceCol = fit(r.resource, 14);
+    const nameCol      = fit(r.type_name, 22);
+    const x = r.position_x != null ? Math.round(r.position_x) : "?";
+    const y = r.position_y != null ? Math.round(r.position_y) : "?";
+    return `  ${resourceCol}  ${nameCol}  ${x}, ${y}`;
   });
 
-  return [header, ...lines].join("\n");
+  return [header, colHeader, ...lines].join("\n");
 }
 
 /**

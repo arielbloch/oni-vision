@@ -50,7 +50,7 @@ Features
 
 - **Three consumers, same DB.** The CLI banner (`src/ui.js`), the web dashboard (`src/web.js` + `src/web/`), and the MCP plugin (`oni-vision-plugin/`) all read from `current.sqlite` via SQL. The MCP plugin is self-contained (it has its own `lib/queries.js`) so it can be installed independently of the parent repo.
 
-- **Single source of truth for game rules.** Numeric thresholds (stress-bad cutoff, geyser-quality cutoff, morale-bar max, etc.) live in `src/thresholds.js`, served via `/api/status` so the frontend never hardcodes them. Skill morale-cost rule lives in `src/skills.js`, computed once at parse time and stored on `duplicants.morale_cost`.
+- **Single source of truth for game rules.** Numeric thresholds (stress-bad cutoff, morale-bar max, etc.) live in `src/thresholds.js`, served via `/api/status` so the frontend never hardcodes them. Skill morale-cost rule lives in `src/skills.js`, computed once at parse time and stored on `duplicants.morale_cost`.
 
 - **Lookup tables (always JOIN against these):** `elements`, `geyser_types`, `foods`, `effects`, `skills`, `chore_groups`, `diseases`.
 

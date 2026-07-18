@@ -174,8 +174,15 @@ const SCHEMA = [
      name       TEXT NOT NULL
    )`,
   `CREATE TABLE geyser_types (
-     type_id INTEGER PRIMARY KEY,
-     name    TEXT NOT NULL
+     type_id                INTEGER PRIMARY KEY,
+     name                   TEXT NOT NULL,
+     element                TEXT NOT NULL,
+     output_temp_c          REAL,
+     yield_min_kg_cycle     REAL,
+     yield_max_kg_cycle     REAL,
+     lifetime_avg_kg_cycle  REAL,
+     dlc                    TEXT,
+     disease                TEXT
    )`,
   `CREATE TABLE foods (
      prefab_id TEXT PRIMARY KEY,
@@ -281,7 +288,11 @@ export const TABLE_COLUMNS = {
   ],
   // Lookup tables (static, populated from JS source files during build).
   elements:     ["element_id", "name"],
-  geyser_types: ["type_id", "name"],
+  geyser_types: [
+    "type_id", "name", "element", "output_temp_c",
+    "yield_min_kg_cycle", "yield_max_kg_cycle", "lifetime_avg_kg_cycle",
+    "dlc", "disease",
+  ],
   foods:        ["prefab_id", "name", "kcal", "morale"],
   effects:      ["effect", "label", "severity"],
   skills:       ["branch", "label"],

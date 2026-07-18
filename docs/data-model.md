@@ -29,7 +29,7 @@ Each module is a plain JS file that exports structured data. `pipeline.js` proje
 | Module | SQLite table | What it contains |
 |--------|-------------|-----------------|
 | `src/elements.js` | `elements(element_id, name)` | SimHash integer → element display name (Water, Algae, …) |
-| `src/geyser_types.js` | `geyser_types(type_id, name)` | SimHash integer → geyser display name (Steam Vent, Volcano, …) |
+| `src/geyser_types.js` | `geyser_types(type_id, name, element, output_temp_c, yield_min_kg_cycle, yield_max_kg_cycle, lifetime_avg_kg_cycle, dlc, disease)` | SimHash integer → geyser display name plus produced resource, output temp, and yield (kg/cycle) |
 | `src/food.js` | `foods(prefab_id, name, kcal, morale)` | Food item metadata — name, kcal per unit, morale bonus |
 | `src/effects.js` | `effects(effect, label, severity)` | Status effect string → display label + severity tier |
 | `src/skills.js` | `skills(branch, label)` | Skill branch prefix → display name (mining → Miner) |
@@ -74,8 +74,8 @@ FROM storage_contents sc
 JOIN elements en ON en.element_id = sc.element_id
 GROUP BY sc.element_id ORDER BY kg DESC;
 
--- Geyser names
-SELECT gt.name, rate_roll, year_percent_roll
+-- Geyser names + resource + yield
+SELECT gt.name, gt.element, gt.lifetime_avg_kg_cycle, g.position_x, g.position_y
 FROM geysers g
 JOIN geyser_types gt ON gt.type_id = g.type_id;
 ```

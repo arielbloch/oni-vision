@@ -300,6 +300,33 @@ describe("lookup-table round-trips", () => {
     });
   });
 
+  test("geyser_types carries resource/temp/yield metadata", () => {
+    withLookupDb((db) => {
+      const row = db.prepare(
+        `SELECT element, output_temp_c, yield_min_kg_cycle, yield_max_kg_cycle,
+                lifetime_avg_kg_cycle, dlc, disease
+         FROM geyser_types WHERE type_id = -899515856`
+      ).get();
+      assert.equal(row.element, "Steam");
+      assert.equal(row.output_temp_c, 110);
+      assert.equal(row.yield_min_kg_cycle, 1000);
+      assert.equal(row.yield_max_kg_cycle, 2000);
+      assert.equal(row.lifetime_avg_kg_cycle, 900);
+      assert.equal(row.dlc, null);
+      assert.equal(row.disease, null);
+    });
+  });
+
+  test("geyser_types every row has a non-null element (NOT NULL constraint honored)", () => {
+    withLookupDb((db) => {
+      const rows = db.prepare("SELECT type_id, element FROM geyser_types").all();
+      assert.ok(rows.length > 0);
+      for (const r of rows) {
+        assert.ok(r.element, `type_id ${r.type_id} should have a non-null element`);
+      }
+    });
+  });
+
   test("JOIN geyser_types against geysers resolves geyser names", () => {
     withLookupDb((db) => {
       const rows = db.prepare(

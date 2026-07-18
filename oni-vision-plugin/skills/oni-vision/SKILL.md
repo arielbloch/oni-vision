@@ -100,7 +100,7 @@ Six static tables resolve SimHash integers and short strings to human-readable v
 | Table | Key → value |
 |-------|------------|
 | `elements(element_id, name)` | SimHash → element name (Water, Algae, …) |
-| `geyser_types(type_id, name)` | SimHash → geyser name (Steam Vent, Volcano, …) |
+| `geyser_types(type_id, name, element, output_temp_c, yield_min_kg_cycle, yield_max_kg_cycle, lifetime_avg_kg_cycle, dlc, disease)` | SimHash → geyser name, produced resource, output temp, yield (kg/cycle) |
 | `foods(prefab_id, name, kcal, morale)` | prefab → food display name + nutrition |
 | `effects(effect, label, severity)` | effect string → readable label + severity |
 | `skills(branch, label)` | branch prefix → display name |

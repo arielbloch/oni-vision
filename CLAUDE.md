@@ -58,8 +58,11 @@ SELECT name, ROUND(stress,1) AS stress, current_role
 FROM duplicants
 ORDER BY stress DESC;
 
--- Geysers on the asteroid
-SELECT type_id, position_x, position_y FROM geysers ORDER BY type_id;
+-- Geysers on the asteroid, with resource produced and expected yield
+SELECT gt.name, gt.element, gt.lifetime_avg_kg_cycle, g.position_x, g.position_y
+FROM geysers g
+JOIN geyser_types gt ON gt.type_id = g.type_id
+ORDER BY gt.name;
 
 -- Total stored mass per element (inside containers)
 SELECT element_id, ROUND(SUM(units),0) AS total_units, COUNT(*) AS items
@@ -95,7 +98,7 @@ Seven static tables written once per parse let you resolve SimHash integers to h
 | Table | Key column | Name column | Use for |
 |-------|-----------|-------------|---------|
 | `elements(element_id, name)` | `element_id` (INTEGER) | `name` | elements in `world_objects`, `storage_contents`, `buildings` |
-| `geyser_types(type_id, name)` | `type_id` (INTEGER) | `name` | geysers |
+| `geyser_types(type_id, name, element, output_temp_c, yield_min_kg_cycle, yield_max_kg_cycle, lifetime_avg_kg_cycle, dlc, disease)` | `type_id` (INTEGER) | `name`, `element` | geysers — `element` is the resource produced, `lifetime_avg_kg_cycle` is the long-run average output |
 | `foods(prefab_id, name, kcal, morale)` | `prefab_id` (TEXT) | `name` | food in `storage_contents` |
 | `effects(effect, label, severity)` | `effect` (TEXT) | `label` | dupe status effects |
 | `skills(branch, label)` | `branch` (TEXT) | `label` | skill branches |
