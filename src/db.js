@@ -148,7 +148,12 @@ const SCHEMA = [
      year_length_roll REAL,
      year_percent_roll REAL,
      position_x REAL,
-     position_y REAL
+     position_y REAL,
+     scaled_rate REAL,
+     scaled_iteration_length_s REAL,
+     scaled_iteration_percent REAL,
+     scaled_year_length_s REAL,
+     scaled_year_percent REAL
    )`,
   `CREATE INDEX idx_g_type ON geysers(type_id)`,
   `CREATE TABLE critters (
@@ -281,6 +286,8 @@ export const TABLE_COLUMNS = {
     "rate_roll", "iteration_length_roll", "iteration_percent_roll",
     "year_length_roll", "year_percent_roll",
     "position_x", "position_y",
+    "scaled_rate", "scaled_iteration_length_s", "scaled_iteration_percent",
+    "scaled_year_length_s", "scaled_year_percent",
   ],
   critters: [
     "game_object_id", "prefab_id", "position_x", "position_y",

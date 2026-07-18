@@ -131,7 +131,7 @@ Without the JOIN, `element_id` returns raw integers like `1836671383` that the m
 | `buildings(game_object_id, prefab_id, position_x, position_y, element_id, units, temperature, ...)` | placed structures only |
 | `world_objects(...)` | loose stuff with mass/temp; same column shape as `buildings` |
 | `storage_contents(owner_id, item_prefab_id, element_id, units, temperature, ...)` | items in a Storage behavior; `owner_id` joins to `buildings` or `world_objects` |
-| `geysers(game_object_id, prefab_id, type_id, rate_roll, year_percent_roll, position_x, position_y, ...)` | |
+| `geysers(game_object_id, prefab_id, type_id, rate_roll, year_percent_roll, position_x, position_y, scaled_year_length_s, scaled_year_percent, ...)` | `scaled_year_length_s`/`scaled_year_percent` are the resolved per-instance dormancy-cycle length (seconds, ÷600 for days) and active %. No live "time until next eruption" — the save doesn't persist current cycle phase. |
 | `critters(game_object_id, prefab_id, age, calories, hp, happiness, temperature, ...)` | hatches, dreckos, pufts, etc. + their eggs/babies |
 | `behaviors(id, game_object_id, name, template_data, extra_data)` | generic fallback; `template_data` and `extra_data` are stringified JSON — use `json_extract(template_data, '$.field')` to drill in |
 

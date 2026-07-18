@@ -263,7 +263,7 @@ Run an arbitrary SELECT (or `WITH … SELECT`) against the full DB schema. **For
 | `buildings(game_object_id, prefab_id, position_x, position_y, element_id, units, temperature)` | Placed structures |
 | `world_objects` | Loose resources, plants, eggs — same shape as `buildings` |
 | `storage_contents(owner_id, item_prefab_id, element_id, units, temperature)` | Items inside Storage behaviors |
-| `geysers(game_object_id, prefab_id, type_id, rate_roll, year_percent_roll, position_x, position_y)` | |
+| `geysers(game_object_id, prefab_id, type_id, rate_roll, year_percent_roll, position_x, position_y, scaled_year_length_s, scaled_year_percent)` | `scaled_year_*` are the resolved per-instance dormancy-cycle length/percent (no live eruption countdown — phase isn't persisted) |
 | `critters(game_object_id, prefab_id, age, calories, hp, happiness, temperature)` | |
 | `behaviors(game_object_id, name, template_data, extra_data)` | Generic fallback; template_data is JSON |
 | `elements(element_id, name)` | SimHash → element name lookup |

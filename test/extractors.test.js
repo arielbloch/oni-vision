@@ -131,8 +131,8 @@ describe("storage extraction", () => {
 
 describe("generic fallback tables", () => {
   test("every game object emits a row in game_objects", () => {
-    // 8 groups, 1 object each in this fixture.
-    assert.equal(tables.game_objects.length, 8);
+    // 9 groups, 1 object each in this fixture.
+    assert.equal(tables.game_objects.length, 9);
   });
 
   test("behaviors are JSON-stringified into the behaviors table", () => {

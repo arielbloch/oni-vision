@@ -14,16 +14,16 @@ For one-off ad-hoc questions, prefer narrow projections (`SELECT col1, col2`) an
 
 ## Tables you'll reach for first
 
-- `save_meta(key, value)` — cycle count, base name, dupe count, save version, plus `parsed_at` (ISO timestamp of last parse) and `source_file` (which `.sav` was parsed). `SELECT key, value FROM save_meta` is a good first move; check `parsed_at` if you suspect the data is stale.
+- `save_meta(key, value)` — cycle count, base name, dupe count, save version, plus `parsed_at` (ISO timestamp of last parse), `source_file` (which `.sav` was parsed), and `worldWidth`/`worldHeight` (map size in cells — divide `position_x`/`position_y` by these to get percent-of-map). `SELECT key, value FROM save_meta` is a good first move; check `parsed_at` if you suspect the data is stale.
 - `duplicants(game_object_id, name, gender, current_role, stress, calories, stamina, breath, hp, decor, immune, body_temperature, ...)` — one row per dupe.
 - `duplicant_traits(duplicant_id, trait)` — join to `duplicants.game_object_id`.
 - `duplicant_skills(duplicant_id, skill)` — mastered skills only.
 - `duplicant_attributes(duplicant_id, attribute, level, experience)`.
 - `duplicant_effects(duplicant_id, effect, time_remaining)` — active status effects.
-- `buildings(game_object_id, prefab_id, position_x, position_y, element_id, units, temperature, ...)` — **placed structures only** (objects with `BuildingComplete`). Querying counts here gives you "how many of building X exist", not polluted by debris.
+- `buildings(game_object_id, prefab_id, position_x, position_y, element_id, units, temperature, ...)` — **placed structures only** (objects with `BuildingComplete`). Querying counts here gives you "how many of building X exist", not polluted by debris. The printing pod is `prefab_id = 'Headquarters'`, not anything containing "pod"/"telepad" — it's gone from this table if the player deconstructed it.
 - `world_objects(game_object_id, prefab_id, ...)` — same column shape as `buildings`. Loose stuff lying on the map: dropped resources, food items, plants, eggs, raw materials. Reach for this when the user asks about *resources on the floor* or *plants*; reach for `buildings` when they ask about *what they've built*.
 - `storage_contents(owner_id, item_prefab_id, element_id, units, temperature, ...)` — items inside a building's or world object's `Storage` behavior. `owner_id` joins to either `buildings.game_object_id` or `world_objects.game_object_id`.
-- `geysers(game_object_id, prefab_id, type_id, rate_roll, year_percent_roll, position_x, position_y, ...)`. **The `*_roll` columns are 0–1 percentiles, not kg/s.** Don't quote them as flow rates.
+- `geysers(game_object_id, prefab_id, type_id, rate_roll, year_percent_roll, position_x, position_y, scaled_year_length_s, scaled_year_percent, ...)`. **The `*_roll` columns are 0–1 percentiles, not kg/s.** Don't quote them as flow rates. `scaled_year_length_s`/`scaled_year_percent` are the game's own resolved per-instance dormancy-cycle stats (length in seconds, % active) — divide `scaled_year_length_s` by 600 for days. There's no persisted field for *where* a geyser currently sits in that cycle, so don't try to derive a live "time until next eruption."
 - `critters(game_object_id, prefab_id, age, calories, hp, happiness, temperature, ...)`.
 
 ## Generic fallback

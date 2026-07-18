@@ -167,7 +167,7 @@ describe("round-trip queries", () => {
         .prepare("SELECT prefab_id FROM buildings ORDER BY prefab_id")
         .all()
         .map((r) => r.prefab_id);
-      assert.deepEqual(prefabs, ["BatterySmart", "StorageLocker"]);
+      assert.deepEqual(prefabs, ["BatterySmart", "Headquarters", "StorageLocker"]);
     });
   });
 

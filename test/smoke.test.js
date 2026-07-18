@@ -13,12 +13,13 @@ describe("smoke pipeline", () => {
     const result = runSmoke({ silent: true });
 
     // FAKE_SAVE: 1 dupe, 2 critters (Hatch + Pip), 2 geysers (steam + BigVolcano),
-    // 2 buildings (BatterySmart + StorageLocker), 1 world object (loose Algae pile),
-    // 2 storage_contents rows (Algae + Water inside the StorageLocker).
+    // 3 buildings (Headquarters pod + BatterySmart + StorageLocker), 1 world
+    // object (loose Algae pile), 2 storage_contents rows (Algae + Water
+    // inside the StorageLocker).
     assert.equal(result.rowCounts.duplicants, 1);
     assert.equal(result.rowCounts.critters, 2);
     assert.equal(result.rowCounts.geysers, 2);
-    assert.equal(result.rowCounts.buildings, 2);
+    assert.equal(result.rowCounts.buildings, 3);
     assert.equal(result.rowCounts.world_objects, 1);
     assert.equal(result.rowCounts.storage_contents, 2);
   });

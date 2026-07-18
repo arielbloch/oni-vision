@@ -289,23 +289,51 @@ function renderDupes(rows) {
   setHTML("dupes-card", `<table><tbody>${html}</tbody></table>`);
 }
 
+// One card per game-relevant category (Water/Steam, Polluted Water, Salt
+// Water, Fuel, Metals, Other — server sends rows pre-sorted by `category`).
+// Styled like the Food Left / per-food chips: title line in the chip
+// font/color, then one block per geyser instance (name, %location +
+// direction from the pod, and its eruption duty cycle).
 function renderGeysers(rows) {
   if (!rows || rows.length === 0) {
     setHTML("geysers-card", `<div class="empty">no geysers detected</div>`);
     return;
   }
-  const html = rows.map(r => {
-    const resource = r.resource ?? "?";
-    const name = r.type_name ?? geyserName(r.type_id);
-    const x = r.position_x != null ? Math.round(r.position_x) : "?";
-    const y = r.position_y != null ? Math.round(r.position_y) : "?";
-    return `<tr>
-      <td style="font-size:12px">${escapeHtml(resource)}</td>
-      <td style="font-size:12px;color:var(--fg-dim)">${escapeHtml(name)}</td>
-      <td class="metric" style="font-size:11px">${x}, ${y}</td>
-    </tr>`;
+
+  const groups = [];
+  let current = null;
+  for (const r of rows) {
+    const category = r.category ?? "Other";
+    if (!current || current.category !== category) {
+      current = { category, rows: [] };
+      groups.push(current);
+    }
+    current.rows.push(r);
+  }
+
+  const cards = groups.map(({ category, rows }) => {
+    const entries = rows.map((r) => {
+      const name = r.type_name ?? geyserName(r.type_id);
+      const pos = r.xPct != null ? `${r.xPct}% / ${r.yPct}%` : "?";
+      const rel = r.relative_location;
+      const locationLine = rel ? `${pos} · ${escapeHtml(rel)}` : pos;
+      const cycle = r.activePct != null && r.cycleDays != null
+        ? `active ${r.activePct}% · cycle ~${r.cycleDays.toFixed(1)}d`
+        : null;
+      return `<div>
+        <div style="font-size:12px">${escapeHtml(name)}</div>
+        <div style="font-size:11px;color:var(--fg-dim)">${locationLine}</div>
+        ${cycle ? `<div style="font-size:11px;color:var(--fg-dim)">${cycle}</div>` : ""}
+      </div>`;
+    }).join("");
+
+    return `<div style="display:flex;flex-direction:column;gap:8px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;min-width:190px;flex:1 1 190px">
+      <div style="font-size:${cfg.fs}px;color:${cfg.color};white-space:nowrap">${escapeHtml(category)}</div>
+      <div style="display:flex;flex-direction:column;gap:8px">${entries}</div>
+    </div>`;
   }).join("");
-  setHTML("geysers-card", `<table><tbody>${html}</tbody></table>`);
+
+  setHTML("geysers-card", `<div style="display:flex;flex-wrap:wrap;gap:${cfg.chipgap}px;align-items:flex-start">${cards}</div>`);
 }
 
 // ── Stockpile state ───────────────────────────────────────────────────────────

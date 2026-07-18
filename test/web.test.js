@@ -92,7 +92,8 @@ describe("GET /api/status", () => {
     assert.equal(body.counts.duplicants, 1);
     assert.equal(body.counts.critters, 2);
     assert.equal(body.counts.geysers, 2);
-    assert.equal(body.counts.buildings, 2);
+    // 3 buildings: Headquarters (pod) + BatterySmart + StorageLocker.
+    assert.equal(body.counts.buildings, 3);
 
     // Top sections populated from FAKE_SAVE.
     assert.ok(Array.isArray(body.top_dupes));
@@ -107,6 +108,23 @@ describe("GET /api/status", () => {
     assert.equal(steamVent.resource, "Steam");
     assert.equal(typeof steamVent.position_x, "number");
     assert.equal(typeof steamVent.position_y, "number");
+    // Grouping: rows come back pre-sorted by game-relevant category (Water/
+    // Steam, Polluted Water, Salt Water, Fuel, Metals, Other) so the FE can
+    // group cards by watching for a change in `category`. Steam is
+    // "Water / Steam" (category 0); the volcano's Magma isn't in any named
+    // bucket so it falls into "Other" (last) — Steam Vent comes first.
+    assert.equal(body.geysers[0].category, "Water / Steam");
+    assert.equal(body.geysers.at(-1).category, "Other");
+    assert.equal(steamVent.category, "Water / Steam");
+    // Position as percent-of-map (worldWidth=200, worldHeight=100, steam at
+    // 50,60) and direction relative to the pod (Headquarters at 10,10).
+    assert.equal(steamVent.xPct, 25);
+    assert.equal(steamVent.yPct, 60);
+    assert.equal(steamVent.relative_location, "far above pod");
+    // Eruption duty cycle: scaledYearPercent=0.5, scaledYearLength=48000s
+    // (=80 days) from the fixture's Geyser behavior.
+    assert.equal(steamVent.activePct, 50);
+    assert.equal(steamVent.cycleDays, 80);
     assert.ok(Array.isArray(body.top_resources));
 
     // Feature 6: lookup tables served from DB.

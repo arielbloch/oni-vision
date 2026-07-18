@@ -22,6 +22,8 @@ import { THRESHOLDS } from "./thresholds.js";
 import { oxygenStats } from "./oxygen.js";
 import { reportStats } from "./report.js";
 import { GENERATOR_SPECS } from "./generators.js";
+import { percentPosition, relativeToPod } from "./geo.js";
+import { categorizeGeyser } from "./geyser_categories.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(HERE, "web");
@@ -281,6 +283,23 @@ function readPinnedResources(db) {
   });
 }
 
+/** worldWidth/worldHeight in cells, from save_meta. Null if unknown. */
+function readWorldDims(db) {
+  const rows = db.prepare(
+    `SELECT key, value FROM save_meta WHERE key IN ('worldWidth', 'worldHeight')`
+  ).all();
+  const m = Object.fromEntries(rows.map((r) => [r.key, Number(r.value)]));
+  return { width: m.worldWidth || null, height: m.worldHeight || null };
+}
+
+/** Printing pod ("Headquarters" prefab) position. Nulls if deconstructed/absent. */
+function readPodPosition(db) {
+  const row = db.prepare(
+    `SELECT position_x, position_y FROM buildings WHERE prefab_id = 'Headquarters' LIMIT 1`
+  ).get();
+  return { x: row?.position_x ?? null, y: row?.position_y ?? null };
+}
+
 /**
  * Read the union of element hashes accepted by any TreeFilterable behaviour
  * (storage buildings). Used by the FE as the default stockpile filter.
@@ -370,20 +389,43 @@ function serveStatus(res, outputDir) {
 
     enrichDupes(db, payload.top_dupes);
 
-    // Per-geyser quality rolls. statusObject's grouped `geyser_types` is
-    // discarded — the FE wants per-instance detail, not by-type counts.
-    // Joined against geyser_types for the resource it produces and its
-    // display name, so the FE can render Resource | Geyser Name | Location
-    // without a second round-trip.
+    // Per-geyser detail for the dashboard's geyser cards (one card per
+    // game-relevant category — Water/Steam, Polluted Water, Salt Water,
+    // Fuel, Metals, Other — not statusObject's grouped-by-exact-type
+    // `geyser_types` summary, which is discarded here).
+    //
+    // Each row is enriched with: its map position as a percent; a
+    // plain-English direction from the printing pod ("Headquarters"), if
+    // it's still standing; and its eruption duty cycle (active % and
+    // supercycle length in days) computed from the save's own per-instance
+    // scaled_year_* fields — there's no persisted "current phase" field, so
+    // this is the statistical pattern, not a live countdown.
+    // Pre-sorted by category so the FE can group cards by just watching for
+    // a change in `category`.
     delete payload.geyser_types;
+    const { width: worldWidth, height: worldHeight } = readWorldDims(db);
+    const pod = readPodPosition(db);
     payload.geysers = db.prepare(
       `SELECT g.type_id, g.position_x, g.position_y,
               g.rate_roll, g.year_percent_roll,
+              g.scaled_year_length_s, g.scaled_year_percent,
               gt.name AS type_name, gt.element AS resource
        FROM geysers g
-       LEFT JOIN geyser_types gt ON gt.type_id = g.type_id
-       ORDER BY gt.name, g.rate_roll DESC`
-    ).all();
+       LEFT JOIN geyser_types gt ON gt.type_id = g.type_id`
+    ).all().map((r) => {
+      const { xPct, yPct } = percentPosition(r.position_x, r.position_y, worldWidth, worldHeight);
+      const { label: category, order: categoryOrder } = categorizeGeyser(r.resource);
+      return {
+        ...r,
+        xPct, yPct,
+        relative_location: relativeToPod(r.position_x, r.position_y, pod.x, pod.y, worldWidth, worldHeight),
+        category,
+        activePct: r.scaled_year_percent != null ? Math.round(r.scaled_year_percent * 100) : null,
+        cycleDays: r.scaled_year_length_s != null ? r.scaled_year_length_s / 600 : null,
+        _categoryOrder: categoryOrder,
+      };
+    }).sort((a, b) => a._categoryOrder - b._categoryOrder || a.type_name?.localeCompare(b.type_name ?? "") || 0)
+      .map(({ _categoryOrder, ...r }) => r);
 
     // Food in storage sorted by morale DESC (best food first); includes name,
     // kcal, morale from the lookup so the FE can compute days without a

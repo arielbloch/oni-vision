@@ -31,7 +31,7 @@ export const FAKE_SAVE = {
     },
   },
   settings: { baseAlreadyCreated: true, nextUniqueID: 99, gameID: 1 },
-  world: { worldDetails: "BIG", other: "ok" },
+  world: { worldDetails: "BIG", other: "ok", WidthInCells: 200, HeightInCells: 100 },
   gameData: { gasConduitFlow: "BLOB", customGameSettings: { is_custom_game: false } },
   gameObjects: [
     {
@@ -87,6 +87,11 @@ export const FAKE_SAVE = {
               // Real saves store typeId as { hash: N } — match that shape.
               typeId: { hash: -899515856 }, rateRoll: 0.5, iterationLengthRoll: 0.4,
               iterationPercentRoll: 0.6, yearLengthRoll: 0.5, yearPercentRoll: 0.55,
+              // "scaled*" fields aren't in oni-save-parser's typed Geyser
+              // shape but are present in real saves — the resolved
+              // per-instance eruption/dormancy timing used for the web
+              // dashboard's "active X% · cycle ~Yd" card line.
+              scaledYearLength: 48000, scaledYearPercent: 0.5,
             }}},
           ],
         },
@@ -105,7 +110,28 @@ export const FAKE_SAVE = {
             { name: "Geyser", templateData: { configuration: {
               typeId: { hash: -1592417549 }, rateRoll: 0.7, iterationLengthRoll: 0.3,
               iterationPercentRoll: 0.4, yearLengthRoll: 0.6, yearPercentRoll: 0.5,
+              scaledYearLength: 30000, scaledYearPercent: 0.4,
             }}},
+          ],
+        },
+      ],
+    },
+    {
+      // Printing pod — internal prefab id is "Headquarters", not anything
+      // containing "pod" or "telepad". Used as the fixed reference point
+      // for relativeToPod() in ui.test.js / web.test.js.
+      name: "Headquarters",
+      gameObjects: [
+        {
+          position: { x: 10, y: 10, z: 0 }, scale: { x: 1, y: 1 },
+          rotation: { x: 0, y: 0, z: 0, w: 1 }, folder: 0,
+          behaviors: [
+            { name: "KPrefabID", templateData: { InstanceID: 6 } },
+            { name: "BuildingComplete", templateData: {} },
+            { name: "PrimaryElement", templateData: {
+              ElementID: "Granite", Units: 1, _Temperature: 295,
+              diseaseID: { hash: 0 }, diseaseCount: 0,
+            }},
           ],
         },
       ],

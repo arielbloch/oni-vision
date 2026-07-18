@@ -16,6 +16,7 @@ import { ANSI, paint, bar, pad, fit, lpad, formatMass, formatKcal, formatAge, st
 import { oxygenStats } from "./oxygen.js";
 import { reportStats } from "./report.js";
 import { GENERATOR_SPECS } from "./generators.js";
+import { percentPosition, relativeToPod } from "./geo.js";
 
 /**
  * Pull the headline facts out of save_meta. Returns a plain object;
@@ -131,9 +132,27 @@ export function renderDupes(db, { color = false, limit = 12 } = {}) {
   return [sectionLabel, colHeader, ...lines].join("\n");
 }
 
+/** worldWidth/worldHeight in cells, from save_meta. Null if unknown. */
+function readWorldDims(db) {
+  const rows = db.prepare(
+    `SELECT key, value FROM save_meta WHERE key IN ('worldWidth', 'worldHeight')`
+  ).all();
+  const m = Object.fromEntries(rows.map((r) => [r.key, Number(r.value)]));
+  return { width: m.worldWidth || null, height: m.worldHeight || null };
+}
+
+/** Printing pod ("Headquarters" prefab) position. Nulls if deconstructed/absent. */
+function readPodPosition(db) {
+  const row = db.prepare(
+    `SELECT position_x, position_y FROM buildings WHERE prefab_id = 'Headquarters' LIMIT 1`
+  ).get();
+  return { x: row?.position_x ?? null, y: row?.position_y ?? null };
+}
+
 /**
- * Geysers, one row per instance: resource produced | geyser name | map
- * location. Mirrors the web dashboard's Geysers card layout.
+ * Geysers, grouped by resource (all Steam together, all Water together, …),
+ * one row per instance under each group: geyser name | map location as
+ * %x / %y | plain-English direction relative to the printing pod.
  */
 export function renderGeysers(db, { color = false } = {}) {
   const rows = db.prepare(`
@@ -142,25 +161,29 @@ export function renderGeysers(db, { color = false } = {}) {
            COALESCE(gtn.name, 'hash:' || g.type_id) AS type_name
     FROM geysers g
     LEFT JOIN geyser_types gtn ON gtn.type_id = g.type_id
-    ORDER BY gtn.name, g.position_x
+    ORDER BY resource, type_name, g.position_x
   `).all();
 
   if (rows.length === 0) return paint("Geysers: none", ANSI.dim, color);
 
-  const header    = paint("Geysers", ANSI.bold + ANSI.green, color);
-  const colHeader = paint(
-    `  ${"Resource".padEnd(14)}  ${"Geyser Name".padEnd(22)}  Location`,
-    ANSI.dim, color
-  );
-  const lines = rows.map((r) => {
-    const resourceCol = fit(r.resource, 14);
-    const nameCol      = fit(r.type_name, 22);
-    const x = r.position_x != null ? Math.round(r.position_x) : "?";
-    const y = r.position_y != null ? Math.round(r.position_y) : "?";
-    return `  ${resourceCol}  ${nameCol}  ${x}, ${y}`;
-  });
+  const { width, height } = readWorldDims(db);
+  const pod = readPodPosition(db);
 
-  return [header, colHeader, ...lines].join("\n");
+  const lines = [paint("Geysers", ANSI.bold + ANSI.green, color)];
+  let lastResource = null;
+  for (const r of rows) {
+    if (r.resource !== lastResource) {
+      lines.push(paint(`  ${r.resource}`, ANSI.bold, color));
+      lastResource = r.resource;
+    }
+    const nameCol = fit(r.type_name, 22);
+    const { xPct, yPct } = percentPosition(r.position_x, r.position_y, width, height);
+    const posStr = xPct != null ? `${xPct}% / ${yPct}%` : "?";
+    const rel = relativeToPod(r.position_x, r.position_y, pod.x, pod.y, width, height);
+    lines.push(`    ${nameCol}  ${pad(posStr, 12)}${rel ? "  " + rel : ""}`);
+  }
+
+  return lines.join("\n");
 }
 
 /**

@@ -98,6 +98,14 @@ export function extractAll(save) {
     key: "buildVersion",
     value: String(save.header?.buildVersion ?? ""),
   });
+  // Map dimensions in cells — used to convert building/geyser positions to
+  // percentages of the map (position_x / worldWidth, etc).
+  if (save.world?.WidthInCells != null) {
+    tables.save_meta.push({ key: "worldWidth", value: String(save.world.WidthInCells) });
+  }
+  if (save.world?.HeightInCells != null) {
+    tables.save_meta.push({ key: "worldHeight", value: String(save.world.HeightInCells) });
+  }
 
   // Walk groups.
   let goId = 0;
@@ -260,9 +268,19 @@ function extractDuplicant(go, goId, instanceId, tables) {
 function extractGeyser(go, goId, prefabId, tables) {
   const geyser = findBehavior(go, GeyserBehavior)?.templateData ?? {};
   const cfg = geyser.configuration ?? {};
-  // Note: rate_roll and *_roll fields are 0..1 percentiles against the
-  // geyser type's base range, NOT actual kg/s. Resolving to a real rate
-  // requires the library's geyser const-data. See README "Caveats".
+  // rate_roll and the other *_roll fields are 0..1 percentiles against the
+  // geyser type's base range, NOT actual kg/s — resolving those to a rate
+  // requires the type's min/max range (see geyser_types.js).
+  //
+  // scaled* fields are the game's own already-resolved per-instance values
+  // (present in the save but not declared in oni-save-parser's Geyser type,
+  // hence read directly off the raw object rather than a typed field).
+  // scaledIterationLength/scaledIterationPercent describe one eruption
+  // burst (seconds); scaledYearLength/scaledYearPercent describe the much
+  // longer active/dormant supercycle the geyser resets into between bursts
+  // — that's the "how often does this actually erupt" timescale relevant
+  // to base planning. There's no persisted field for *where* in that cycle
+  // the geyser currently sits (no live countdown is derivable from this).
   tables.geysers.push({
     game_object_id: goId,
     prefab_id: prefabId,
@@ -276,6 +294,11 @@ function extractGeyser(go, goId, prefabId, tables) {
     year_percent_roll: cfg.yearPercentRoll ?? null,
     position_x: go.position?.x ?? null,
     position_y: go.position?.y ?? null,
+    scaled_rate: cfg.scaledRate ?? null,
+    scaled_iteration_length_s: cfg.scaledIterationLength ?? null,
+    scaled_iteration_percent: cfg.scaledIterationPercent ?? null,
+    scaled_year_length_s: cfg.scaledYearLength ?? null,
+    scaled_year_percent: cfg.scaledYearPercent ?? null,
   });
 }
 

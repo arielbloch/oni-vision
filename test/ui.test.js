@@ -83,28 +83,51 @@ describe("renderHeadCounts", () => {
     withDb((db) => {
       const out = renderHeadCounts(db);
       // FAKE_SAVE: 1 dupe, 2 critters (Hatch + Pip), 2 geysers (steam + BigVolcano),
-      // 2 buildings (BatterySmart + StorageLocker). Algae pile is a world_object.
+      // 3 buildings (Headquarters + BatterySmart + StorageLocker). Algae pile
+      // is a world_object.
       assert.match(out, /1 duplicants/);
       assert.match(out, /2 critters/);
       assert.match(out, /2 geysers/);
-      assert.match(out, /2 buildings/);
+      assert.match(out, /3 buildings/);
     });
   });
 });
 
 describe("renderGeysers", () => {
-  test("lists each geyser instance with resource + name + location", () => {
+  test("groups by resource and shows % location + direction from the pod", () => {
     withDb((db) => {
       const out = renderGeysers(db);
-      // type_id hashes are now resolved to display names, joined with the
-      // resource each geyser produces and its map position.
-      assert.match(out, /Steam Vent/);
-      assert.match(out, /Volcano/);
-      assert.match(out, /Steam/);
-      assert.match(out, /Magma/);
-      assert.match(out, /50, 60/);
-      assert.match(out, /70, 80/);
+      // FAKE_SAVE: worldWidth=200, worldHeight=100, Headquarters (pod) at
+      // (10,10). Steam Vent at (50,60) -> 25%/60%, far above pod.
+      // BigVolcano at (70,80) -> 35%/80%, far above pod. Groups sort by
+      // resource: "Magma" before "Steam".
+      const magmaIdx = out.indexOf("Magma");
+      const steamGroupIdx = out.indexOf("\n  Steam");
+      const volcanoIdx = out.indexOf("Volcano");
+      const steamVentIdx = out.indexOf("Steam Vent");
+      assert.ok(magmaIdx >= 0 && steamGroupIdx >= 0, "both resource groups present");
+      assert.ok(magmaIdx < volcanoIdx, "Volcano listed under the Magma group");
+      assert.ok(steamGroupIdx < steamVentIdx, "Steam Vent listed under the Steam group");
+      assert.match(out, /25% \/ 60%/);
+      assert.match(out, /35% \/ 80%/);
+      assert.match(out, /far above pod/);
     });
+  });
+
+  test("omits the relative-to-pod text when the pod isn't in the save", () => {
+    const tables = buildFakeTables();
+    tables.buildings = tables.buildings.filter((b) => b.prefab_id !== "Headquarters");
+    const dir = mkdtempSync(join(tmpdir(), "oni-ui-nopod-"));
+    const dbPath = join(dir, "test.sqlite");
+    writeDatabase(dbPath, tables);
+    const db = new DatabaseSync(dbPath);
+    try {
+      const out = renderGeysers(db, { color: false });
+      assert.doesNotMatch(out, /pod/, "no pod in the save -> no relative-location text");
+      assert.match(out, /25% \/ 60%/, "percent location still renders without the pod");
+    } finally {
+      db.close();
+    }
   });
 });
 
