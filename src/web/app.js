@@ -349,7 +349,7 @@ function renderGeysers(rows, worldWidth, worldHeight, pod) {
       // fields), not a type-level average.
       const cardLineStyle = `font-size:${BASE_FS}px;font-weight:700;color:${color}`;
       const outputTemp = r.outputRate != null && r.output_temp_c != null
-        ? `${(r.outputRate / 1000).toFixed(1)} kg/s - ${Math.round(r.output_temp_c)}°`
+        ? `${(r.outputRate / 1000).toFixed(1)} kg/s @ ${Math.round(r.output_temp_c)}°`
         : null;
       const text = `<div>
         <div style="${nameStyle}">${escapeHtml(name)}</div>
@@ -359,7 +359,12 @@ function renderGeysers(rows, worldWidth, worldHeight, pod) {
       return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">${text}${minimap}</div>`;
     }).join("");
 
-    return `<div style="display:flex;flex-direction:column;gap:8px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;min-width:190px;flex:1 1 190px">
+    // min-width is wide enough that the longest geyser name ("Cool Chlorine
+    // Gas Vent" / "Cool Salt Slush Geyser") sits comfortably next to the
+    // mini-map without either being cut off — the name is never truncated.
+    // overflow:hidden is just a safety net so nothing pokes out past the
+    // card's own border in some unanticipated narrow layout.
+    return `<div style="display:flex;flex-direction:column;gap:8px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;min-width:280px;flex:1 1 280px;overflow:hidden">
       <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(category)}</div>
       <div style="display:flex;flex-direction:column;gap:8px">${entries}</div>
     </div>`;
