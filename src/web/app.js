@@ -289,12 +289,38 @@ function renderDupes(rows) {
   setHTML("dupes-card", `<table><tbody>${html}</tbody></table>`);
 }
 
-// One card per game-relevant category (Water/Steam, Polluted Water, Salt
-// Water, Fuel, Metals, Other — server sends rows pre-sorted by `category`).
-// Styled like the Food Left / per-food chips: title line in the chip
-// font/color, then one block per geyser instance (name, %location +
-// direction from the pod, and its eruption duty cycle).
-function renderGeysers(rows) {
+// Small position-on-map indicator: a rect shaped like the real map
+// (bounded to 100px on its longest side, not square) with a white 5x5 dot
+// for the pod and a colored 5x5 dot for this geyser. Y is flipped (ONI's
+// +y is up/toward the surface; CSS `top` grows downward) so "up" in the
+// rect reads as "up" in the game.
+const MINIMAP_MAX_PX = 100;
+const MINIMAP_DOT_PX = 5;
+function geyserMiniMap(worldWidth, worldHeight, pod, xPct, yPct, color) {
+  if (!worldWidth || !worldHeight || pod?.xPct == null || xPct == null) return "";
+  const ratio = worldWidth / worldHeight;
+  const w = ratio >= 1 ? MINIMAP_MAX_PX : MINIMAP_MAX_PX * ratio;
+  const h = ratio >= 1 ? MINIMAP_MAX_PX / ratio : MINIMAP_MAX_PX;
+  const dot = (dx, dy, dotColor) => `<div style="position:absolute;width:${MINIMAP_DOT_PX}px;height:${MINIMAP_DOT_PX}px;background:${dotColor};left:${dx}%;top:${100 - dy}%;transform:translate(-50%,-50%);border-radius:1px"></div>`;
+  // Background matches the page's outer background (var(--bg)), not the
+  // card it sits in, so it reads as a recessed cut-out rather than blending
+  // into the card. Also makes it theme-aware (light/dark) instead of a
+  // hardcoded dark hex.
+  return `<div style="position:relative;width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;background:var(--bg);border:1px solid #2a2a44;border-radius:3px;flex-shrink:0">
+    ${dot(pod.xPct, pod.yPct, "#fff")}
+    ${dot(xPct, yPct, color)}
+  </div>`;
+}
+
+// One card per game-relevant category (Water, Steam, Polluted Water, Salt
+// Water, Natural Gas, Crude Oil, Hydrogen, Metals, Other — server sends
+// rows pre-sorted by `category`). Each category gets its own color from the
+// same palette as the food chips, applied to the card title, the output+
+// temp line, and each geyser's mini-map dot. Geyser name is white, 20%
+// larger than the line below it, and never wraps. Exact %-location and
+// direction-from-pod text were dropped once the mini-map made them
+// redundant — the dots show position directly.
+function renderGeysers(rows, worldWidth, worldHeight, pod) {
   if (!rows || rows.length === 0) {
     setHTML("geysers-card", `<div class="empty">no geysers detected</div>`);
     return;
@@ -311,24 +337,30 @@ function renderGeysers(rows) {
     current.rows.push(r);
   }
 
-  const cards = groups.map(({ category, rows }) => {
+  const BASE_FS = 13;
+  const nameStyle = `font-size:${Math.round(BASE_FS * 1.2)}px;font-weight:700;color:#fff;white-space:nowrap`;
+
+  const cards = groups.map(({ category, rows }, i) => {
+    const color = RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
+
     const entries = rows.map((r) => {
       const name = r.type_name ?? geyserName(r.type_id);
-      const pos = r.xPct != null ? `${r.xPct}% / ${r.yPct}%` : "?";
-      const rel = r.relative_location;
-      const locationLine = rel ? `${pos} · ${escapeHtml(rel)}` : pos;
-      const cycle = r.activePct != null && r.cycleDays != null
-        ? `active ${r.activePct}% · cycle ~${r.cycleDays.toFixed(1)}d`
+      // Real per-instance value (resolved from this geyser's own scaled_*
+      // fields), not a type-level average.
+      const cardLineStyle = `font-size:${BASE_FS}px;font-weight:700;color:${color}`;
+      const outputTemp = r.outputRate != null && r.output_temp_c != null
+        ? `${(r.outputRate / 1000).toFixed(1)} kg/s - ${Math.round(r.output_temp_c)}°`
         : null;
-      return `<div>
-        <div style="font-size:12px">${escapeHtml(name)}</div>
-        <div style="font-size:11px;color:var(--fg-dim)">${locationLine}</div>
-        ${cycle ? `<div style="font-size:11px;color:var(--fg-dim)">${cycle}</div>` : ""}
+      const text = `<div>
+        <div style="${nameStyle}">${escapeHtml(name)}</div>
+        ${outputTemp ? `<div style="${cardLineStyle}">${escapeHtml(outputTemp)}</div>` : ""}
       </div>`;
+      const minimap = geyserMiniMap(worldWidth, worldHeight, pod, r.xPct, r.yPct, color);
+      return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">${text}${minimap}</div>`;
     }).join("");
 
     return `<div style="display:flex;flex-direction:column;gap:8px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;min-width:190px;flex:1 1 190px">
-      <div style="font-size:${cfg.fs}px;color:${cfg.color};white-space:nowrap">${escapeHtml(category)}</div>
+      <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(category)}</div>
       <div style="display:flex;flex-direction:column;gap:8px">${entries}</div>
     </div>`;
   }).join("");
@@ -705,7 +737,7 @@ function renderAll(data) {
   renderStatus(data.top_dupes || [], data.oxygen || null, data.report || null);
   renderFood(data.food || [], data.counts?.duplicants ?? 0, data.report?.food ?? null);
   renderPower(data.report || null, data.all_resources || [], GENERATOR_FUELS, GENERATOR_SPECS);
-  renderGeysers(data.geysers || []);
+  renderGeysers(data.geysers || [], data.world_width, data.world_height, data.pod);
   renderResources(data.all_resources || []);
 }
 

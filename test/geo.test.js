@@ -30,46 +30,56 @@ describe("relativeToPod", () => {
     assert.equal(relativeToPod(150, 50, ...POD, null, null), null);
   });
 
-  test("very close to the pod on both axes reads 'at the pod'", () => {
-    assert.equal(relativeToPod(102, 51, ...POD, W, H), "at the pod");
+  test("very close to the pod on both axes reads 'At the pod'", () => {
+    assert.equal(relativeToPod(102, 51, ...POD, W, H), "At the pod");
   });
 
-  test("horizontal dominant, slightly right", () => {
+  test("horizontal only (vertical under 5% is dropped), slightly right", () => {
     // dx=20 -> nx=0.10 (>0.05, <0.15); dy=0
-    assert.equal(relativeToPod(120, 50, ...POD, W, H), "slightly right of pod");
+    assert.equal(relativeToPod(120, 50, ...POD, W, H), "Slightly right of pod");
   });
 
-  test("horizontal dominant, plain right", () => {
+  test("horizontal only, plain right", () => {
     // dx=40 -> nx=0.20 (>=0.15, <0.35)
-    assert.equal(relativeToPod(140, 50, ...POD, W, H), "right of pod");
+    assert.equal(relativeToPod(140, 50, ...POD, W, H), "Right of pod");
   });
 
-  test("horizontal dominant, far right", () => {
+  test("horizontal only, far right", () => {
     // dx=90 -> nx=0.45 (>=0.35)
-    assert.equal(relativeToPod(190, 50, ...POD, W, H), "far right of pod");
+    assert.equal(relativeToPod(190, 50, ...POD, W, H), "Far right of pod");
   });
 
-  test("horizontal dominant, left", () => {
-    assert.equal(relativeToPod(60, 50, ...POD, W, H), "left of pod");
+  test("horizontal only, left", () => {
+    assert.equal(relativeToPod(60, 50, ...POD, W, H), "Left of pod");
   });
 
-  test("vertical dominant, slightly above (no 'of')", () => {
+  test("vertical only (no 'of'), slightly above", () => {
     // dy=8 -> ny=0.08 (>0.05, <0.15); dx=0
-    assert.equal(relativeToPod(100, 58, ...POD, W, H), "slightly above pod");
+    assert.equal(relativeToPod(100, 58, ...POD, W, H), "Slightly above pod");
   });
 
-  test("vertical dominant, plain below", () => {
+  test("vertical only, plain below", () => {
     // dy=-20 -> ny=-0.20 (>=0.15, <0.35)
-    assert.equal(relativeToPod(100, 30, ...POD, W, H), "below pod");
+    assert.equal(relativeToPod(100, 30, ...POD, W, H), "Below pod");
   });
 
-  test("vertical dominant, far above", () => {
+  test("vertical only, far above", () => {
     // dy=45 -> ny=0.45 (>=0.35)
-    assert.equal(relativeToPod(100, 95, ...POD, W, H), "far above pod");
+    assert.equal(relativeToPod(100, 95, ...POD, W, H), "Far above pod");
   });
 
-  test("picks the larger-magnitude axis when both are non-trivial", () => {
-    // dx=20 -> nx=0.10; dy=15 -> ny=0.15 — vertical wins (0.15 >= 0.10)
-    assert.equal(relativeToPod(120, 65, ...POD, W, H), "above pod");
+  test("combines both axes when both are >= 5%", () => {
+    // dx=20 -> nx=0.10 (slightly); dy=15 -> ny=0.15 (plain)
+    assert.equal(relativeToPod(120, 65, ...POD, W, H), "Above and slightly right of pod");
+  });
+
+  test("combines both axes, matching the requested example phrasing", () => {
+    // dx=-20 -> nx=-0.10 (slightly left); dy=30 -> ny=0.30 (plain above)
+    assert.equal(relativeToPod(80, 80, ...POD, W, H), "Above and slightly left of pod");
+  });
+
+  test("combines both axes with independent tiers (far + slightly)", () => {
+    // dx=90 -> nx=0.45 (far right); dy=-8 -> ny=-0.08 (slightly below)
+    assert.equal(relativeToPod(190, 42, ...POD, W, H), "Slightly below and far right of pod");
   });
 });

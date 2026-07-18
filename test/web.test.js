@@ -108,23 +108,51 @@ describe("GET /api/status", () => {
     assert.equal(steamVent.resource, "Steam");
     assert.equal(typeof steamVent.position_x, "number");
     assert.equal(typeof steamVent.position_y, "number");
-    // Grouping: rows come back pre-sorted by game-relevant category (Water/
-    // Steam, Polluted Water, Salt Water, Fuel, Metals, Other) so the FE can
-    // group cards by watching for a change in `category`. Steam is
-    // "Water / Steam" (category 0); the volcano's Magma isn't in any named
-    // bucket so it falls into "Other" (last) — Steam Vent comes first.
-    assert.equal(body.geysers[0].category, "Water / Steam");
+    // Grouping: rows come back pre-sorted by game-relevant category (Water,
+    // Steam, Polluted Water, Salt Water, Natural Gas, Crude Oil, Hydrogen,
+    // Metals, Other) so the FE can group cards by watching for a change in
+    // `category`. Steam Vent is category "Steam"; the volcano's Magma isn't
+    // in any named bucket so it falls into "Other" (last) — Steam Vent
+    // comes first.
+    assert.equal(body.geysers[0].category, "Steam");
     assert.equal(body.geysers.at(-1).category, "Other");
-    assert.equal(steamVent.category, "Water / Steam");
+    assert.equal(steamVent.category, "Steam");
+    // Output temp from the geyser_types lookup (Steam Vent = 110°C).
+    assert.equal(steamVent.output_temp_c, 110);
     // Position as percent-of-map (worldWidth=200, worldHeight=100, steam at
     // 50,60) and direction relative to the pod (Headquarters at 10,10).
     assert.equal(steamVent.xPct, 25);
     assert.equal(steamVent.yPct, 60);
-    assert.equal(steamVent.relative_location, "far above pod");
+    assert.equal(steamVent.relative_location, "Far above and right of pod");
     // Eruption duty cycle: scaledYearPercent=0.5, scaledYearLength=48000s
     // (=80 days) from the fixture's Geyser behavior.
     assert.equal(steamVent.activePct, 50);
     assert.equal(steamVent.cycleDays, 80);
+    // Real per-instance stats (not type averages): scaledRate=2700 g/s,
+    // scaledIterationLength=300s (0.5 cycles). Symmetric 50/50 year split
+    // means live/dormant are equal here (40/40) — the volcano fixture below
+    // uses an asymmetric split to catch a live/dormant swap bug.
+    assert.equal(steamVent.outputRate, 2700);
+    assert.equal(steamVent.iterationCycles, 0.5);
+    assert.equal(steamVent.liveCycles, 40);
+    assert.equal(steamVent.dormantCycles, 40);
+
+    // BigVolcano: scaledRate=4800 g/s, scaledIterationLength=900s (1.5
+    // cycles), scaledYearLength=30000s (50 cycles) split 40/60 by
+    // scaledYearPercent=0.4 -> live=20, dormant=30 (asymmetric, so a
+    // live/dormant formula swap would be caught here).
+    const volcano = body.geysers.find((g) => g.type_id === -1592417549);
+    assert.ok(volcano);
+    assert.equal(volcano.outputRate, 4800);
+    assert.equal(volcano.iterationCycles, 1.5);
+    assert.equal(volcano.liveCycles, 20);
+    assert.equal(volcano.dormantCycles, 30);
+    // Map dims + pod position as a percent, so the FE can draw a per-geyser
+    // mini-map (pod dot + geyser dot) without re-deriving them from a row.
+    assert.equal(body.world_width, 200);
+    assert.equal(body.world_height, 100);
+    // Headquarters at (10,10) -> 5%/10%.
+    assert.deepEqual(body.pod, { xPct: 5, yPct: 10 });
     assert.ok(Array.isArray(body.top_resources));
 
     // Feature 6: lookup tables served from DB.

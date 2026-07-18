@@ -61,7 +61,7 @@ export const ELEMENT_NAMES = new Map([
   [1757792140,  "Fossil"],
   [-527922989,  "Fulgurite"],
   [867327137,   "Clay"],
-  [947100397,   "Carbon"],
+  [947100397,   "Coal"],           // Klei's internal element/tag name is "Carbon"; in-game display is "Coal"
   [1262005685,  "Oxylite"],
   [-1396791454, "Fertilizer"],
 
@@ -82,7 +82,6 @@ export const ELEMENT_NAMES = new Map([
   [-400237395,  "Oxidized Copper"],
 
   // Carbon & glass
-  [892111639,   "Coal"],
   [-902240476,  "Refined Carbon"],
   [-2079931820, "Diamond"],
   [623986332,   "Glass"],

@@ -391,15 +391,23 @@ function serveStatus(res, outputDir) {
 
     // Per-geyser detail for the dashboard's geyser cards (one card per
     // game-relevant category — Water/Steam, Polluted Water, Salt Water,
-    // Fuel, Metals, Other — not statusObject's grouped-by-exact-type
-    // `geyser_types` summary, which is discarded here).
+    // Natural Gas, Crude Oil, Hydrogen, Metals, Other — not statusObject's
+    // grouped-by-exact-type `geyser_types` summary, which is discarded
+    // here).
     //
     // Each row is enriched with: its map position as a percent; a
     // plain-English direction from the printing pod ("Headquarters"), if
-    // it's still standing; and its eruption duty cycle (active % and
-    // supercycle length in days) computed from the save's own per-instance
-    // scaled_year_* fields — there's no persisted "current phase" field, so
-    // this is the statistical pattern, not a live countdown.
+    // it's still standing; and real per-instance eruption stats resolved
+    // from the save's own scaled_* fields — NOT type-level averages, these
+    // are the exact parameters this specific geyser was seeded with.
+    // scaled_year_length_s is the *whole* active+dormant supercycle, so it's
+    // split by scaled_year_percent into liveCycles (the active portion) and
+    // dormantCycles (the rest) rather than exposed as one lump "cycle
+    // length" — scaled_year_length_s alone is not "how long it's dormant".
+    // scaled_iteration_length_s is a shorter, separate timescale: the
+    // eruption/cooldown burst that repeats *within* the active portion.
+    // There's no persisted "current phase" field, so none of this is a live
+    // countdown — it's each geyser's real designed behavior.
     // Pre-sorted by category so the FE can group cards by just watching for
     // a change in `category`.
     delete payload.geyser_types;
@@ -408,24 +416,39 @@ function serveStatus(res, outputDir) {
     payload.geysers = db.prepare(
       `SELECT g.type_id, g.position_x, g.position_y,
               g.rate_roll, g.year_percent_roll,
+              g.scaled_rate, g.scaled_iteration_length_s,
               g.scaled_year_length_s, g.scaled_year_percent,
-              gt.name AS type_name, gt.element AS resource
+              gt.name AS type_name, gt.element AS resource,
+              gt.output_temp_c
        FROM geysers g
        LEFT JOIN geyser_types gt ON gt.type_id = g.type_id`
     ).all().map((r) => {
       const { xPct, yPct } = percentPosition(r.position_x, r.position_y, worldWidth, worldHeight);
       const { label: category, order: categoryOrder } = categorizeGeyser(r.resource);
+      const hasYearData = r.scaled_year_length_s != null && r.scaled_year_percent != null;
       return {
         ...r,
         xPct, yPct,
         relative_location: relativeToPod(r.position_x, r.position_y, pod.x, pod.y, worldWidth, worldHeight),
         category,
+        outputRate: r.scaled_rate,
+        iterationCycles: r.scaled_iteration_length_s != null ? r.scaled_iteration_length_s / 600 : null,
+        liveCycles: hasYearData ? (r.scaled_year_length_s * r.scaled_year_percent) / 600 : null,
+        dormantCycles: hasYearData ? (r.scaled_year_length_s * (1 - r.scaled_year_percent)) / 600 : null,
         activePct: r.scaled_year_percent != null ? Math.round(r.scaled_year_percent * 100) : null,
         cycleDays: r.scaled_year_length_s != null ? r.scaled_year_length_s / 600 : null,
         _categoryOrder: categoryOrder,
       };
     }).sort((a, b) => a._categoryOrder - b._categoryOrder || a.type_name?.localeCompare(b.type_name ?? "") || 0)
       .map(({ _categoryOrder, ...r }) => r);
+
+    // Map dimensions (for the mini-map dot rects the FE draws per geyser —
+    // proportions must match the real map, not be square) and the pod's own
+    // position as a percent, so the FE doesn't need to re-derive it from a
+    // geyser row (there may be none, or the pod may not be near any of them).
+    payload.world_width = worldWidth;
+    payload.world_height = worldHeight;
+    payload.pod = percentPosition(pod.x, pod.y, worldWidth, worldHeight);
 
     // Food in storage sorted by morale DESC (best food first); includes name,
     // kcal, morale from the lookup so the FE can compute days without a

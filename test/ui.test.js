@@ -98,8 +98,9 @@ describe("renderGeysers", () => {
     withDb((db) => {
       const out = renderGeysers(db);
       // FAKE_SAVE: worldWidth=200, worldHeight=100, Headquarters (pod) at
-      // (10,10). Steam Vent at (50,60) -> 25%/60%, far above pod.
-      // BigVolcano at (70,80) -> 35%/80%, far above pod. Groups sort by
+      // (10,10). Steam Vent at (50,60) -> 25%/60%, far above + right of pod.
+      // BigVolcano at (70,80) -> 35%/80%, far above + right of pod (same
+      // phrase — both sit up-and-right of the pod). Groups sort by
       // resource: "Magma" before "Steam".
       const magmaIdx = out.indexOf("Magma");
       const steamGroupIdx = out.indexOf("\n  Steam");
@@ -110,7 +111,7 @@ describe("renderGeysers", () => {
       assert.ok(steamGroupIdx < steamVentIdx, "Steam Vent listed under the Steam group");
       assert.match(out, /25% \/ 60%/);
       assert.match(out, /35% \/ 80%/);
-      assert.match(out, /far above pod/);
+      assert.match(out, /Far above and right of pod/);
     });
   });
 

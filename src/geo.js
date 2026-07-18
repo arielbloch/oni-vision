@@ -22,9 +22,10 @@ export function percentPosition(x, y, width, height) {
 
 /**
  * Describe `(x, y)` relative to the pod at `(podX, podY)` in plain English,
- * e.g. "slightly right of pod", "far above pod", "at the pod". Picks
- * whichever axis (horizontal/vertical) is more dominant rather than
- * producing compound directions like "upper-right".
+ * combining both axes when both are non-trivial, e.g. "Above and slightly
+ * left of pod", "Slightly below and slightly right of pod". An axis is
+ * dropped when its normalized distance is under 5% (e.g. "Left of pod"),
+ * and both being under 5% collapses to "At the pod".
  *
  * ONI world coordinates: +x is east/right, +y is up/toward the surface.
  *
@@ -48,16 +49,21 @@ export function relativeToPod(x, y, podX, podY, width, height) {
   const ax = Math.abs(nx);
   const ay = Math.abs(ny);
 
-  if (ax < 0.05 && ay < 0.05) return "at the pod";
+  const tier = (mag) => (mag < 0.15 ? "slightly " : mag < 0.35 ? "" : "far ");
 
-  const dominant = ax >= ay ? "x" : "y";
-  const mag = dominant === "x" ? ax : ay;
-  const dir = dominant === "x"
-    ? (nx >= 0 ? "right" : "left")
-    : (ny >= 0 ? "above" : "below");
-  const tier = mag < 0.15 ? "slightly " : mag < 0.35 ? "" : "far ";
+  const vertical   = ay >= 0.05 ? `${tier(ay)}${ny >= 0 ? "above" : "below"}` : null;
+  const horizontal = ax >= 0.05 ? `${tier(ax)}${nx >= 0 ? "right" : "left"}` : null;
 
-  // "right of pod" / "left of pod" reads naturally; "above of pod" doesn't —
-  // vertical directions drop the "of".
-  return dominant === "x" ? `${tier}${dir} of pod` : `${tier}${dir} pod`;
+  let phrase;
+  if (!vertical && !horizontal) {
+    phrase = "at the pod";
+  } else if (vertical && horizontal) {
+    phrase = `${vertical} and ${horizontal} of pod`;
+  } else {
+    // A lone vertical direction reads naturally without "of" ("above pod");
+    // a lone horizontal direction needs it ("right of pod").
+    phrase = vertical ? `${vertical} pod` : `${horizontal} of pod`;
+  }
+
+  return phrase.charAt(0).toUpperCase() + phrase.slice(1);
 }

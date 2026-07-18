@@ -4,17 +4,19 @@ import assert from "node:assert/strict";
 import { categorizeGeyser } from "../src/geyser_categories.js";
 
 describe("categorizeGeyser", () => {
-  test("Water and Steam share the 'Water / Steam' category", () => {
-    assert.equal(categorizeGeyser("Water").label, "Water / Steam");
-    assert.equal(categorizeGeyser("Steam").label, "Water / Steam");
-    assert.equal(categorizeGeyser("Water").order, categorizeGeyser("Steam").order);
+  test("Water and Steam are separate categories, Water first", () => {
+    const water = categorizeGeyser("Water");
+    const steam = categorizeGeyser("Steam");
+    assert.equal(water.label, "Water");
+    assert.equal(steam.label, "Steam");
+    assert.ok(water.order < steam.order);
   });
 
-  test("Dirty Water is its own category, ordered after Water / Steam", () => {
-    const water = categorizeGeyser("Water");
+  test("Dirty Water is its own category, ordered after Water and Steam", () => {
+    const steam = categorizeGeyser("Steam");
     const dirty = categorizeGeyser("Dirty Water");
     assert.equal(dirty.label, "Polluted Water");
-    assert.ok(dirty.order > water.order);
+    assert.ok(dirty.order > steam.order);
   });
 
   test("Salt Water and Brine share the 'Salt Water' category", () => {
@@ -22,10 +24,17 @@ describe("categorizeGeyser", () => {
     assert.equal(categorizeGeyser("Brine").label, "Salt Water");
   });
 
-  test("Methane, Crude Oil, and Hydrogen are all 'Fuel'", () => {
-    assert.equal(categorizeGeyser("Methane").label, "Fuel");
-    assert.equal(categorizeGeyser("Crude Oil").label, "Fuel");
-    assert.equal(categorizeGeyser("Hydrogen").label, "Fuel");
+  test("each fuel type gets its own card under its common name", () => {
+    assert.equal(categorizeGeyser("Methane").label, "Natural Gas");
+    assert.equal(categorizeGeyser("Crude Oil").label, "Crude Oil");
+    assert.equal(categorizeGeyser("Hydrogen").label, "Hydrogen");
+    // All three are distinct categories, not lumped together.
+    const orders = new Set([
+      categorizeGeyser("Methane").order,
+      categorizeGeyser("Crude Oil").order,
+      categorizeGeyser("Hydrogen").order,
+    ]);
+    assert.equal(orders.size, 3);
   });
 
   test("every molten metal is 'Metals'", () => {
