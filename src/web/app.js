@@ -314,6 +314,25 @@ function geyserMiniMap(worldWidth, worldHeight, pod, xPct, yPct, color) {
 // line below it, and never wraps. Exact %-location and direction-from-pod
 // text were dropped once the mini-map made them redundant — the dots show
 // position directly.
+// Fixed per-category colors instead of RUNWAY_PALETTE[i % ...] rotation, so
+// a resource always reads as itself regardless of which categories a given
+// save happens to have. Picked to approximate each resource's real in-game
+// color; Crude Oil is lightened from the "true" near-black brown (#3F2E1E)
+// to #A0703D — the true value fails contrast against the card's near-black
+// background (1.5:1) since this color is used as foreground text/dots, not
+// a fill. Categories with no entry here (grouped under "Other") fall back
+// to the RUNWAY_PALETTE rotation.
+const GEYSER_CATEGORY_COLORS = {
+  "Water":          "#22d3ee",
+  "Steam":          "#818cf8",
+  "Salt Water":     "#67e8f9",
+  "Polluted Water": "#84994f",
+  "Natural Gas":    "#fb923c",
+  "Crude Oil":      "#A0703D",
+  "Hydrogen":       "#f472b6",
+  "Metals":         "#eab308",
+};
+
 function renderGeysers(rows, worldWidth, worldHeight, pod) {
   if (!rows || rows.length === 0) {
     setHTML("geysers-card", `<div class="empty">no geysers detected</div>`);
@@ -335,7 +354,7 @@ function renderGeysers(rows, worldWidth, worldHeight, pod) {
   const nameStyle = `font-size:${Math.round(BASE_FS * 1.2)}px;font-weight:700;color:#fff;white-space:nowrap`;
 
   const cards = groups.map(({ category, rows }, i) => {
-    const color = RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
+    const color = GEYSER_CATEGORY_COLORS[category] ?? RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
 
     const entries = rows.map((r) => {
       const baseName = r.type_name ?? geyserName(r.type_id);
