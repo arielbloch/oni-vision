@@ -469,7 +469,7 @@ export function schedules(db) {
   ).get();
   if (!row) return [];
 
-  let data = {};
+  let data;
   try { data = JSON.parse(row.template_data ?? "{}"); } catch { return []; }
 
   return (data.schedules ?? []).map((s) => {

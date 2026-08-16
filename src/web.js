@@ -121,8 +121,6 @@ async function tryListen(server, host, port) {
       });
     });
     if (bound) {
-      const addr = server.address();
-      const realPort = typeof addr === "object" && addr ? addr.port : p;
       server.on("error", (err) => console.error(`oni-vision: server error — ${err.message}`));
       return server;
     }

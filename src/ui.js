@@ -12,7 +12,7 @@
 // tables written by the pipeline — no in-process JS maps needed.
 
 import { THRESHOLDS } from "./thresholds.js";
-import { ANSI, paint, bar, pad, fit, lpad, formatKcal, formatAge, stressColor } from "./format.js";
+import { ANSI, paint, bar, pad, fit, lpad, formatAge, stressColor } from "./format.js";
 import { oxygenStats } from "./oxygen.js";
 import { reportStats } from "./report.js";
 import { GENERATOR_SPECS } from "./generators.js";

@@ -62,9 +62,7 @@ async function copyAtomic(srcPath, finalPath) {
 export async function buildOutputs({ savePath, outputDir }) {
   await mkdir(outputDir, { recursive: true });
 
-  const t0 = Date.now();
   const save = await parseSaveFile(savePath);
-  const tParsed = Date.now();
 
   const tables = extractAll(save);
   // Stamp parsing metadata so Claude can detect stale data via SQL.
@@ -81,7 +79,6 @@ export async function buildOutputs({ savePath, outputDir }) {
   tables.chore_groups = CHORE_GROUP_NAMES;
   tables.diseases     = DISEASE_NAMES;
   assertLookupTablesPopulated(tables);
-  const tExtracted = Date.now();
 
   // Write SQLite to a temp file, then rename. Pipeline atomicity matters:
   // readers (Claude, sqlite3 CLI) can fire at any moment, and we never want
@@ -125,8 +122,6 @@ export async function buildOutputs({ savePath, outputDir }) {
     console.warn(`[pipeline]   could not copy original save: ${err.message}`);
   }
 
-  const tDone = Date.now();
-
   // Print a human-readable status block after each successful parse.
   let renderDb = null;
   try {
@@ -135,7 +130,7 @@ export async function buildOutputs({ savePath, outputDir }) {
     const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
     const width = process.stdout.columns ?? 80;
     console.log("\n" + render(renderDb, { color: useColor, width }) + "\n");
-  } catch (err) {
+  } catch {
     // Render errors are non-fatal; the parse itself succeeded.
   } finally {
     if (renderDb) {

@@ -17,8 +17,11 @@
 
 let ELEMENT_NAMES = {};  // element_id (string) → name
 let GEYSER_NAMES  = {};  // type_id (string)    → name
-let BAD_EFFECTS   = {};  // effect string        → { label, cls }
-let STRESS_DELTA  = {};  // dupe name → net stress %-pts last cycle (from ReportManager type 2)
+// STRESS_DELTA (dupe name → net stress %-pts last cycle, from ReportManager
+// type 2) is parked along with renderDupes/stressDeltaTri below and the
+// commented-out "Dupes" section in index.html — reactivate all three
+// together for the future per-dupe detail view.
+// let STRESS_DELTA = {};
 let GENERATOR_SPECS = {}; // populated from API — { [prefab_id]: { j_per_kg } }
 let GENERATOR_FUELS = []; // populated from API — [{ generator_prefab, element_id, fuel_prefab, stored_kg }]
 // Note: DISTANCE (tiles walked per dupe per cycle) is available in data.report.distance
@@ -127,19 +130,13 @@ function fmtW(wh) {
   return `${Math.round(w)} W`;
 }
 
-function bar(pct) {
-  const v = Math.max(0, Math.min(100, Number(pct) || 0));
-  const cls = v >= T.stress_bad ? "high" : v >= T.stress_warn ? "med" : "";
-  return `<div class="bar-track"><div class="bar-fill ${cls}" style="width: ${v}%"></div></div>`;
-}
-
 function fileBaseName(path) {
   if (!path) return "";
   return String(path).split(/[\\/]/).pop();
 }
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"'\/]/g, (c) => ({
+  return String(s).replace(/[&<>"'/]/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "/": "&#x2F;",
   }[c]));
 }
@@ -156,15 +153,16 @@ function renderCounts(c) {
   setText("counts", parts.map(([n, label]) => `${n ?? "—"} ${label}`).join("  ·  "));
 }
 
-/** Grey triangle indicating stress trend. Brightness: 0%→50%grey, +50→white, -50→black. */
-function stressDeltaTri(name) {
-  const delta = STRESS_DELTA[name];
-  if (delta == null) return '';
-  const b = Math.max(0, Math.min(1, 0.5 + delta / 100));
-  const v = Math.round(b * 255);
-  const dir = delta >= 0 ? '▲' : '▼';
-  return `<span class="stress-delta-tri" style="color:rgb(${v},${v},${v})">${dir}</span>`;
-}
+// Grey triangle indicating stress trend. Brightness: 0%→50%grey, +50→white,
+// -50→black. Parked with renderDupes below — see STRESS_DELTA comment.
+// function stressDeltaTri(name) {
+//   const delta = STRESS_DELTA[name];
+//   if (delta == null) return '';
+//   const b = Math.max(0, Math.min(1, 0.5 + delta / 100));
+//   const v = Math.round(b * 255);
+//   const dir = delta >= 0 ? '▲' : '▼';
+//   return `<span class="stress-delta-tri" style="color:rgb(${v},${v},${v})">${dir}</span>`;
+// }
 
 // ── Layout helper ────────────────────────────────────────────────────────────
 
@@ -265,22 +263,24 @@ function renderStatus(dupes, oxygen, report) {
   ));
 }
 
-function renderDupes(rows) {
-  if (!rows || rows.length === 0) {
-    setHTML("dupes-card", `<div class="empty">no duplicants in this save</div>`);
-    return;
-  }
-  const html = rows.map(r => {
-    const stress = Math.max(0, Math.min(100, r.stress ?? 0));
-    const col = stress >= T.stress_bad ? '#ff2222' : stress >= T.stress_warn ? '#facc15' : '#4ade80';
-    return `<tr>
-      <td style="font-size:12px">${escapeHtml(r.name)}</td>
-      <td style="font-size:11px;color:var(--fg-dim)">${escapeHtml(r.current_role ?? '')}</td>
-      <td class="metric" style="color:${col}">${stress.toFixed(0)}%</td>
-    </tr>`;
-  }).join('');
-  setHTML("dupes-card", `<table><tbody>${html}</tbody></table>`);
-}
+// Parked with STRESS_DELTA/stressDeltaTri and index.html's commented-out
+// "Dupes" section — reactivate together for the future per-dupe detail view.
+// function renderDupes(rows) {
+//   if (!rows || rows.length === 0) {
+//     setHTML("dupes-card", `<div class="empty">no duplicants in this save</div>`);
+//     return;
+//   }
+//   const html = rows.map(r => {
+//     const stress = Math.max(0, Math.min(100, r.stress ?? 0));
+//     const col = stress >= T.stress_bad ? '#ff2222' : stress >= T.stress_warn ? '#facc15' : '#4ade80';
+//     return `<tr>
+//       <td style="font-size:12px">${escapeHtml(r.name)}</td>
+//       <td style="font-size:11px;color:var(--fg-dim)">${escapeHtml(r.current_role ?? '')}</td>
+//       <td class="metric" style="color:${col}">${stress.toFixed(0)}%</td>
+//     </tr>`;
+//   }).join('');
+//   setHTML("dupes-card", `<table><tbody>${html}</tbody></table>`);
+// }
 
 // Small position-on-map indicator: a rect shaped like the real map
 // (bounded to 70px on its longest side, not square) with a white 3.5x3.5
@@ -409,7 +409,7 @@ function renderGeysers(rows, worldWidth, worldHeight, pod) {
 
 function renderPower(report, resources, generatorFuels, generatorSpecs) {
   if (!report?.power) { setHTML("power-card", `<div class="empty">no data</div>`); return; }
-  const { produced_wh, consumed_wh } = report.power;
+  const { consumed_wh } = report.power;
 
   // Look up total mass per element_id from the resources payload (storage + loose).
   const massByElement = {};
@@ -523,7 +523,7 @@ function runwaySegs(days, overrideColor) {
   return `<div style="display:flex;gap:${cfg.seggap}px;align-items:center">${parts.join('')}</div>`;
 }
 
-function renderFood(rows, dupeCount, foodReport) {
+function renderFood(rows, dupeCount) {
   const known = (rows ?? [])
     .filter(r => r.kcal != null)
     .sort((a, b) => b.morale - a.morale || (b.kcal * b.qty) - (a.kcal * a.qty));
@@ -635,13 +635,11 @@ async function refresh() {
     // Populate lookup tables and thresholds from the DB-backed API response.
     if (data.elements)     ELEMENT_NAMES = data.elements;
     if (data.geyser_types) GEYSER_NAMES  = data.geyser_types;
-    if (data.effects)      BAD_EFFECTS   = data.effects;
     if (data.thresholds)   T             = { ...T, ...data.thresholds };
     if (data.generator_specs)  GENERATOR_SPECS = data.generator_specs;
     if (data.generator_fuels)  GENERATOR_FUELS = data.generator_fuels;
-    if (data.report) {
-      STRESS_DELTA = data.report.stress_delta ?? {};
-    }
+    // Parked with STRESS_DELTA/stressDeltaTri/renderDupes — see declaration comment above.
+    // if (data.report) STRESS_DELTA = data.report.stress_delta ?? {};
 
     _lastData = data;
     renderAll(data);
@@ -653,7 +651,7 @@ async function refresh() {
 function renderAll(data) {
   renderCounts(data.counts || {});
   renderStatus(data.top_dupes || [], data.oxygen || null, data.report || null);
-  renderFood(data.food || [], data.counts?.duplicants ?? 0, data.report?.food ?? null);
+  renderFood(data.food || [], data.counts?.duplicants ?? 0);
   renderPower(data.report || null, data.all_resources || [], GENERATOR_FUELS, GENERATOR_SPECS);
   renderGeysers(data.geysers || [], data.world_width, data.world_height, data.pod);
 }
@@ -751,6 +749,16 @@ function onColorPick(hex) {
   saveSettings();
   if (_lastData) renderAll(_lastData);
 }
+
+// Public entry points invoked from inline onclick/oninput/onchange attributes
+// in generated HTML (settings button in index.html, sliders/swatches in
+// renderSettingsPanel) — real call sites eslint can't see since they're
+// embedded in template-literal strings, not ordinary JS references.
+window.toggleSettings = toggleSettings;
+window.onSetting = onSetting;
+window.onToggle = onToggle;
+window.onColorSwatch = onColorSwatch;
+window.onColorPick = onColorPick;
 
 // ── SSE — instant push when a new save lands ─────────────────────────────────
 

@@ -51,7 +51,7 @@ async function runOnce(reason) {
       includeAutoSaves: config.includeAutoSaves,
     });
     if (!latest) {
-      console.warn(`oni-vision: no .sav files found in ${config.saveDir}`);
+      console.warn(`oni-vision: no .sav files found in ${config.saveDir} (trigger: ${reason})`);
       return;
     }
     const result = await safeBuildOutputs({
