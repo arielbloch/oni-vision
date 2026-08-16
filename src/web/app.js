@@ -305,31 +305,35 @@ function geyserMiniMap(worldWidth, worldHeight, pod, xPct, yPct, color) {
   </div>`;
 }
 
-// One card per game-relevant category (Water, Steam, Polluted Water, Salt
-// Water, Natural Gas, Crude Oil, Hydrogen, Metals, Other — server sends
-// rows pre-sorted by `category`). Each category gets its own color from the
-// same palette as the food chips, applied to the card title, the output
-// line, and each geyser's mini-map dot. Geyser name (with its output temp
-// appended, e.g. "Steam Vent - 500°") is white, 20% larger than the output
-// line below it, and never wraps. Exact %-location and direction-from-pod
-// text were dropped once the mini-map made them redundant — the dots show
-// position directly.
+// One card per game-relevant category (Water, Steam, Hot Steam, Polluted
+// Water, Salt Water, Natural Gas, Crude Oil, Hydrogen, Chlorine, Metals,
+// Other — server sends rows pre-sorted by `category`). Each category gets
+// its own color from the same palette as the food chips, applied to the
+// card title, the output line, and each geyser's mini-map dot. Geyser name
+// (with its output temp appended, e.g. "Steam Vent - 500°") is white, 20%
+// larger than the output line below it, and never wraps. Exact %-location
+// and direction-from-pod text were dropped once the mini-map made them
+// redundant — the dots show position directly.
 // Fixed per-category colors instead of RUNWAY_PALETTE[i % ...] rotation, so
 // a resource always reads as itself regardless of which categories a given
 // save happens to have. Picked to approximate each resource's real in-game
 // color; Crude Oil is lightened from the "true" near-black brown (#3F2E1E)
 // to #A0703D — the true value fails contrast against the card's near-black
 // background (1.5:1) since this color is used as foreground text/dots, not
-// a fill. Categories with no entry here (grouped under "Other") fall back
-// to the RUNWAY_PALETTE rotation.
+// a fill. Hot Steam reuses Steam's hue shifted hot (red) rather than a new
+// family, since it's the same substance at a different, more dangerous
+// temperature. Categories with no entry here (grouped under "Other") fall
+// back to the RUNWAY_PALETTE rotation.
 const GEYSER_CATEGORY_COLORS = {
   "Water":          "#22d3ee",
   "Steam":          "#818cf8",
+  "Hot Steam":      "#f87171",
   "Salt Water":     "#67e8f9",
   "Polluted Water": "#84994f",
   "Natural Gas":    "#fb923c",
   "Crude Oil":      "#A0703D",
   "Hydrogen":       "#f472b6",
+  "Chlorine":       "#bef264",
   "Metals":         "#eab308",
 };
 
@@ -339,47 +343,66 @@ function renderGeysers(rows, worldWidth, worldHeight, pod) {
     return;
   }
 
-  const groups = [];
-  let current = null;
+  // Two-level grouping: rows arrive pre-sorted section-major, category-minor
+  // (server-side — see web.js). Water/Power/Metals/Other each render as
+  // their own labeled row, with one card per category inside that row —
+  // e.g. Water's row holds Water, Polluted Water, Salt Water, Steam, and
+  // Hot Steam as five separate cards, not merged into one.
+  const sections = [];
+  let currentSection = null;
+  let currentCategory = null;
   for (const r of rows) {
+    const section = r.section ?? "Other";
     const category = r.category ?? "Other";
-    if (!current || current.category !== category) {
-      current = { category, rows: [] };
-      groups.push(current);
+    if (!currentSection || currentSection.section !== section) {
+      currentSection = { section, groups: [] };
+      sections.push(currentSection);
+      currentCategory = null;
     }
-    current.rows.push(r);
+    if (!currentCategory || currentCategory.category !== category) {
+      currentCategory = { category, rows: [] };
+      currentSection.groups.push(currentCategory);
+    }
+    currentCategory.rows.push(r);
   }
 
   const BASE_FS = 13;
   const nameStyle = `font-size:${Math.round(BASE_FS * 1.2)}px;font-weight:700;color:#fff;white-space:nowrap`;
 
-  const cards = groups.map(({ category, rows }, i) => {
-    const color = GEYSER_CATEGORY_COLORS[category] ?? RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
+  const sectionBlocks = sections.map(({ section, groups }) => {
+    const cards = groups.map(({ category, rows }, i) => {
+      const color = GEYSER_CATEGORY_COLORS[category] ?? RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
 
-    const entries = rows.map((r) => {
-      const baseName = r.type_name ?? geyserName(r.type_id);
-      const temp = r.output_temp_c != null ? `${Math.round(r.output_temp_c)}°` : null;
-      // Real per-instance value (resolved from this geyser's own scaled_*
-      // fields), not a type-level average.
-      const cardLineStyle = `font-size:${BASE_FS}px;font-weight:700;color:${color}`;
-      const output = r.outputRate != null ? `${(r.outputRate / 1000).toFixed(1)} kg/s` : null;
-      const text = `<div>
-        <div style="${nameStyle}">${escapeHtml(baseName)}${temp ? ` - <span style="color:${color}">${escapeHtml(temp)}</span>` : ""}</div>
-        ${output ? `<div style="${cardLineStyle}">${escapeHtml(output)}</div>` : ""}
+      const entries = rows.map((r) => {
+        const baseName = r.type_name ?? geyserName(r.type_id);
+        const temp = r.output_temp_c != null ? `${Math.round(r.output_temp_c)}°` : null;
+        // Real per-instance value (resolved from this geyser's own scaled_*
+        // fields), not a type-level average.
+        const cardLineStyle = `font-size:${BASE_FS}px;font-weight:700;color:${color}`;
+        const output = r.outputRate != null ? `${(r.outputRate / 1000).toFixed(1)} kg/s` : null;
+        const text = `<div>
+          <div style="${nameStyle}">${escapeHtml(baseName)}${temp ? ` - <span style="color:${color}">${escapeHtml(temp)}</span>` : ""}</div>
+          ${output ? `<div style="${cardLineStyle}">${escapeHtml(output)}</div>` : ""}
+        </div>`;
+        const minimap = geyserMiniMap(worldWidth, worldHeight, pod, r.xPct, r.yPct, color);
+        return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">${text}${minimap}</div>`;
+      }).join("");
+
+      // Capped at 300px so a category card never grows wider than that,
+      // regardless of how much room the flex row has to give it.
+      return `<div style="display:flex;flex-direction:column;gap:8px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;max-width:300px;flex:1 1 300px;overflow:hidden">
+        <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(category)}</div>
+        <div style="display:flex;flex-direction:column;gap:8px">${entries}</div>
       </div>`;
-      const minimap = geyserMiniMap(worldWidth, worldHeight, pod, r.xPct, r.yPct, color);
-      return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">${text}${minimap}</div>`;
     }).join("");
 
-    // Capped at 300px so a category card never grows wider than that,
-    // regardless of how much room the flex row has to give it.
-    return `<div style="display:flex;flex-direction:column;gap:8px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;max-width:300px;flex:1 1 300px;overflow:hidden">
-      <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(category)}</div>
-      <div style="display:flex;flex-direction:column;gap:8px">${entries}</div>
+    return `<div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font-size:${Math.round(cfg.fs * 0.85)}px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-dim)">${escapeHtml(section)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:${cfg.chipgap}px;align-items:flex-start">${cards}</div>
     </div>`;
   }).join("");
 
-  setHTML("geysers-card", `<div style="display:flex;flex-wrap:wrap;gap:${cfg.chipgap}px;align-items:flex-start">${cards}</div>`);
+  setHTML("geysers-card", `<div style="display:flex;flex-direction:column;gap:${cfg.chipgap}px">${sectionBlocks}</div>`);
 }
 
 // ── Renderers ─────────────────────────────────────────────────────────────────

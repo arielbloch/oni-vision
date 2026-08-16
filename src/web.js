@@ -309,10 +309,11 @@ function serveStatus(res, outputDir) {
     enrichDupes(db, payload.top_dupes);
 
     // Per-geyser detail for the dashboard's geyser cards (one card per
-    // game-relevant category — Water/Steam, Polluted Water, Salt Water,
-    // Natural Gas, Crude Oil, Hydrogen, Metals, Other — not statusObject's
-    // grouped-by-exact-type `geyser_types` summary, which is discarded
-    // here).
+    // game-relevant category — Water, Polluted Water, Salt Water, Steam,
+    // Hot Steam, Natural Gas, Crude Oil, Hydrogen, Metals, Chlorine, Other —
+    // nested under four sections, Water/Power/Metals/Other — not
+    // statusObject's grouped-by-exact-type `geyser_types` summary, which is
+    // discarded here).
     //
     // Each row is enriched with: its map position as a percent; a
     // plain-English direction from the printing pod ("Headquarters"), if
@@ -327,8 +328,9 @@ function serveStatus(res, outputDir) {
     // eruption/cooldown burst that repeats *within* the active portion.
     // There's no persisted "current phase" field, so none of this is a live
     // countdown — it's each geyser's real designed behavior.
-    // Pre-sorted by category so the FE can group cards by just watching for
-    // a change in `category`.
+    // Pre-sorted by section then category so the FE can group cards into
+    // section rows, and cards within a row, by just watching for a change
+    // in `section`/`category`.
     delete payload.geyser_types;
     const { width: worldWidth, height: worldHeight } = readWorldDims(db);
     const pod = readPodPosition(db);
@@ -343,23 +345,25 @@ function serveStatus(res, outputDir) {
        LEFT JOIN geyser_types gt ON gt.type_id = g.type_id`
     ).all().map((r) => {
       const { xPct, yPct } = percentPosition(r.position_x, r.position_y, worldWidth, worldHeight);
-      const { label: category, order: categoryOrder } = categorizeGeyser(r.resource);
+      const { label: category, order: categoryOrder, section, sectionOrder } = categorizeGeyser(r.resource, r.type_name);
       const hasYearData = r.scaled_year_length_s != null && r.scaled_year_percent != null;
       return {
         ...r,
         xPct, yPct,
         relative_location: relativeToPod(r.position_x, r.position_y, pod.x, pod.y, worldWidth, worldHeight),
         category,
+        section,
         outputRate: r.scaled_rate,
         iterationCycles: r.scaled_iteration_length_s != null ? r.scaled_iteration_length_s / 600 : null,
         liveCycles: hasYearData ? (r.scaled_year_length_s * r.scaled_year_percent) / 600 : null,
         dormantCycles: hasYearData ? (r.scaled_year_length_s * (1 - r.scaled_year_percent)) / 600 : null,
         activePct: r.scaled_year_percent != null ? Math.round(r.scaled_year_percent * 100) : null,
         cycleDays: r.scaled_year_length_s != null ? r.scaled_year_length_s / 600 : null,
+        _sectionOrder: sectionOrder,
         _categoryOrder: categoryOrder,
       };
-    }).sort((a, b) => a._categoryOrder - b._categoryOrder || a.type_name?.localeCompare(b.type_name ?? "") || 0)
-      .map(({ _categoryOrder, ...r }) => r);
+    }).sort((a, b) => a._sectionOrder - b._sectionOrder || a._categoryOrder - b._categoryOrder || a.type_name?.localeCompare(b.type_name ?? "") || 0)
+      .map(({ _sectionOrder, _categoryOrder, ...r }) => r);
 
     // Map dimensions (for the mini-map dot rects the FE draws per geyser —
     // proportions must match the real map, not be square) and the pod's own

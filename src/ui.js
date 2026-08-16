@@ -153,6 +153,12 @@ function readPodPosition(db) {
  * Geysers, grouped by resource (all Steam together, all Water together, …),
  * one row per instance under each group: geyser name | map location as
  * %x / %y | plain-English direction relative to the printing pod.
+ *
+ * Hot Steam Vent (500°C) is pulled out of the "Steam" group into its own
+ * "Hot Steam" group despite sharing the Steam element with Steam Vent/Cool
+ * Steam Vent (110°C) — same substance, a completely different design
+ * problem (heat-tolerant piping vs. a simple boiler loop), so lumping them
+ * under one header would hide that.
  */
 export function renderGeysers(db, { color = false } = {}) {
   const rows = db.prepare(`
@@ -161,7 +167,7 @@ export function renderGeysers(db, { color = false } = {}) {
            COALESCE(gtn.name, 'hash:' || g.type_id) AS type_name
     FROM geysers g
     LEFT JOIN geyser_types gtn ON gtn.type_id = g.type_id
-    ORDER BY resource, type_name, g.position_x
+    ORDER BY resource, (type_name = 'Hot Steam Vent'), type_name, g.position_x
   `).all();
 
   if (rows.length === 0) return paint("Geysers: none", ANSI.dim, color);
@@ -172,9 +178,10 @@ export function renderGeysers(db, { color = false } = {}) {
   const lines = [paint("Geysers", ANSI.bold + ANSI.green, color)];
   let lastResource = null;
   for (const r of rows) {
-    if (r.resource !== lastResource) {
-      lines.push(paint(`  ${r.resource}`, ANSI.bold, color));
-      lastResource = r.resource;
+    const groupLabel = r.type_name === "Hot Steam Vent" ? "Hot Steam" : r.resource;
+    if (groupLabel !== lastResource) {
+      lines.push(paint(`  ${groupLabel}`, ANSI.bold, color));
+      lastResource = groupLabel;
     }
     const nameCol = fit(r.type_name, 22);
     const { xPct, yPct } = percentPosition(r.position_x, r.position_y, width, height);
