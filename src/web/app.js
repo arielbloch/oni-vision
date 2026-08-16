@@ -369,6 +369,11 @@ function renderGeysers(rows, worldWidth, worldHeight, pod) {
   const BASE_FS = 13;
   const nameStyle = `font-size:${Math.round(BASE_FS * 1.2)}px;font-weight:700;color:#fff;white-space:nowrap`;
 
+  // Fixed, not a range — every category card is exactly this size
+  // regardless of title length or how many cards share its section, so a
+  // 1-card section (Metals) doesn't shrink-to-content next to a 3-card one.
+  const CARD_WIDTH = 300;
+
   const sectionBlocks = sections.map(({ section, groups }) => {
     const cards = groups.map(({ category, rows }, i) => {
       const color = GEYSER_CATEGORY_COLORS[category] ?? RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
@@ -388,21 +393,39 @@ function renderGeysers(rows, worldWidth, worldHeight, pod) {
         return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">${text}${minimap}</div>`;
       }).join("");
 
-      // Capped at 300px so a category card never grows wider than that,
-      // regardless of how much room the flex row has to give it.
-      return `<div style="display:flex;flex-direction:column;gap:8px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;max-width:300px;flex:1 1 300px;overflow:hidden">
+      return `<div style="display:flex;flex-direction:column;gap:8px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;width:${CARD_WIDTH}px;flex:0 0 ${CARD_WIDTH}px;overflow:hidden">
         <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(category)}</div>
         <div style="display:flex;flex-direction:column;gap:8px">${entries}</div>
       </div>`;
     }).join("");
 
-    return `<div style="display:flex;flex-direction:column;gap:6px">
+    // Water never wraps internally — it's always a single row (scrolls
+    // horizontally if the card is too narrow to fit all 5), so every other
+    // section reflows starting on the line(s) below it instead of packing
+    // in beside a ragged, 2-line-tall Water block.
+    const isWater = section === "Water";
+    const cardsRowStyle = isWater
+      ? `display:flex;flex-wrap:nowrap;gap:${cfg.chipgap}px;align-items:flex-start;overflow-x:auto`
+      : `display:flex;flex-wrap:wrap;gap:${cfg.chipgap}px;align-items:flex-start`;
+
+    // flex:0 0 auto — hugs its own content width rather than stretching, so
+    // a short section (e.g. 2-card Power) doesn't claim a full line and can
+    // sit alongside Metals/Other on the same row when there's room. Water
+    // additionally forces flex-basis:100% so it always starts its own line
+    // and every other section reflows below it, never beside it.
+    return `<div style="display:flex;flex-direction:column;gap:6px;flex:${isWater ? "0 0 100%" : "0 0 auto"}">
       <div style="font-size:${Math.round(cfg.fs * 0.85)}px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-dim)">${escapeHtml(section)}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:${cfg.chipgap}px;align-items:flex-start">${cards}</div>
+      <div style="${cardsRowStyle}">${cards}</div>
     </div>`;
   }).join("");
 
-  setHTML("geysers-card", `<div style="display:flex;flex-direction:column;gap:${cfg.chipgap}px">${sectionBlocks}</div>`);
+  // Row-wrap, not column-stack: sections flow left-to-right and wrap onto a
+  // new line only when they run out of horizontal room, so e.g. Power (2
+  // cards), Metals (1), and Other can share a line instead of each forcing
+  // its own row. Same gap as the intra-section card gap (not a larger
+  // "group gap") — with every card a fixed width, a different gap here
+  // would throw off horizontal alignment between cards in different rows.
+  setHTML("geysers-card", `<div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:${cfg.chipgap}px">${sectionBlocks}</div>`);
 }
 
 // ── Renderers ─────────────────────────────────────────────────────────────────
