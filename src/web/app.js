@@ -282,15 +282,48 @@ function renderStatus(dupes, oxygen, report) {
 //   setHTML("dupes-card", `<table><tbody>${html}</tbody></table>`);
 // }
 
-// Fixed per-category colors (not a RUNWAY_PALETTE[i % ...] rotation) so a
-// resource always reads as itself regardless of which categories a given
-// save happens to have — used for both the map dots and the tile labels.
-// Picked to approximate each resource's real in-game color; Crude Oil is
-// lightened from the "true" near-black brown (#3F2E1E) to #A0703D — the
-// true value fails contrast against the near-black background (1.5:1)
-// since this color is used as foreground text/dots, not a fill. Hot Steam
-// reuses Steam's hue shifted hot (red) rather than a new family, since
-// it's the same substance at a different, more dangerous temperature.
+// Small position-on-map indicator: a rect shaped like the real map
+// (bounded to 70px on its longest side, not square) with a white 3.5x3.5
+// dot for the pod and a colored 3.5x3.5 dot for this geyser. Y is flipped
+// (ONI's +y is up/toward the surface; CSS `top` grows downward) so "up" in
+// the rect reads as "up" in the game.
+const MINIMAP_MAX_PX = 70;
+const MINIMAP_DOT_PX = 3.5;
+function geyserMiniMap(worldWidth, worldHeight, pod, xPct, yPct, color) {
+  if (!worldWidth || !worldHeight || pod?.xPct == null || xPct == null) return "";
+  const ratio = worldWidth / worldHeight;
+  const w = ratio >= 1 ? MINIMAP_MAX_PX : MINIMAP_MAX_PX * ratio;
+  const h = ratio >= 1 ? MINIMAP_MAX_PX / ratio : MINIMAP_MAX_PX;
+  const dot = (dx, dy, dotColor) => `<div style="position:absolute;width:${MINIMAP_DOT_PX}px;height:${MINIMAP_DOT_PX}px;background:${dotColor};left:${dx}%;top:${100 - dy}%;transform:translate(-50%,-50%);border-radius:1px"></div>`;
+  // Background matches the page's outer background (var(--bg)), not the
+  // card it sits in, so it reads as a recessed cut-out rather than blending
+  // into the card. Also makes it theme-aware (light/dark) instead of a
+  // hardcoded dark hex.
+  return `<div style="position:relative;width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;background:var(--bg);border:1px solid #2a2a44;border-radius:3px;flex-shrink:0">
+    ${dot(pod.xPct, pod.yPct, "#fff")}
+    ${dot(xPct, yPct, color)}
+  </div>`;
+}
+
+// One card per game-relevant category (Water, Steam, Hot Steam, Polluted
+// Water, Salt Water, Natural Gas, Crude Oil, Hydrogen, Chlorine, Metals,
+// Other — server sends rows pre-sorted by `category`). Each category gets
+// its own color from the same palette as the food chips, applied to the
+// card title, the output line, and each geyser's mini-map dot. Geyser name
+// (with its output temp appended, e.g. "Steam Vent - 500°") is white, 20%
+// larger than the output line below it, and never wraps. Exact %-location
+// and direction-from-pod text were dropped once the mini-map made them
+// redundant — the dots show position directly.
+// Fixed per-category colors instead of RUNWAY_PALETTE[i % ...] rotation, so
+// a resource always reads as itself regardless of which categories a given
+// save happens to have. Picked to approximate each resource's real in-game
+// color; Crude Oil is lightened from the "true" near-black brown (#3F2E1E)
+// to #A0703D — the true value fails contrast against the card's near-black
+// background (1.5:1) since this color is used as foreground text/dots, not
+// a fill. Hot Steam reuses Steam's hue shifted hot (red) rather than a new
+// family, since it's the same substance at a different, more dangerous
+// temperature. Categories with no entry here (grouped under "Other") fall
+// back to the RUNWAY_PALETTE rotation.
 const GEYSER_CATEGORY_COLORS = {
   "Water":          "#22d3ee",
   "Steam":          "#818cf8",
@@ -303,141 +336,96 @@ const GEYSER_CATEGORY_COLORS = {
   "Chlorine":       "#bef264",
   "Metals":         "#eab308",
 };
-const GEYSER_OTHER_COLOR = "#a8a8c0";
-function geyserColor(category) { return GEYSER_CATEGORY_COLORS[category] ?? GEYSER_OTHER_COLOR; }
-
-// One big map of the whole world with every geyser plotted as a colored dot
-// at its real position (plus the pod as a white dot), instead of a tiny
-// thumbnail repeated inside each card. Individual geyser tiles (name, temp,
-// output — no per-tile minimap anymore, the shared map replaces it) sit
-// outside the map on whichever side matches the geyser's real x-position,
-// each connected to its dot by a thin leader line. This means one tile per
-// geyser *instance* now, not one card per category — a category with two
-// instances (e.g. two Steam Vents) gets two tiles, because each instance
-// has its own point on the map and needs its own line.
-const MAP_MAX_PX = 480;
-const MAP_DOT_PX = 7;
-const TILE_WIDTH = 250;
 
 function renderGeysers(rows, worldWidth, worldHeight, pod) {
   if (!rows || rows.length === 0) {
     setHTML("geysers-card", `<div class="empty">no geysers detected</div>`);
     return;
   }
-  if (!worldWidth || !worldHeight || pod?.xPct == null) {
-    // No map to plot against (pod deconstructed, or dims missing) — fall
-    // back to a plain colored list rather than an empty/broken map.
-    const list = rows.map((r) => {
-      const baseName = r.type_name ?? geyserName(r.type_id);
-      const temp = r.output_temp_c != null ? ` - ${Math.round(r.output_temp_c)}°` : "";
-      return `<div style="padding:4px 0;color:${geyserColor(r.category)}">${escapeHtml(baseName)}${escapeHtml(temp)}</div>`;
-    }).join("");
-    setHTML("geysers-card", list);
-    return;
+
+  // Two-level grouping: rows arrive pre-sorted section-major, category-minor
+  // (server-side — see web.js). Water/Power/Metals/Other each render as
+  // their own labeled row, with one card per category inside that row —
+  // e.g. Water's row holds Water, Polluted Water, Salt Water, Steam, and
+  // Hot Steam as five separate cards, not merged into one.
+  const sections = [];
+  let currentSection = null;
+  let currentCategory = null;
+  for (const r of rows) {
+    const section = r.section ?? "Other";
+    const category = r.category ?? "Other";
+    if (!currentSection || currentSection.section !== section) {
+      currentSection = { section, groups: [] };
+      sections.push(currentSection);
+      currentCategory = null;
+    }
+    if (!currentCategory || currentCategory.category !== category) {
+      currentCategory = { category, rows: [] };
+      currentSection.groups.push(currentCategory);
+    }
+    currentCategory.rows.push(r);
   }
-
-  // Stable per-geyser index ties each tile to its map dot for the
-  // leader-line measurement pass below (drawGeyserLeaderLines).
-  const indexed = rows.map((r, idx) => ({ ...r, _idx: idx }));
-
-  const left = [];
-  const right = [];
-  for (const r of indexed) (r.xPct < 50 ? left : right).push(r);
-  // Top-to-bottom on-screen order (higher yPct = further "up" in-game — see
-  // the `100 - yPct` flip in mapDot below) so each side's tile stack reads
-  // top-to-bottom the same way its dots do, keeping leader lines short and
-  // uncrossed rather than random.
-  const byScreenY = (a, b) => (b.yPct ?? 0) - (a.yPct ?? 0);
-  left.sort(byScreenY);
-  right.sort(byScreenY);
 
   const BASE_FS = 13;
   const nameStyle = `font-size:${Math.round(BASE_FS * 1.2)}px;font-weight:700;color:#fff;white-space:nowrap`;
 
-  const tile = (r) => {
-    const color = geyserColor(r.category);
-    const baseName = r.type_name ?? geyserName(r.type_id);
-    const temp = r.output_temp_c != null ? `${Math.round(r.output_temp_c)}°` : null;
-    const output = r.outputRate != null ? `${(r.outputRate / 1000).toFixed(1)} kg/s` : null;
-    // flex:0 0 auto, not flex:0 0 TILE_WIDTHpx — the parent (left/right
-    // tile column) is flex-direction:column, so flex-basis sets the main
-    // axis (height), not width. A tile's height must stay content-driven;
-    // its width comes from the `width` property (cross axis) instead.
-    return `<div id="geyser-tile-${r._idx}" style="display:flex;flex-direction:column;gap:3px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;width:${TILE_WIDTH}px;flex:0 0 auto;overflow:hidden">
-      <div style="font-size:${Math.round(cfg.fs * 0.8)}px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:${color}">${escapeHtml(r.category ?? "Other")}</div>
-      <div style="${nameStyle}">${escapeHtml(baseName)}${temp ? ` - <span style="color:${color}">${escapeHtml(temp)}</span>` : ""}</div>
-      ${output ? `<div style="font-size:${BASE_FS}px;font-weight:700;color:${color}">${escapeHtml(output)}</div>` : ""}
+  // Fixed, not a range — every category card is exactly this size
+  // regardless of title length or how many cards share its section, so a
+  // 1-card section (Metals) doesn't shrink-to-content next to a 3-card one.
+  const CARD_WIDTH = 300;
+
+  const sectionBlocks = sections.map(({ section, groups }) => {
+    const cards = groups.map(({ category, rows }, i) => {
+      const color = GEYSER_CATEGORY_COLORS[category] ?? RUNWAY_PALETTE[i % RUNWAY_PALETTE.length];
+
+      const entries = rows.map((r) => {
+        const baseName = r.type_name ?? geyserName(r.type_id);
+        const temp = r.output_temp_c != null ? `${Math.round(r.output_temp_c)}°` : null;
+        // Real per-instance value (resolved from this geyser's own scaled_*
+        // fields), not a type-level average.
+        const cardLineStyle = `font-size:${BASE_FS}px;font-weight:700;color:${color}`;
+        const output = r.outputRate != null ? `${(r.outputRate / 1000).toFixed(1)} kg/s` : null;
+        const text = `<div>
+          <div style="${nameStyle}">${escapeHtml(baseName)}${temp ? ` - <span style="color:${color}">${escapeHtml(temp)}</span>` : ""}</div>
+          ${output ? `<div style="${cardLineStyle}">${escapeHtml(output)}</div>` : ""}
+        </div>`;
+        const minimap = geyserMiniMap(worldWidth, worldHeight, pod, r.xPct, r.yPct, color);
+        return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">${text}${minimap}</div>`;
+      }).join("");
+
+      return `<div style="display:flex;flex-direction:column;gap:8px;background:#0a0a14;border:1px solid #2a2a44;border-radius:5px;padding:${cfg.pad}px ${cfg.pad + 3}px;width:${CARD_WIDTH}px;flex:0 0 ${CARD_WIDTH}px;overflow:hidden">
+        <div style="font-size:${cfg.fs}px;color:${color};white-space:nowrap">${escapeHtml(category)}</div>
+        <div style="display:flex;flex-direction:column;gap:8px">${entries}</div>
+      </div>`;
+    }).join("");
+
+    // Water never wraps internally — it's always a single row (scrolls
+    // horizontally if the card is too narrow to fit all 5), so every other
+    // section reflows starting on the line(s) below it instead of packing
+    // in beside a ragged, 2-line-tall Water block.
+    const isWater = section === "Water";
+    const cardsRowStyle = isWater
+      ? `display:flex;flex-wrap:nowrap;gap:${cfg.chipgap}px;align-items:flex-start;overflow-x:auto`
+      : `display:flex;flex-wrap:wrap;gap:${cfg.chipgap}px;align-items:flex-start`;
+
+    // flex:0 0 auto — hugs its own content width rather than stretching, so
+    // a short section (e.g. 2-card Power) doesn't claim a full line and can
+    // sit alongside Metals/Other on the same row when there's room. Water
+    // additionally forces flex-basis:100% so it always starts its own line
+    // and every other section reflows below it, never beside it.
+    return `<div style="display:flex;flex-direction:column;gap:6px;flex:${isWater ? "0 0 100%" : "0 0 auto"}">
+      <div style="font-size:${Math.round(cfg.fs * 0.85)}px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-dim)">${escapeHtml(section)}</div>
+      <div style="${cardsRowStyle}">${cards}</div>
     </div>`;
-  };
-
-  const ratio = worldWidth / worldHeight;
-  const mapW = ratio >= 1 ? MAP_MAX_PX : MAP_MAX_PX * ratio;
-  const mapH = ratio >= 1 ? MAP_MAX_PX / ratio : MAP_MAX_PX;
-  // Y is flipped (ONI's +y is up/toward the surface; CSS `top` grows
-  // downward) so "up" on the map reads as "up" in the game.
-  const mapDot = (xPct, yPct, color, id) =>
-    `<div id="${id}" style="position:absolute;width:${MAP_DOT_PX}px;height:${MAP_DOT_PX}px;background:${color};left:${xPct}%;top:${100 - yPct}%;transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(0,0,0,0.5)"></div>`;
-  const dots = indexed
-    .filter((r) => r.xPct != null && r.yPct != null)
-    .map((r) => mapDot(r.xPct, r.yPct, geyserColor(r.category), `geyser-dot-${r._idx}`))
-    .join("");
-  const podDot = `<div style="position:absolute;width:${MAP_DOT_PX}px;height:${MAP_DOT_PX}px;background:#fff;left:${pod.xPct}%;top:${100 - pod.yPct}%;transform:translate(-50%,-50%);border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,0.35)"></div>`;
-  // Background matches the page's outer background (var(--bg)), not the
-  // card it sits in, so it reads as a recessed cut-out rather than blending
-  // into the card. Also makes it theme-aware (light/dark) instead of a
-  // hardcoded dark hex.
-  const mapHtml = `<div id="geyser-map" style="position:relative;width:${mapW.toFixed(1)}px;height:${mapH.toFixed(1)}px;background:var(--bg);border:1px solid #2a2a44;border-radius:6px;flex-shrink:0">${podDot}${dots}</div>`;
-
-  const leftHtml = `<div style="display:flex;flex-direction:column;gap:${cfg.chipgap}px;flex-shrink:0">${left.map(tile).join("")}</div>`;
-  const rightHtml = `<div style="display:flex;flex-direction:column;gap:${cfg.chipgap}px;flex-shrink:0">${right.map(tile).join("")}</div>`;
-
-  // overflow-x:auto so a narrow window scrolls instead of clipping tiles —
-  // the composite (tiles + map + tiles) is wider than a typical card.
-  setHTML("geysers-card", `<div id="geyser-map-wrap" style="position:relative;display:flex;align-items:flex-start;justify-content:center;gap:28px;overflow-x:auto;padding:2px">
-    ${leftHtml}
-    ${mapHtml}
-    ${rightHtml}
-    <svg id="geyser-lines" style="position:absolute;top:0;left:0;pointer-events:none"></svg>
-  </div>`);
-
-  drawGeyserLeaderLines(indexed);
-}
-
-// Runs right after renderGeysers' setHTML — at that point the map dots and
-// side tiles are real DOM elements, so their actual measured positions (not
-// nominal ones) drive the thin connector lines. This is what keeps lines
-// accurate regardless of how tall a tile's content makes it, without having
-// to predict tile heights ourselves.
-function drawGeyserLeaderLines(indexed) {
-  const wrap = $("geyser-map-wrap");
-  const svg = $("geyser-lines");
-  if (!wrap || !svg) return;
-  const wrapRect = wrap.getBoundingClientRect();
-
-  const lines = indexed.map((r) => {
-    if (r.xPct == null || r.yPct == null) return "";
-    const dotEl = document.getElementById(`geyser-dot-${r._idx}`);
-    const tileEl = document.getElementById(`geyser-tile-${r._idx}`);
-    if (!dotEl || !tileEl) return "";
-    const dotRect = dotEl.getBoundingClientRect();
-    const tileRect = tileEl.getBoundingClientRect();
-    const dotX = dotRect.left + dotRect.width / 2 - wrapRect.left;
-    const dotY = dotRect.top + dotRect.height / 2 - wrapRect.top;
-    // Anchor at the tile's map-facing edge (right edge for left-side tiles,
-    // left edge for right-side ones), not its center, so the line starts at
-    // the tile's border instead of cutting across its text.
-    const onLeft = r.xPct < 50;
-    const tileX = (onLeft ? tileRect.right : tileRect.left) - wrapRect.left;
-    const tileY = tileRect.top + tileRect.height / 2 - wrapRect.top;
-    return `<line x1="${tileX.toFixed(1)}" y1="${tileY.toFixed(1)}" x2="${dotX.toFixed(1)}" y2="${dotY.toFixed(1)}" stroke="${geyserColor(r.category)}" stroke-width="1" opacity="0.45"/>`;
   }).join("");
 
-  // Explicit pixel size (not width:100%/height:100%) so the SVG covers the
-  // full scrollable content area, not just the visible viewport, when the
-  // wrap is narrower than its content and scrolling horizontally.
-  svg.setAttribute("width", wrap.scrollWidth);
-  svg.setAttribute("height", wrap.scrollHeight);
-  svg.innerHTML = lines;
+  // Row-wrap, not column-stack: sections flow left-to-right and wrap onto a
+  // new line only when they run out of horizontal room, so e.g. Power (2
+  // cards), Metals (1), and Other can share a line instead of each forcing
+  // its own row. Same gap as the intra-section card gap (not a larger
+  // "group gap") — with every card a fixed width, a different gap here
+  // would throw off horizontal alignment between cards in different rows.
+  setHTML("geysers-card", `<div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:${cfg.chipgap}px">${sectionBlocks}</div>`);
 }
 
 // ── Renderers ─────────────────────────────────────────────────────────────────
